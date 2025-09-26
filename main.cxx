@@ -7,17 +7,30 @@
 #include "trnod.h"
 #include "util.h"
 
+/*////////////////////////////////////
+
+* whether Char translate to char or to wchar_t
+* whether string translate to string or wstring
+* how to translate AnsiChar and WideChar
+
+* если в ф-ции Result:= <smth> - транслируется неверно
+* const в определении параметров ф-ции транслируется неправильно
+
+*////////////////////////////////////
+
 extern int zzparse();
 
 static void load_predefined() 
 { 
-    b_ring::add_cur(nm_entry::add("integer", TKN_IDENT), 
+	// all simple built-in types need to be aded to b_ring here
+
+    b_ring::add_cur(nm_entry::add("integer", TKN_IDENT), nm_entry::add("int", TKN_IDENT),
 				  symbol::s_type, 
 				  &integer_type);
-    b_ring::add_cur(nm_entry::add("real", TKN_IDENT), 
+    b_ring::add_cur(nm_entry::add("real", TKN_IDENT), nm_entry::add("double", TKN_IDENT),
 				  symbol::s_type, 
 				  &real_type);
-    b_ring::add_cur(nm_entry::add("boolean", TKN_IDENT), 
+    b_ring::add_cur(nm_entry::add("boolean", TKN_IDENT), nm_entry::add("bool", TKN_IDENT),
 				  symbol::s_type, 
 				  &bool_type);
     b_ring::add_cur(nm_entry::add("char", TKN_IDENT),
@@ -26,8 +39,7 @@ static void load_predefined()
     b_ring::add_cur(nm_entry::add("text", TKN_IDENT), 
 				  symbol::s_type, 
 				  &text_type);
-    b_ring::add_cur(nm_entry::add("zero_terminated_string", TKN_IDENT), 
-		    nm_entry::add("char*", TKN_IDENT), 
+    b_ring::add_cur(nm_entry::add("zero_terminated_string", TKN_IDENT), nm_entry::add("char *", TKN_IDENT), 
 				  symbol::s_type, 
 				  &string_type);
     b_ring::add_cur(nm_entry::add("true", TKN_IDENT), 
@@ -39,27 +51,83 @@ static void load_predefined()
     b_ring::add_cur(nm_entry::add("nil", TKN_IDENT), 
 				  symbol::s_const, 
 				  &void_type);
+
     if (hp_pascal) { 
         nm_entry::add("addr", TKN_ADDR);
     }
-    if (turbo_pascal) { 
-	b_ring::add_cur(nm_entry::add("pointer", TKN_IDENT), 
-			symbol::s_type, 
+
+	if (turbo_pascal)  // two out_nm entries cannot be equal, b_ring::add_cur will generate unique name from in_nm parameter
+	{
+		b_ring::add_cur(nm_entry::add("cardinal", TKN_IDENT), nm_entry::add("unsigned int", TKN_IDENT),
+			symbol::s_type,
+			&cardinal_type);
+		b_ring::add_cur(nm_entry::add("pointer", TKN_IDENT), nm_entry::add("void*", TKN_IDENT),
+			symbol::s_type,
 			&pointer_type);
-	b_ring::add_cur(nm_entry::add("pchar", TKN_IDENT), 
-			symbol::s_type, 
+		b_ring::add_cur(nm_entry::add("pchar", TKN_IDENT), nm_entry::add("char*", TKN_IDENT),
+			symbol::s_type,
 			&string_type);
-	b_ring::add_cur(nm_entry::add("longint", TKN_IDENT), 
-			symbol::s_type, 
+		b_ring::add_cur(nm_entry::add("shortint", TKN_IDENT), nm_entry::add("signed char", TKN_IDENT),
+			symbol::s_type,
+			&char_type);
+		b_ring::add_cur(nm_entry::add("byte", TKN_IDENT), nm_entry::add("unsigned char", TKN_IDENT),
+			symbol::s_type,
+			&char_type);
+		b_ring::add_cur(nm_entry::add("smallint", TKN_IDENT), nm_entry::add("signed short", TKN_IDENT),
+			symbol::s_type,
+			&smallint_type);
+		b_ring::add_cur(nm_entry::add("word", TKN_IDENT), nm_entry::add("unsigned short", TKN_IDENT),
+			symbol::s_type,
+			&smallint_type);
+		b_ring::add_cur(nm_entry::add("longint", TKN_IDENT), nm_entry::add("signed int", TKN_IDENT),
+			symbol::s_type,
 			&longint_type);
-	b_ring::add_cur(nm_entry::add("double", TKN_IDENT), 
-			symbol::s_type, 
+		b_ring::add_cur(nm_entry::add("longword", TKN_IDENT), nm_entry::add("unsigned int", TKN_IDENT),
+			symbol::s_type,
+			&cardinal_type);
+		b_ring::add_cur(nm_entry::add("uint32", TKN_IDENT), nm_entry::add("uint32_t", TKN_IDENT),
+			symbol::s_type,
+			&cardinal_type);
+		b_ring::add_cur(nm_entry::add("int32", TKN_IDENT), nm_entry::add("int32_t", TKN_IDENT),
+			symbol::s_type,
+			&integer_type);
+		b_ring::add_cur(nm_entry::add("uint64", TKN_IDENT), nm_entry::add("uint64_t", TKN_IDENT),
+			symbol::s_type,
+			&uint64_type);
+		b_ring::add_cur(nm_entry::add("int64", TKN_IDENT), nm_entry::add("int64_t", TKN_IDENT),
+			symbol::s_type,
+			&int64_type);
+		b_ring::add_cur(nm_entry::add("NativeInt", TKN_IDENT), nm_entry::add("int", TKN_IDENT),
+			symbol::s_type,
+			&integer_type);
+		b_ring::add_cur(nm_entry::add("NativeUInt", TKN_IDENT), nm_entry::add("unsigned int", TKN_IDENT),
+			symbol::s_type,
+			&cardinal_type);
+		b_ring::add_cur(nm_entry::add("FixedInt", TKN_IDENT), nm_entry::add("int", TKN_IDENT),
+			symbol::s_type,
+			&integer_type);
+		b_ring::add_cur(nm_entry::add("FixedUInt", TKN_IDENT), nm_entry::add("unsigned int", TKN_IDENT),
+			symbol::s_type,
+			&cardinal_type);
+
+		b_ring::add_cur(nm_entry::add("double", TKN_IDENT),
+			symbol::s_type,
 			&double_type);
-	b_ring::add_cur(nm_entry::add("untyped_file", TKN_IDENT), 
-			symbol::s_type, 
+		b_ring::add_cur(nm_entry::add("single", TKN_IDENT), nm_entry::add("float", TKN_IDENT),
+			symbol::s_type,
+			&real_type);
+		b_ring::add_cur(nm_entry::add("extended", TKN_IDENT), nm_entry::add("long double", TKN_IDENT),
+			symbol::s_type,
+			&double_type);
+		b_ring::add_cur(nm_entry::add("currency", TKN_IDENT), nm_entry::add("double", TKN_IDENT),
+			symbol::s_type,
+			&double_type);
+		b_ring::add_cur(nm_entry::add("untyped_file", TKN_IDENT),
+			symbol::s_type,
 			&text_type);
-	nested_comments = TRUE;
-    }
+
+		nested_comments = TRUE;
+	}
 }
 
 static void load_keywords() 
@@ -274,7 +342,7 @@ static void scan_opt (int argc, char **argv) {
 	}
 	if (!found) { 
  	  Help:
-	    fprintf (stderr, "Pascal to C/C++ converter. Version "VERSION"\n"
+	    fprintf (stderr, "Pascal to C/C++ converter. Version " VERSION "\n"
 			     "Available options are:\n");
 
 	    for (j = 0; j < (sizeof(opt)/sizeof(opt_str)); j++ ) {
@@ -311,6 +379,8 @@ static void scan_opt (int argc, char **argv) {
 #endif
     i_path = dprintf("%s%c%s", i_path, path_sep, prog_path);
 }
+
+extern int zzdebug;
 
 int main(int argc, char* argv[]) 
 { 
@@ -360,8 +430,19 @@ int main(int argc, char* argv[])
 
     compile_system_library = FALSE;
     token::reset();
-    token::input(input_file); 
-    zzparse(); 
+	
+	zzdebug = 1;
+
+	token::input(input_file);
+
+	try
+	{
+		zzparse();
+	}
+	catch (...)
+	{
+		dprintf("UNKNOWN ERROR!");
+	}
 
     token::output(output_file);
 
