@@ -28,7 +28,7 @@ enum category {
     CAT_STR,
     CAT_NUM,
     CAT_KWD,
-    CAT_WSPC,
+    CAT_WSPC, // white space?
     CAT_PUT,
     CAT_SPEC,  
     CAT_GEN
@@ -90,7 +90,6 @@ class token : public heap_object {
     token*      bind;           // token position of which is taken 	    
     token*      clone;          // cloned token 
     
-
     token* insert_b(token* t) { // insert token before (returns this)
         next = t; prev = t->prev;   
         return t->prev = t->prev->next = this;
@@ -145,6 +144,8 @@ class token : public heap_object {
         cat = CAT_GEN;	
         out_text = (char*)str;
     }    
+
+    virtual void print_debug() { fprintf(stderr, "%s, cat=%d, tag=%d", in_text, cat, tag); }
 
     static void input(char *file);
     static void output(char *file);
