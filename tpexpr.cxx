@@ -7,16 +7,21 @@
 
 tpexpr void_type(tp_void, NULL, "void");
 tpexpr any_type(tp_any, NULL, "void*");
-tpexpr integer_type(tp_integer, NULL, "integer");
-tpexpr longint_type(tp_longint, NULL, "longint");
-tpexpr real_type(tp_real, NULL, "real");
-tpexpr double_type(tp_real, NULL, "double");
+tpexpr integer_type(tp_integer, NULL, "int_2");
+tpexpr longint_type(tp_longint, NULL, "int32_t");
+tpexpr real_type(tp_real, NULL, "single"); // this is actually 4 bytes delphi single type
+tpexpr double_type(tp_double, NULL, "double"); // this is 8 bytes double type
 tpexpr char_type(tp_char, NULL, "char");
-tpexpr bool_type(tp_bool, NULL, "boolean");
+tpexpr bool_type(tp_bool, NULL, "bool2");
 ref_tp pointer_type(&void_type); 
 string_tp string_type;
 varying_string_tp varying_string_type;
 text_tp text_type;
+
+tpexpr smallint_type(tp_longint, NULL, "short");
+tpexpr cardinal_type(tp_integer, NULL, "uint32_t1"); //TODO whether we need tp_uint32 tag or not? 
+tpexpr uint64_type(tp_integer, NULL, "uint64_t"); //TODO whether we need tp_uint64 tag or not? 
+tpexpr int64_type(tp_integer, NULL, "int64_t"); //TODO whether we need tp_int64 tag or not? 
 
 
 //---------------------------------------------------------------------
