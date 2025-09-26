@@ -748,6 +748,84 @@ void compound_node::translate(int)
 
 bool compound_node::is_compound() { return TRUE; }
 
+
+raise_node::raise_node(token* t_raise, expr_node* expr)
+{
+	CONS2(t_raise, expr);
+}
+void raise_node::attrib(int ctx)
+{
+
+}
+void raise_node::translate(int ctx)
+{
+
+}
+void raise_node::print_debug()
+{ 
+	fprintf(stderr, "raise:"); expr->print_debug(); 
+};
+
+
+try_finally_node::try_finally_node(token* t_try, stmt_node* body1, token* t_finally, stmt_node* body2, token* t_end)
+{
+	CONS5(t_try, body1, body2, t_finally, t_end);
+}
+
+void try_finally_node::attrib(int ctx)
+{
+
+}
+
+void try_finally_node::translate(int ctx)
+{
+
+}
+
+try_except_node::try_except_node(token* t_try, stmt_node* body1, token* t_except, stmt_node* ex_many, token* t_else, stmt_node* body2, token* t_end)
+{
+	CONS7(t_try, body1, t_except, ex_many, t_else, body2, t_end);
+}
+
+void try_except_node::attrib(int ctx)
+{
+
+}
+
+void try_except_node::translate(int ctx)
+{
+
+}
+
+on_except_node::on_except_node(token* t_on, token* t_ident, token* t_coln, tpd_node* ex_type, token* t_do, stmt_node* body)
+{
+	CONS6(t_on, t_ident, t_coln, ex_type, t_do, body);
+}
+
+void on_except_node::attrib(int ctx)
+{
+
+}
+
+void on_except_node::translate(int ctx)
+{
+
+}
+
+inherited_node::inherited_node(token* t_inherited, token* t_ident, token* t_lpar, expr_node* params, token* t_rpar)
+{
+	CONS5(t_inherited, t_ident, t_lpar, params, t_rpar);
+}
+void inherited_node::attrib(int ctx)
+{
+
+}
+void inherited_node::translate(int ctx)
+{
+
+}
+
+
 assign_node* assign_node::stmt;
 
 assign_node::assign_node(expr_node* lval, token* assign, expr_node* rval)
@@ -845,6 +923,13 @@ void assign_node::translate(int)
     }
     force_semicolon();
 }
+
+void assign_node::print_debug() 
+{ 
+	fprintf(stderr, "assign_node. lval:");  lval->print_debug();
+	fprintf(stderr, ", rval:");  rval->print_debug();
+};
+
 
 
 goto_node::goto_node(token* t_goto, token* t_label)
@@ -1973,7 +2058,7 @@ void access_expr_node::attrib(int)
 	    warning(field, "component not found");
 	}
     } else {
-	warning(field, "unknown record type");
+	warning(field, "unknown record type '%s'", rec->type->name);
 	recfld = NULL;
     }
     if (recfld == NULL) {
@@ -3220,7 +3305,7 @@ static char* make_fmt_string(char* src) {
     }
     *--dst = '\0'; // skip '"'
     assert(dst < buf + sizeof(buf));
-    return strdup(buf);
+    return _strdup(buf);
 }
 
 void write_param_node::translate(int ctx)
@@ -3711,9 +3796,9 @@ void unit_spec_node::translate(int ctx)
 }
 
 
-var_decl_node::var_decl_node(token_list* vars, token* coln, tpd_node* tpd)
+var_decl_node::var_decl_node(token_list* vars, token* coln, tpd_node* tpd, token* eq, expr_node* def_value)
 {
-    CONS3(vars, coln, tpd);
+    CONS5(vars, coln, tpd, eq, def_value);
     scope = NULL;
 }
 
@@ -3721,10 +3806,13 @@ void var_decl_node::attrib(int ctx)
 {
     tpexpr* tp;
     if (tpd != NULL) {
-	tpd->attrib(ctx);
+		tpd->attrib(ctx);
 	tp = tpd->type;
 	if (tp == NULL) {
-	    warning(coln, "type is unknown");
+		if(tpd && tpd->f_tkn)
+			warning(coln, "type is unknown '%s'", tpd->f_tkn->in_text);
+		else
+			warning(coln, "type is unknown");
 	    tpd->type = tp = &any_type;
 	}
     } else {
@@ -3750,6 +3838,7 @@ void var_decl_node::attrib(int ctx)
 	}
 
 	tkn->var = b_ring::add_cur(tkn->ident, prm_class, tp);
+
 	if (ctx == ctx_varpar) {
 	    tkn->var->flags |= symbol::f_var_param;
 	}
@@ -3780,7 +3869,7 @@ void  var_decl_node::translate(int ctx)
     l_tkn = coln ? coln : f_tkn;
 
     if (coln != NULL) {
-	token::disable(coln->prev_relevant()->next, tpd->f_tkn->prev);
+	token::disable(coln->prev_relevant()->next, tpd->f_tkn->prev); // disables two tokens ":" and "PascalType" in variable decl
     }
     if (ctx == ctx_valpar || ctx == ctx_varpar) {
 	if (language_c && tp->tag == tp_dynarray) {
@@ -3931,11 +4020,14 @@ void  var_decl_node::translate(int ctx)
 
 var_decl_part_node::var_decl_part_node(token* t_var, var_decl_node* vars)
 {
+	assert(t_var);
     CONS2(t_var, vars);
 }
 
 void var_decl_part_node::attrib(int ctx)
 {
+	is_const = (strcmp(t_var->in_text, "const") == 0);
+
     for (decl_node* var = vars; var != NULL; var = var->next) {
         var->attrib(ctx == ctx_valpar ? (int)ctx_varpar : ctx);
     }
@@ -3944,15 +4036,24 @@ void var_decl_part_node::attrib(int ctx)
 void var_decl_part_node::translate(int ctx)
 {
     f_tkn = l_tkn = t_var;
-    for (decl_node* var = vars; var != NULL; var = var->next) {
-        var->translate(ctx == ctx_valpar ? (int)ctx_varpar : ctx);
-	l_tkn = var->l_tkn;
+    for (decl_node* var = vars; var != NULL; var = var->next) 
+	{
+		if(is_const)
+			var->translate(ctx); // for 'const' declarations
+		else
+			var->translate(ctx == ctx_valpar ? (int)ctx_varpar : ctx); // this is 'var' declarations
+		l_tkn = var->l_tkn;
     }
-    if (t_var) {
-	t_var->disappear();
-    } else {
-	f_tkn = vars->f_tkn;
-    }
+
+    if (t_var && !is_const) 
+	{
+		t_var->disappear();
+    } 
+//	else 
+//	{
+//		f_tkn = vars->f_tkn;
+ //   }
+
     //    token::disable(t_var, t_var->next_relevant()->prev);
     if (ctx == ctx_module || ctx == ctx_program) {
         (new token((char*)0, TKN_BEG_SHIFT, f_tkn->line,
@@ -4022,6 +4123,43 @@ void var_origin_decl_node::translate(int ctx)
     }
 }
 
+void proc_decl_part_node::attrib(int ctx)
+{
+	for (decl_node* proc = procs; proc != NULL; proc = proc->next) 
+	{
+		proc->attrib(ctx);
+	}
+}
+
+void proc_decl_part_node::translate(int ctx)
+{
+	//f_tkn = l_tkn = t_var;
+	for (decl_node* proc = procs; proc != NULL; proc = proc->next) 
+	{
+		proc->translate(ctx);
+		l_tkn = proc->l_tkn;
+	}
+	f_tkn = procs->f_tkn;
+
+	/*
+	//    token::disable(t_var, t_var->next_relevant()->prev);
+	if (ctx == ctx_module || ctx == ctx_program) {
+		(new token((char*)0, TKN_BEG_SHIFT, f_tkn->line,
+			f_tkn->next_relevant()->pos))->insert_b(f_tkn);
+		(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
+		if (unit_node::interface_part) {
+			f_tkn = f_tkn->prepend(dprintf("\n#ifdef __%s_implementation__\n"
+				"#undef EXTERN\n"
+				"#define EXTERN\n"
+				"#endif\n\n",
+				unit_node::unit_name));
+			l_tkn = l_tkn->append("\n#undef EXTERN\n"
+				"#define EXTERN extern\n");
+		}
+	}*/
+}
+
+
 
 param_list_node::param_list_node(token* lpar, decl_node* params, token* rpar)
 {
@@ -4080,14 +4218,16 @@ void proc_decl_node::attrib(int ctx)
 void proc_decl_node::insert_return_type() {
     if (ret_type) {
         ret_type->translate(ctx_block);
-	assert(ret_type->type->name != NULL);
-	if (language_c && ret_type->type->tag == tp_array) {
-	    t_proc->set_trans(dprintf("%s*", ret_type->type->name));
-	    var->flags |= symbol::f_var_param;
-	} else {
-	    t_proc->set_trans(ret_type->type->name);
-	}
-	token::disable(t_coln->prev_relevant()->next, ret_type->l_tkn);
+		assert(ret_type->type->name != NULL);
+		if (language_c && ret_type->type->tag == tp_array) {
+			t_proc->set_trans(dprintf("%s*", ret_type->type->name));
+			var->flags |= symbol::f_var_param;
+		} else {
+			assert(ret_type->f_tkn->out_text);
+			t_proc->set_trans(ret_type->f_tkn->out_text); //TODO out_text is NULL for some reason, need to investigate
+			//t_proc->set_trans(ret_type->type->name);
+		}
+		token::disable(t_coln->prev_relevant()->next, ret_type->l_tkn);
     } else {
 	if (type->is_constructor || type->is_destructor) {
 	    if (var != NULL) {
@@ -4226,17 +4366,55 @@ void proc_fwd_decl_node::attrib(int ctx)
     is_external = FALSE;
     is_static = FALSE;
     is_virtual = FALSE;
-    for (token_list* t = qualifiers; t != NULL; t = t->next) {
-	if (t->ident->tag == TKN_EXTERNAL) {
-	    is_external = TRUE;
-	} else if (t->ident->tag == TKN_STATIC) {
-	    is_static = TRUE;
-	} else if (t->ident->tag == TKN_VIRTUAL) {
-	    is_virtual = TRUE;
-	} else if (t->ident->tag == TKN_C) {
-	    type->is_extern_c = TRUE;
+	for (token_list* t = qualifiers; t != NULL; t = t->next)
+	{
+		if (t->ident->tag == TKN_EXTERNAL) {
+			is_external = TRUE;
+		}
+		else if (t->ident->tag == TKN_STATIC) {
+			is_static = TRUE;
+		}
+		else if (t->ident->tag == TKN_VIRTUAL) { 
+			is_virtual = TRUE;
+			if (ctx != ctx_object) warning(t->ident, "method %s: virtual directive cannot be used here, only class methods can be marked virtual", t_ident->in_text);
+		}
+		else if (t->ident->tag == TKN_DYNAMIC) { // dynamic functions are marked virtual in C++
+			is_virtual = TRUE;
+			if (ctx != ctx_object) warning(t->ident, "method %s: dynamic directive cannot be used here, only class methods can be marked dynamic", t_ident->in_text);
+		}
+		else if (t->ident->tag == TKN_OVERRIDE) {
+			is_override = TRUE;
+			if (ctx != ctx_object) warning(t->ident, "method %s: override directive cannot be used here, only class methods can be marked override", t_ident->in_text);
+		}
+		else if (t->ident->tag == TKN_OVERLOAD) {
+			is_overload = TRUE;
+		}
+		else if (t->ident->tag == TKN_STDCALL) {
+			is_stdcall = TRUE;
+		}
+		else if (t->ident->tag == TKN_PASCAL) {
+			is_pascal = TRUE;
+		}
+		else if (t->ident->tag == TKN_CDECL) {
+			is_cdecl = TRUE;
+		}
+		else if (t->ident->tag == TKN_REGISTER) {
+			is_register = TRUE;
+		}
+		else if (t->ident->tag == TKN_FINAL) {
+			is_final = TRUE;
+		}
+		else if (t->ident->tag == TKN_ABSTRACT) {
+			is_abstract = TRUE; 
+		}
+		else if (t->ident->tag == TKN_C) {
+			type->is_extern_c = TRUE;
+		}
 	}
-    }
+
+	if (is_abstract && !is_virtual)
+		warning(t_ident, "abstract method '%s' must be virtual or dynamic", t_ident->in_text);
+
 
     if ((var = b_ring::search_cur(t_ident)) == NULL || var->type == NULL
 	|| var->type->tag != tp_proc || var->ring != b_ring::curr_b_ring
@@ -4264,20 +4442,48 @@ void proc_fwd_decl_node::translate(int)
     l_tkn = t_semi1;
 
     insert_return_type();
-    if (qualifiers) {
-	if (is_external) {
-	    f_tkn = f_tkn->prepend(type->is_extern_c && !language_c
-				   ? "extern \"C\" " : "extern ");
-	} else if (is_static) {
-	    f_tkn = f_tkn->prepend("static ");
-	} else if (is_virtual) {
-	    f_tkn = f_tkn->prepend("virtual ");
+
+	if (qualifiers)
+	{
+		if (is_external) {
+			f_tkn = f_tkn->prepend(type->is_extern_c && !language_c ? "extern \"C\" " : "extern ");
+		}
+		if (is_static)
+			f_tkn = f_tkn->prepend("static ");
+
+		if (is_virtual)
+			f_tkn = f_tkn->prepend("virtual ");
+		
+		if (is_override)
+			l_tkn = l_tkn->prepend(" override"); 
+		
+		if (is_stdcall)
+			f_tkn = f_tkn->append(" __stdcall");
+		
+		if (is_pascal)
+			f_tkn = f_tkn->append(" __pascal");
+		
+		if (is_cdecl)
+			f_tkn = f_tkn->append(" __cdecl");
+		
+		if (is_register)
+			f_tkn = f_tkn->append(" __fastcall");
+
+		if (is_final)
+			l_tkn = l_tkn->prepend(" final");
+
+		if (is_abstract)
+			l_tkn = l_tkn->prepend(" = 0");
+
 	}
-    }
+
     var->translate(t_ident);
     insert_params();
-    if (qualifiers) {
-	token::remove(qualifiers->ident, t_semi2);
+    if (qualifiers) 
+	{
+		auto qual = qualifiers;
+		while (qual->next) qual = qual->next; // look for the first qualifier because "qualifiers" refers to the last one
+		token::remove(qual->ident, t_semi2);
     }
 }
 
@@ -4471,12 +4677,12 @@ void simple_tpd_node::attrib(int ctx)
     if (sym == NULL) {
         if (ctx == ctx_reftyp) {
             type = new fwd_ref_tp(tkn);
-	} else {
- 	    warning(tkn, "unknown type");
-	    type = &void_type;
+		} else {
+ 			warning(tkn, "unknown type '%s'", tkn->in_text);
+			type = &void_type;
         }
     } else {
-	type = sym->type;
+		type = sym->type;
     }
 }
 
@@ -4485,10 +4691,10 @@ void simple_tpd_node::translate(int ctx)
 {
     l_tkn = f_tkn = tkn;
     if (sym != NULL) {
-	sym->translate(tkn);
+		sym->translate(tkn); // does actually the following: tkn->set_trans(out_name->text);
     } else {
-	if (ctx == ctx_reftyp) {
-	    f_tkn = tkn->prepend("struct ");
+		if (ctx == ctx_reftyp) {
+			f_tkn = tkn->prepend("struct ");
         }
     }
 }
@@ -5202,10 +5408,10 @@ void field_list_node::translate(int)
 
 object_tpd_node::object_tpd_node(token* t_object,
 				 token* t_lbr, token* t_superclass, token* t_rbr,
-				 decl_node* fields, token* t_end)
+				 decl_node* parts, token* t_end)
 : tpd_node(tpd_object)
 {
-    CONS6(t_object, t_lbr, t_superclass, t_rbr, fields, t_end);
+    CONS6(t_object, t_lbr, t_superclass, t_rbr, parts, t_end);
 }
 
 void object_tpd_node::attrib(int)
@@ -5222,7 +5428,7 @@ void object_tpd_node::attrib(int)
 	type = new object_tp(this);
     }
     b_ring::push((object_tp*)type);
-    for (decl_node* dcl = fields; dcl != NULL; dcl = dcl->next) {
+    for (decl_node* dcl = parts; dcl != NULL; dcl = dcl->next) {
 	dcl->attrib(ctx_object);
     }
     b_ring::pop((object_tp*)type);
@@ -5238,12 +5444,14 @@ void object_tpd_node::translate(int)
 	}
 	t_lbr->set_trans(" : public ");
 	t_rbr->set_trans(" {\n");
-	t_rbr->append("public:")->set_bind(t_object);
+	//t_rbr->append("public:")->set_bind(t_object);
+	t_rbr->set_bind(t_object);
     } else {
-	t_object->append(" {\n")->append("public:")->set_bind(t_object);
+	//t_object->append(" {\n")->append("public:")->set_bind(t_object);
+	t_object->append(" {\n")->set_bind(t_object);
     }
 
-    for (decl_node* dcl = fields; dcl != NULL; dcl = dcl->next) {
+    for (decl_node* dcl = parts; dcl != NULL; dcl = dcl->next) {
 	dcl->translate(ctx_object);
     }
     t_object->set_trans("class ");
@@ -5251,12 +5459,34 @@ void object_tpd_node::translate(int)
     t_end->set_bind(t_object);
 }
 
+object_part_node::object_part_node(token* t_access_lvl,	decl_node* components)
+{
+	CONS2(t_access_lvl, components);
+}
 
-record_tpd_node::record_tpd_node(token* t_packed, token* t_record,
-				 field_list_node* fields, token* t_end)
+void object_part_node::attrib(int)
+{
+	for (decl_node* dcl = components; dcl != NULL; dcl = dcl->next) {
+		dcl->attrib(ctx_object);
+	}
+}
+
+void object_part_node::translate(int)
+{
+	//TODO add special processing for Published access level
+	t_access_lvl->set_trans(t_access_lvl->in_text);
+	t_access_lvl->append(":\n");
+
+	for (decl_node* dcl = components; dcl != NULL; dcl = dcl->next) {
+		dcl->translate(ctx_object);
+	}
+}
+
+
+record_tpd_node::record_tpd_node(token* t_packed, token* t_record, field_list_node* fields, decl_node* methods, token* t_end)
 : tpd_node(tpd_record)
 {
-    CONS4(t_packed, t_record, fields, t_end);
+    CONS5(t_packed, t_record, fields, methods, t_end);
 }
 
 void record_tpd_node::attrib(int ctx)
@@ -5268,7 +5498,8 @@ void record_tpd_node::attrib(int ctx)
     char* save_path = struct_path;
     struct_path = "";
     b_ring::push((record_tp*)type);
-    fields->attrib(ctx);
+    if(fields) fields->attrib(ctx);
+	if(methods) methods->attrib(ctx);
     ((record_tp*)type)->calc_flags();
     b_ring::pop((record_tp*)type);
     struct_path = save_path;
@@ -5277,7 +5508,7 @@ void record_tpd_node::attrib(int ctx)
 
 void record_tpd_node::translate(int ctx)
 {
-    fields->translate(ctx);
+	if (fields) fields->translate(ctx);
     f_tkn = t_record;
     l_tkn = t_end;
     if (smart_union && fields->fix_part == NULL && fields->var_part != NULL
@@ -5299,6 +5530,8 @@ void record_tpd_node::translate(int ctx)
     if (t_packed) {
       	t_packed->disable();
     }
+
+	if(methods) methods->translate(ctx);
 }
 
 
@@ -5324,6 +5557,7 @@ void record_tpd_node::assign_name()
 	}
     }
 }
+
 
 file_tpd_node::file_tpd_node(token* t_packed, token* t_file, token* t_of, tpd_node* recordtp)
 : tpd_node(tpd_file)
