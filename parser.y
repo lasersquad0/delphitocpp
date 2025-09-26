@@ -17,12 +17,16 @@ static int zzcnv_table[] = {
 
 #define YYINITDEPTH 100000
 
-void zzerror(char* text) 
+void zzerror(const char* text) 
 {
     error(curr_token, "syntax error: %s", text); 
 }
 
 %}
+
+%define parse.error verbose               // Enables detailed error messages (required for counterexamples)
+//%define parse.counterexample timeout 15   // Set time limit to 15 seconds
+//%define parse.lr.minimize timeout 30
 
 
 %union {
@@ -64,49 +68,77 @@ void zzerror(char* text)
 
 
 
-%token <tok> ARRAY
+%token <tok> ABSTRACT
+             ARRAY
              BEGIN
              CASE
+             CDECL
+             CLASS  
              CONST
              DO
              DOTS
+             DYNAMIC
              ELSE
-             END             
+             END
+             EXCEPT
+             EXTERNAL
              FIL
+             FINAL
+             FINALLY
              FAR
              FOR
+             FORWARD
              FUNCTION
              GOTO
              IDENT
              ICONST
              IF
              IMPLEMENTATION
+             INHERITED
              INTERFACE
              LABEL
              LOOPHOLE
              OBJECT
              OF
+             ON
              ORIGIN
              OTHERWISE
+             OVERLOAD
+             OVERRIDE
              PACKED
+             PASCAL
              PROCEDURE
              PROGRAM
+             PRIVATE
+             PROTECTED
+             PUBLIC
+             PUBLISHED
+             RAISE
              RCONST
              READ
              RECORD
+             REGISTER
+             REINTRODUCE
              REPEAT
              RETURN
+             SAFECALL
              SET
              SCONST
+             STATIC
+             STDCALL
              STRING
              THEN
              TO
+             TRY
              TYPE
              UNTIL
              UNIT
              UNIT_END
              VAR
+             VARARGS            
+             VIRTUAL
              WHILE
+             WINAPI
              WITH
              WRITE
              '.'
@@ -121,19 +153,25 @@ void zzerror(char* text)
              '@'
              SCOPE
 
-%right <tok> LET LETADD LETSUB LETDIV LETMUL LETAND LETOR LETSHL LETSHR
-%left <tok>  EQ NE LT LE GT GE IN 
-%left <tok>  PLUS MINUS OR XOR BINOR
-%left <tok>  MOD DIV DIVR MUL AND SHR SHL BINAND
-%right <tok> UPLUS UMINUS NOT ADDRESS BINNOT
 
+%right <tok>  LET LETADD LETSUB LETDIV LETMUL LETAND LETOR LETSHL LETSHR
+%left  <tok>  EQ NE LT LE GT GE IN 
+%left  <tok>  PLUS MINUS OR XOR BINOR
+%left  <tok>  MOD DIV DIVR MUL AND SHR SHL BINAND
+%right <tok>  UPLUS UMINUS NOT ADDRESS BINNOT
 
 %type <toks>    ident_list
 %type <toks>    label_list
-%type <toks>    qualifiers
+%type <toks>    qualifiers   
+%type <tok>     fun_qualifier
+                meth_qualifier
+                qualifier
 %type <tok>     packed
 %type <tok>     progend
 %type <tok>     otherwise
+//%type <tok>     class_or_object
+%type <tok>     access_specifier
+//%type <tok>     private
 
 %type <n_imp>   prog_param_list
 
@@ -147,6 +185,11 @@ void zzerror(char* text)
 %type <n_block> block
 %type <n_stmt>  statement
 %type <n_stmt>  sequence
+%type <n_stmt>  inherited
+%type <n_stmt>  try_finally
+%type <n_stmt>  try_except
+%type <n_stmt>  except
+%type <n_stmt>  except_many
 %type <n_grp>   actual_params
 
 %type <n_comp>  compoundst
@@ -185,21 +228,29 @@ void zzerror(char* text)
 %type <n_decl>  decl_part_list
 %type <n_decl>  label_decl_part
 %type <n_decl>  const_def_part
-%type <n_decl>  object_components
 %type <n_decl>  object_fields 
 %type <n_decl>  object_methods
+//%type <n_decl>  object_part
+%type <n_decl>  object_body
+//%type <n_decl>  strict_object_body
+%type <n_decl>  object_components
+%type <n_decl>  object_component
+
+%type <n_fldls> record_fields
 %type <n_cdef>  const_def_list
 %type <n_cdef>  const_def
 %type <n_decl>  type_def_part
 %type <n_tdef>  type_def_list
 %type <n_tdef>  type_def
 %type <n_decl>  var_decl_part
+%type <n_decl>  field_decl_part
 %type <n_vdcl>  var_decl_list
 %type <n_vdcl>  field_decl_list
 %type <n_vdcl>  var_decl
 %type <n_vdcl>  param_decl
 %type <n_decl>  proc_decl
 %type <n_decl>  proc_fwd_decl
+%type <n_decl>  proc_fwd_decl_list
 %type <n_decl>  proc_spec
 %type <n_decl>  proc_def
 
@@ -222,7 +273,8 @@ void zzerror(char* text)
 %type <n_tpd>   pointer_type
 %type <n_tpd>   set_type
 %type <n_tpd>   record_type
-%type <n_tpd>   object_type
+%type <n_tpd>   class_type
+//%type <n_tpd>   fwd_object_type
 %type <n_tpd>   file_type
 
 %type <n_idx>   indices
@@ -238,6 +290,20 @@ void zzerror(char* text)
 %type <n_vari>  variant
 
 %start translation
+
+%verbose
+%no-lines
+%define parse.trace
+
+%printer { auto obj = (object_tpd_node*)$$; fprintf (yyo, "%s", obj->t_object->in_text); } class_type
+%printer { if($$) $$->print_debug(); } <tok> 
+%printer { $$->print_debug(); } <toks> 
+%printer { fprintf (yyo, "%s", $$? ((literal_node*)$$)->value_tkn->in_text: "NULL"); } constant 
+%printer { $$->print_debug(); } <n_expr> 
+%printer { $$->print_debug(); } <n_stmt> 
+%printer { $$->print_debug(); } <n_tpd> 
+
+//%glr-parser
 
 %%
 
@@ -272,6 +338,7 @@ translation:
     zzcnv_table[TKN_INTERFACE] = INTERFACE;
 
     zzcnv_table[TKN_OBJECT] = OBJECT;
+    zzcnv_table[TKN_CLASS] = CLASS;
     zzcnv_table[TKN_CONSTRUCTOR] = PROCEDURE;
     zzcnv_table[TKN_DESTRUCTOR] = PROCEDURE;
   } else { 
@@ -370,6 +437,29 @@ unit_decl: label_decl_part | const_def_part | type_def_part | var_decl_part
 //=============================================================================
 */
 
+inherited: INHERITED { $$ = new inherited_node($1, NULL, NULL, NULL, NULL); }
+   | INHERITED IDENT
+        { $$ = new inherited_node($1, $2, NULL, NULL, NULL); }
+   | INHERITED IDENT '(' act_param_list ')' 
+        { $$ = new inherited_node($1, $2, $3, $4, $5); }
+
+//raise: RAISE access_expr {$$ = new raise_node($1, $2); }
+
+// probably we need separate class for try* nterminals
+try_finally: TRY sequence FINALLY sequence END
+    { $$ = new try_finally_node($1, $2, $3, $4, $5); }
+
+try_except: TRY sequence EXCEPT except_many END
+    { $$ = new try_except_node($1, $2, $3, $4, NULL, NULL, $5); }
+
+try_except: TRY sequence EXCEPT except_many ELSE sequence END
+    { $$ = new try_except_node($1, $2, $3, $4, $5, $6, $7); }
+
+except_many: except | except ';' except_many { $1->next = $3; $$ = $1; }
+
+except: ON IDENT ':' simple_type DO statement
+        { $$ = new on_except_node($1, $2, $3, $4, $5, $6); }
+
 statement: { $$ = new empty_node(curr_token->prev_relevant()); }
     | primary LET expr { $$ = new assign_node($1, $2, $3); }
     | primary LETADD expr { $$ = new assign_node($1, $2, $3); }
@@ -392,13 +482,17 @@ statement: { $$ = new empty_node(curr_token->prev_relevant()); }
     | REPEAT sequence UNTIL expr { $$ = new repeat_node($1, $2, $3, $4); }
     | WRITE write_params { $$ = new write_node($1, $2); }
     | READ actual_params { $$ = new read_node($1, $2); }
+    | RAISE expr { $$ = new raise_node($1, $2); }
     | primary { $$ = new pcall_node($1); } 
     | RETURN { $$ = new return_node($1); }
     | WITH expr_list DO statement { $$ = new with_node($1, $2, $3, $4); }
     | ICONST ':' statement { $$ = new label_node($1, $2, $3); }
     | IDENT ':' statement { $$ = new label_node($1, $2, $3); }
     | compoundst { $$ = $1; }
-  
+    | try_finally
+    | try_except
+    | inherited
+
 compoundst: BEGIN sequence END { $$ = new compound_node($1, $2, $3); }
 
 sequence: statement | statement ';' sequence { $1->next = $3; $$ = $1; }
@@ -623,22 +717,24 @@ var_decl_part: VAR var_decl_list
 
 var_decl_list: { $$ = NULL; }
      | var_decl
-     | var_decl ';' SCOPE 
-       { 
-	 $1->scope = $3;
-	 $3->disable();
-       }
-     | var_decl ';' SCOPE ';' var_decl_list 
-       { 
-	 $1->scope = $3;
-	 token::remove($3, $4);	    
-	 $1->next = $5; $$ = $1; 
-       }
+// SCOPE was either 'external' or 'static' - remove it temporary since external or static keywords are not supported for variables any more 
+//     | var_decl ';' SCOPE 
+//       { 
+//	 $1->scope = $3;
+//	 $3->disable();
+//       }
+//     | var_decl ';' SCOPE ';' var_decl_list 
+//       { 
+//	 $1->scope = $3;
+//	 token::remove($3, $4);	    
+//	 $1->next = $5; $$ = $1; 
+//       }
      | var_decl ';' var_decl_list { $1->next = $3; $$ = $1; }
 
 var_decl: ident_list ':' type { $$ = new var_decl_node($1, $2, $3); }
-     | IDENT ORIGIN expr ':' simple_type 
-       { $$ = (var_decl_node*)new var_origin_decl_node($1, $2, $3, $4, $5); }
+   // temporarity commented out since it generates too many bison warnings (ambiguities)
+   //  | IDENT ORIGIN expr ':' simple_type 
+   //    { $$ = (var_decl_node*)new var_origin_decl_node($1, $2, $3, $4, $5); }
 
 proc_decl: 
       PROCEDURE IDENT formal_params  
@@ -677,10 +773,20 @@ proc_def:
     | FUNCTION IDENT ';' FAR ';' block ';' 
                { $$ = new proc_def_node($1, NULL, NULL, $2, NULL, NULL, NULL, $3, $4, $5, $6, $7); } 
 
-qualifiers: IDENT qualifiers { $$ = new token_list($1, $2); }
-    | SCOPE qualifiers { $$ = new token_list($1, $2); }
-    | IDENT { $$ = new token_list($1); }
-    | SCOPE { $$ = new token_list($1); }
+fun_qualifier: FORWARD | OVERLOAD | REGISTER | PASCAL | CDECL | STDCALL | SAFECALL | WINAPI | VARARGS | EXTERNAL 
+
+meth_qualifier: REINTRODUCE | ABSTRACT | VIRTUAL | DYNAMIC | STATIC | OVERRIDE | FINAL
+
+qualifier: fun_qualifier | meth_qualifier
+      
+qualifiers: qualifier { $$ = new token_list($1); }
+     | qualifiers ';' qualifier
+         { $$ = new token_list($3, $1); }
+
+//qualifiers: IDENT qualifiers { $$ = new token_list($1, $2); }
+//    | SCOPE qualifiers { $$ = new token_list($1, $2); }
+//    | IDENT { $$ = new token_list($1); }
+//    | SCOPE { $$ = new token_list($1); }
 
 
 formal_params: { $$ = NULL; } 
@@ -690,9 +796,12 @@ formal_param_list: formal_param
     | formal_param ';' formal_param_list { $1->next = $3; $$ = $1; }
 
 formal_param: VAR param_decl { $$ = new var_decl_part_node($1, $2); }
-    | param_decl { $$ = $1; } | proc_decl
+    | CONST param_decl { $$ = new var_decl_part_node($1, $2); }
+    | param_decl { $$ = $1; } 
+    | proc_decl
 
 param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3); }
+    |  ident_list ':' param_type EQ constant { $$ = new var_decl_node($1, $2, $3, $4, $5); }
     | ident_list { $$ = new var_decl_node($1, NULL, NULL); }
 
 param_type: simple_type | conformant_array_type
@@ -701,7 +810,7 @@ param_type: simple_type | conformant_array_type
 
 /* Types definition */ 
 
-type: simple_type | array_type | record_type | object_type | set_type | file_type 
+type: simple_type | array_type | record_type | class_type | set_type | file_type 
     | pointer_type | enum_type | range_type | string_type | fptr_type
 
 const_type: simple_type | const_array_type | record_type | const_set_type | string_type
@@ -737,31 +846,119 @@ set_type: packed SET OF type { $$ = new set_tpd_node($1, $2, $3, $4); }
 
 const_set_type: packed SET OF const_type { $$ = new set_tpd_node($1, $2, $3, $4); }
 
-record_type: packed RECORD field_list END 
-    { $$ = new record_tpd_node($1, $2, $3, $4); }
 
-object_type: OBJECT object_components END
-    { $$ = new object_tpd_node($1, NULL, NULL, NULL, $2, $3); }
-| OBJECT '(' IDENT ')' object_components END
-    { $$ = new object_tpd_node($1, $2, $3, $4, $5, $6); }
 
-object_components: object_fields object_methods
-    { $1->next = $2; $$ = $1; } 
-  | object_methods
-  | object_fields
+
+
+// **** NOTE: record can contain variant part declared in field_list while class cannot
+// replacing by object_components will not allow declaring variant part in the record.
+
+
+
+
+
+/* field_list for RECORD can contain variant part while object_fields cannot */
+record_type: packed RECORD record_fields object_methods END 
+       { $$ = new record_tpd_node($1, $2, $3, $4, $5); }
+//   | packed RECORD record_fields END 
+//       { $$ = new record_tpd_node($1, $2, $3, NULL, $4); }
+   | packed RECORD END 
+       { $$ = new record_tpd_node($1, $2, NULL, NULL, $3); }
+// Record forward declararions are not supported
+//   | packed RECORD 
+//       { $$ = new record_tpd_node($1, $2, NULL, NULL, NULL); }
+  
+//record_components: record_fields object_methods //record_component record_components
+//       { $1->next = $2; $$ = $1; }
+//    | record_component
+
+//record_component: access_specifier { $$ = new object_part_node($1, NULL); } 
+//    | record_fields 
+//    | object_methods
+//    | const_def_part 
+//    | type_def_part 
+
+record_fields: field_list
+//    { $$ = new field_list_node($1); }
+
+//class_or_object: OBJECT | CLASS
+ 
+class_type: CLASS object_body END
+       { $$ = new object_tpd_node($1, NULL, NULL, NULL, $2, $3); }  
+    | CLASS '(' IDENT ')' object_body END
+       { $$ = new object_tpd_node($1, $2, $3, $4, $5, $6); }
+    | CLASS '(' IDENT ')' END
+       { $$ = new object_tpd_node($1, $2, $3, $4, NULL, $5); }
+    | CLASS END
+       { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2); }
+//    | class_or_object
+//       { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
+
+object_body: object_components
+
+//object_body: strict_object_body | object_components 
+//    | object_components strict_object_body 
+//      { $1->next = $2; $$ = $1; }
+
+//object_sections: //{ $$ = NULL; }
+//    object_sections object_section
+//    | object_section
+//      { $1->next = $2; $$ = $1; }
+//    | object_components complete_object_parts
+//      { $1->next = $2; $$ = $1; }
+
+access_specifier: PRIVATE | PUBLIC | PROTECTED | PUBLISHED
+
+//object_section: access_specifier object_components
+//       { $$ = new object_part_node($1, $2); }
+ //   | object_components
+ //      { $$ = new object_part_node(NULL, $1); }
+
+object_components: object_component object_components
+       { $1->next = $2; $$ = $1; }
+    | object_component
+
+object_component: access_specifier { $$ = new object_part_node($1, NULL); } 
+    | object_fields 
+    | object_methods
+    | const_def_part 
+    | type_def_part 
+
+  /* object_components: object_fields const_def_part object_methods 
+       { $1->next = $2; $2->next = $3; $$ = $1; } 
+    | const_def_part object_fields object_methods 
+       { $1->next = $2; $2->next = $3; $$ = $1; } 
+    | const_def_part object_methods  
+       { $1->next = $2; $$ = $1; } 
+    | object_fields object_methods
+       { $1->next = $2; $$ = $1; } 
+    | object_fields const_def_part
+       { $1->next = $2; $$ = $1; } 
+    | const_def_part object_fields
+       { $1->next = $2; $$ = $1; } 
+    | const_def_part
+    | object_fields
+    | object_methods
+  */
 
 object_fields: field_decl_list 
-    { $$ = new var_decl_part_node(NULL, $1); }
+      { $$ = new var_decl_part_node(NULL, $1); }
+    | field_decl_part
 
-field_decl_list: var_decl
-     | var_decl ';' { $$ = $1; }
-     | var_decl ';' field_decl_list { $1->next = $3; $$ = $1; }
+field_decl_part: VAR field_decl_list 
+       { $$ = new var_decl_part_node($1, $2); }
 
-object_methods: proc_fwd_decl | proc_spec
-  | proc_fwd_decl object_methods { $1->next = $2; $$ = $1; }
-  | proc_spec object_methods { $1->next = $2; $$ = $1; }
+field_decl_list: //var_decl
+     var_decl ';' { $$ = $1; }
+    | var_decl ';' field_decl_list { $1->next = $3; $$ = $1; }
+
+object_methods: proc_fwd_decl_list
+       { $$ = new proc_decl_part_node($1); }
+
+proc_fwd_decl_list: proc_fwd_decl | proc_spec
+    | proc_fwd_decl proc_fwd_decl_list { $1->next = $2; $$ = $1; }
+    | proc_spec     proc_fwd_decl_list { $1->next = $2; $$ = $1; }
   
-
 
 file_type: packed FIL OF type { $$ = new file_tpd_node($1, $2, $3, $4); }
 
