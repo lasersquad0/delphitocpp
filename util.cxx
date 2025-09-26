@@ -94,7 +94,7 @@ void warning(token* tkn, const char* fmt, ...)
     putc('\n',stderr);
 }
 
-extern "C" char* strdup(const char* s) 
+extern "C" char* mystrdup(const char* s) 
 {
     return strcpy((char*)heap.alloc(strlen(s)+1), s);
 }
