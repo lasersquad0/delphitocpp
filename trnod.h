@@ -50,6 +50,8 @@ class node : public heap_object {
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
+    virtual void print_debug() {};
+
 };
 
 class token_list : public heap_object {
@@ -58,10 +60,24 @@ class token_list : public heap_object {
     symbol*          var; 
     token_list*      next;  
 
-    token_list(token* id, token_list* chain = NULL) {
-	ident = id;
-	next = chain; 
-    }  
+    token_list(token* id, token_list* chain = NULL)
+    {
+        ident = id;
+        next = chain;
+        var = nullptr;
+    }
+
+    virtual void print_debug() 
+    {
+        auto tkns = this;
+        do 
+        {         
+            fprintf(stderr, " (");
+            tkns->ident->print_debug(); tkns = tkns->next;
+            fprintf(stderr, ") ");
+        } 
+        while (tkns);
+    }
 };  
 
 //=============================================================================
@@ -185,7 +201,6 @@ class block_node : public node {
 //=============================================================================
 
 
-
 class stmt_node : public node {
   public:
     stmt_node*   next;
@@ -204,6 +219,7 @@ class label_node : public stmt_node {
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
+    void print_debug() override { fprintf(stderr, "lbl:%s", ident->in_text); };
 };
 
 class with_node : public stmt_node { 
@@ -267,6 +283,72 @@ class compound_node : public stmt_node {
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
     virtual bool is_compound(); 
+    void print_debug() override { fprintf(stderr, "compound:"); body->print_debug(); };
+};
+
+
+class raise_node : public stmt_node {
+public:
+    token* t_raise;
+    expr_node* expr;
+
+    raise_node(token* t_raise, expr_node* expr);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+    void print_debug() override;
+};
+
+class try_finally_node : public stmt_node {
+public:
+    token* t_try, *t_finally, *t_end;
+    stmt_node* body1;
+    stmt_node* body2;
+
+    try_finally_node(token* t_try, stmt_node* body1, token* t_finally, stmt_node* body2, token* t_end);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+    void print_debug() override { fprintf(stderr, "try-finally:"); body1->print_debug(); };
+};
+
+class try_except_node : public stmt_node {
+public:
+    token* t_try, *t_except, *t_else, *t_end;
+    stmt_node* body1;
+    stmt_node* body2;
+    stmt_node* ex_many;
+
+    try_except_node(token* t_try, stmt_node* body1, token* t_except, stmt_node* ex_many, token* t_else, stmt_node* body2, token* t_end);
+
+    virtual void attrib(int ctx) override;
+    virtual void translate(int ctx) override;
+    void print_debug() override { fprintf(stderr, "try-except:"); body1->print_debug(); };
+};
+
+class on_except_node : public stmt_node {
+public:
+    token* t_on, *t_ident, *t_coln, * t_do;
+    tpd_node* ex_type;
+    stmt_node* body;
+
+    on_except_node(token* t_on, token* t_ident, token* t_coln, tpd_node* ex_type, token* t_do, stmt_node* body);
+    
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+    void print_debug() override { fprintf(stderr, "on-except:"); body->print_debug(); };
+};
+
+class inherited_node : public stmt_node {
+public:
+    token* t_inherited, *t_ident, *t_lpar, *t_rpar;
+    expr_node* params;
+
+    inherited_node(token* t_inherited, token* t_ident, token* t_lpar, expr_node* params, token* t_rpar);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+    void print_debug() override { fprintf(stderr, "inherited:%s", t_ident->in_text); };
 };
 
 
@@ -282,6 +364,7 @@ class assign_node : public stmt_node {
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
+    void print_debug() override;
 };
 
 class goto_node : public stmt_node {
@@ -505,6 +588,11 @@ class expr_node : public node {
 	flags = expr_flags; 
 	next = NULL; 
     }
+
+    void print_debug() override 
+    { 
+        fprintf(stderr, "tag:%d val:%d", (int)(tag), value);
+    };
 };
 
 //=============================================================================
@@ -521,6 +609,7 @@ class atom_expr_node : public expr_node {
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
+    void print_debug() override { fprintf(stderr, "atom_expr_node:%s", tkn->in_text); };
 };
 
 class literal_node : public expr_node {
@@ -839,7 +928,7 @@ class decl_node : public node {
     };	
     int	      attr;
 
-    decl_node() { next = NULL; }
+    decl_node() { next = NULL; attr = 0; }
 };
 
 
@@ -946,18 +1035,23 @@ class var_decl_node : public decl_node {
     token*           coln;   // ':'
     tpd_node*        tpd; 
     token*           scope;
+    token*           eq;
+    expr_node*       def_value;
 
-    var_decl_node(token_list* vars, token* coln, tpd_node* tpd);
+    var_decl_node(token_list* vars, token* coln, tpd_node* tpd, token* eq = NULL, expr_node* def_value = NULL);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
 
-
+// used for function/proc parameters when parameters declared with 'var' or 'const' specifier
+//      for object's field definitions
+//      for local and global variable definitions
 class var_decl_part_node : public decl_node { 
   public: 
     token*           t_var; 
     var_decl_node*   vars; 
+    bool             is_const;
 
     var_decl_part_node(token* t_var, var_decl_node* vars); 
 
@@ -979,6 +1073,16 @@ class var_origin_decl_node : public decl_node {
     
     var_origin_decl_node(token* t_ident, token* t_origin, 
                          expr_node *addr, token* t_colon, tpd_node *tpd); 
+
+    virtual void attrib(int ctx);
+    virtual void translate(int ctx);
+};
+
+class proc_decl_part_node : public decl_node {
+public:
+    decl_node* procs; // actually this is proc_fwd_decl_node
+
+    proc_decl_part_node(decl_node* procs) { this->procs = procs; };
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1047,6 +1151,15 @@ class proc_fwd_decl_node : public proc_decl_node {
     bool                is_external;
     bool                is_static;
     bool                is_virtual;
+    bool                is_stdcall;
+    bool                is_pascal;
+    bool                is_cdecl;
+    bool                is_register;
+    bool                is_overload;
+    bool                is_abstract;
+    bool                is_final;
+    bool                is_override;
+   // bool                is_dynamic;
 
     proc_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, 
 		       token* t_coln, tpd_node* ret_type, 
@@ -1107,6 +1220,7 @@ class simple_tpd_node: public tpd_node {
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
+    void print_debug() override { fprintf(stderr, "%s", tkn?tkn->in_text: "NULL"); };
 };
 
 //
@@ -1327,7 +1441,7 @@ class variant_part_node : public node {
     virtual void translate(int ctx);
 };
 
-class field_list_node : public node { 
+class field_list_node : public decl_node { 
   public: 
     var_decl_node*     fix_part; 
     variant_part_node* var_part; 
@@ -1349,10 +1463,11 @@ class record_tpd_node : public tpd_node {
     token*           t_record;
     token*           t_end; 
     field_list_node* fields; 
+    decl_node*       methods;
     record_tpd_node* outer;
 
     record_tpd_node(token* t_packed, token* t_record, 
-                    field_list_node* fields, token* t_end);  
+                    field_list_node* fields, decl_node* methods, token* t_end);
 
     void assign_name();
 
@@ -1364,23 +1479,36 @@ class record_tpd_node : public tpd_node {
 // Borland Pascal object
 //
 
-class object_tpd_node : public tpd_node { 
-  public: 
-    token*           t_object;
-    token*           t_lbr;
-    token*           t_superclass;
-    token*           t_rbr;
-    token*           t_end; 
-    decl_node*       fields;         
+class object_part_node : public decl_node {
+public:
+    token* t_access_lvl;
+    decl_node* components;
 
-    symbol*          super;
-    
-    object_tpd_node(token* t_object, token* t_lbr, token* t_superclass, token* t_rbr, 
-                    decl_node* fields, token* t_end);  
+    object_part_node(token* t_access_lvl, decl_node* components);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
+
+class object_tpd_node : public tpd_node { 
+  public: 
+    token*         t_object;
+    token*         t_lbr;
+    token*         t_superclass;
+    token*         t_rbr;
+    token*         t_end; 
+    decl_node*     parts;         
+
+    symbol*          super;
+    
+    object_tpd_node(token* t_object, token* t_lbr, token* t_superclass, token* t_rbr, 
+                    decl_node* parts, token* t_end);  
+
+    virtual void attrib(int ctx);
+    virtual void translate(int ctx);
+};
+
+
 
 
 //
