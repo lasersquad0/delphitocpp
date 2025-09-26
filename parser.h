@@ -39,7 +39,7 @@
 # define YY_ZZ_PARSER_H_INCLUDED
 /* Debug traces.  */
 #ifndef YYDEBUG
-# define YYDEBUG 0
+# define YYDEBUG 1
 #endif
 #if YYDEBUG
 extern int zzdebug;
@@ -54,86 +54,114 @@ extern int zzdebug;
     YYEOF = 0,                     /* "end of file"  */
     YYerror = 256,                 /* error  */
     YYUNDEF = 257,                 /* "invalid token"  */
-    ARRAY = 258,                   /* ARRAY  */
-    BEGIN = 259,                   /* BEGIN  */
-    CASE = 260,                    /* CASE  */
-    CONST = 261,                   /* CONST  */
-    DO = 262,                      /* DO  */
-    DOTS = 263,                    /* DOTS  */
-    ELSE = 264,                    /* ELSE  */
-    END = 265,                     /* END  */
-    FIL = 266,                     /* FIL  */
-    FAR = 267,                     /* FAR  */
-    FOR = 268,                     /* FOR  */
-    FUNCTION = 269,                /* FUNCTION  */
-    GOTO = 270,                    /* GOTO  */
-    IDENT = 271,                   /* IDENT  */
-    ICONST = 272,                  /* ICONST  */
-    IF = 273,                      /* IF  */
-    IMPLEMENTATION = 274,          /* IMPLEMENTATION  */
-    INTERFACE = 275,               /* INTERFACE  */
-    LABEL = 276,                   /* LABEL  */
-    LOOPHOLE = 277,                /* LOOPHOLE  */
-    OBJECT = 278,                  /* OBJECT  */
-    OF = 279,                      /* OF  */
-    ORIGIN = 280,                  /* ORIGIN  */
-    OTHERWISE = 281,               /* OTHERWISE  */
-    PACKED = 282,                  /* PACKED  */
-    PROCEDURE = 283,               /* PROCEDURE  */
-    PROGRAM = 284,                 /* PROGRAM  */
-    RCONST = 285,                  /* RCONST  */
-    READ = 286,                    /* READ  */
-    RECORD = 287,                  /* RECORD  */
-    REPEAT = 288,                  /* REPEAT  */
-    RETURN = 289,                  /* RETURN  */
-    SET = 290,                     /* SET  */
-    SCONST = 291,                  /* SCONST  */
-    STRING = 292,                  /* STRING  */
-    THEN = 293,                    /* THEN  */
-    TO = 294,                      /* TO  */
-    TYPE = 295,                    /* TYPE  */
-    UNTIL = 296,                   /* UNTIL  */
-    UNIT = 297,                    /* UNIT  */
-    UNIT_END = 298,                /* UNIT_END  */
-    VAR = 299,                     /* VAR  */
-    WHILE = 300,                   /* WHILE  */
-    WITH = 301,                    /* WITH  */
-    WRITE = 302,                   /* WRITE  */
-    SCOPE = 303,                   /* SCOPE  */
-    LET = 304,                     /* LET  */
-    LETADD = 305,                  /* LETADD  */
-    LETSUB = 306,                  /* LETSUB  */
-    LETDIV = 307,                  /* LETDIV  */
-    LETMUL = 308,                  /* LETMUL  */
-    LETAND = 309,                  /* LETAND  */
-    LETOR = 310,                   /* LETOR  */
-    LETSHL = 311,                  /* LETSHL  */
-    LETSHR = 312,                  /* LETSHR  */
-    EQ = 313,                      /* EQ  */
-    NE = 314,                      /* NE  */
-    LT = 315,                      /* LT  */
-    LE = 316,                      /* LE  */
-    GT = 317,                      /* GT  */
-    GE = 318,                      /* GE  */
-    IN = 319,                      /* IN  */
-    PLUS = 320,                    /* PLUS  */
-    MINUS = 321,                   /* MINUS  */
-    OR = 322,                      /* OR  */
-    XOR = 323,                     /* XOR  */
-    BINOR = 324,                   /* BINOR  */
-    MOD = 325,                     /* MOD  */
-    DIV = 326,                     /* DIV  */
-    DIVR = 327,                    /* DIVR  */
-    MUL = 328,                     /* MUL  */
-    AND = 329,                     /* AND  */
-    SHR = 330,                     /* SHR  */
-    SHL = 331,                     /* SHL  */
-    BINAND = 332,                  /* BINAND  */
-    UPLUS = 333,                   /* UPLUS  */
-    UMINUS = 334,                  /* UMINUS  */
-    NOT = 335,                     /* NOT  */
-    ADDRESS = 336,                 /* ADDRESS  */
-    BINNOT = 337                   /* BINNOT  */
+    ABSTRACT = 258,                /* ABSTRACT  */
+    ARRAY = 259,                   /* ARRAY  */
+    BEGIN = 260,                   /* BEGIN  */
+    CASE = 261,                    /* CASE  */
+    CDECL = 262,                   /* CDECL  */
+    CLASS = 263,                   /* CLASS  */
+    CONST = 264,                   /* CONST  */
+    DO = 265,                      /* DO  */
+    DOTS = 266,                    /* DOTS  */
+    DYNAMIC = 267,                 /* DYNAMIC  */
+    ELSE = 268,                    /* ELSE  */
+    END = 269,                     /* END  */
+    EXCEPT = 270,                  /* EXCEPT  */
+    EXTERNAL = 271,                /* EXTERNAL  */
+    FIL = 272,                     /* FIL  */
+    FINAL = 273,                   /* FINAL  */
+    FINALLY = 274,                 /* FINALLY  */
+    FAR = 275,                     /* FAR  */
+    FOR = 276,                     /* FOR  */
+    FORWARD = 277,                 /* FORWARD  */
+    FUNCTION = 278,                /* FUNCTION  */
+    GOTO = 279,                    /* GOTO  */
+    IDENT = 280,                   /* IDENT  */
+    ICONST = 281,                  /* ICONST  */
+    IF = 282,                      /* IF  */
+    IMPLEMENTATION = 283,          /* IMPLEMENTATION  */
+    INHERITED = 284,               /* INHERITED  */
+    INTERFACE = 285,               /* INTERFACE  */
+    LABEL = 286,                   /* LABEL  */
+    LOOPHOLE = 287,                /* LOOPHOLE  */
+    OBJECT = 288,                  /* OBJECT  */
+    OF = 289,                      /* OF  */
+    ON = 290,                      /* ON  */
+    ORIGIN = 291,                  /* ORIGIN  */
+    OTHERWISE = 292,               /* OTHERWISE  */
+    OVERLOAD = 293,                /* OVERLOAD  */
+    OVERRIDE = 294,                /* OVERRIDE  */
+    PACKED = 295,                  /* PACKED  */
+    PASCAL = 296,                  /* PASCAL  */
+    PROCEDURE = 297,               /* PROCEDURE  */
+    PROGRAM = 298,                 /* PROGRAM  */
+    PRIVATE = 299,                 /* PRIVATE  */
+    PROTECTED = 300,               /* PROTECTED  */
+    PUBLIC = 301,                  /* PUBLIC  */
+    PUBLISHED = 302,               /* PUBLISHED  */
+    RAISE = 303,                   /* RAISE  */
+    RCONST = 304,                  /* RCONST  */
+    READ = 305,                    /* READ  */
+    RECORD = 306,                  /* RECORD  */
+    REGISTER = 307,                /* REGISTER  */
+    REINTRODUCE = 308,             /* REINTRODUCE  */
+    REPEAT = 309,                  /* REPEAT  */
+    RETURN = 310,                  /* RETURN  */
+    SAFECALL = 311,                /* SAFECALL  */
+    SET = 312,                     /* SET  */
+    SCONST = 313,                  /* SCONST  */
+    STATIC = 314,                  /* STATIC  */
+    STDCALL = 315,                 /* STDCALL  */
+    STRING = 316,                  /* STRING  */
+    THEN = 317,                    /* THEN  */
+    TO = 318,                      /* TO  */
+    TRY = 319,                     /* TRY  */
+    TYPE = 320,                    /* TYPE  */
+    UNTIL = 321,                   /* UNTIL  */
+    UNIT = 322,                    /* UNIT  */
+    UNIT_END = 323,                /* UNIT_END  */
+    VAR = 324,                     /* VAR  */
+    VARARGS = 325,                 /* VARARGS  */
+    VIRTUAL = 326,                 /* VIRTUAL  */
+    WHILE = 327,                   /* WHILE  */
+    WINAPI = 328,                  /* WINAPI  */
+    WITH = 329,                    /* WITH  */
+    WRITE = 330,                   /* WRITE  */
+    SCOPE = 331,                   /* SCOPE  */
+    LET = 332,                     /* LET  */
+    LETADD = 333,                  /* LETADD  */
+    LETSUB = 334,                  /* LETSUB  */
+    LETDIV = 335,                  /* LETDIV  */
+    LETMUL = 336,                  /* LETMUL  */
+    LETAND = 337,                  /* LETAND  */
+    LETOR = 338,                   /* LETOR  */
+    LETSHL = 339,                  /* LETSHL  */
+    LETSHR = 340,                  /* LETSHR  */
+    EQ = 341,                      /* EQ  */
+    NE = 342,                      /* NE  */
+    LT = 343,                      /* LT  */
+    LE = 344,                      /* LE  */
+    GT = 345,                      /* GT  */
+    GE = 346,                      /* GE  */
+    IN = 347,                      /* IN  */
+    PLUS = 348,                    /* PLUS  */
+    MINUS = 349,                   /* MINUS  */
+    OR = 350,                      /* OR  */
+    XOR = 351,                     /* XOR  */
+    BINOR = 352,                   /* BINOR  */
+    MOD = 353,                     /* MOD  */
+    DIV = 354,                     /* DIV  */
+    DIVR = 355,                    /* DIVR  */
+    MUL = 356,                     /* MUL  */
+    AND = 357,                     /* AND  */
+    SHR = 358,                     /* SHR  */
+    SHL = 359,                     /* SHL  */
+    BINAND = 360,                  /* BINAND  */
+    UPLUS = 361,                   /* UPLUS  */
+    UMINUS = 362,                  /* UMINUS  */
+    NOT = 363,                     /* NOT  */
+    ADDRESS = 364,                 /* ADDRESS  */
+    BINNOT = 365                   /* BINNOT  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -142,7 +170,6 @@ extern int zzdebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 28 "parser.y"
 
     token                *tok;
 
@@ -178,7 +205,6 @@ union YYSTYPE
    
     import_list_node     *n_imp; 
 
-#line 182 "parser.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
