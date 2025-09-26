@@ -88,7 +88,7 @@ static use_ctx* use_chain;
 // Token generator function
 
 int tkn (int tag) {
-   curr_token = new token(text ? text : strdup(yytext),
+   curr_token = new token(text ? text : mystrdup(yytext),
 			  tag, line, pos, nm);
    nm = NULL; text = NULL;
    for (char *c = yytext; *c != 0; c++) {
@@ -168,7 +168,7 @@ static int process_end_of_line_comment() {
            *p++ = '\n';
            *p = '\0';
            curr_token = new token(NULL, TKN_CMNT, line, pos);
-           curr_token->in_text = curr_token->out_text = strdup(cmt_buf);
+           curr_token->in_text = curr_token->out_text = ::mystrdup(cmt_buf);
            return 1;
         } else {
            *p++ = (char)c;
@@ -268,10 +268,11 @@ static int process_comments() {
 ID           [_\$A-Z][_\$A-Z0-9]*
 
 DIGIT        [0-9]
+DIGIT_       [0-9_]
 BINDIGIT     [0-1]
 OCTDIGIT     [0-7]
 HEXDIGIT     [0-9A-F]
-
+HEXDIGIT_     [0-9A-F_]
 SIGN         [+-]?
 EXPONENT     E{SIGN}{DIGIT}+
 
@@ -279,7 +280,7 @@ REAL         {DIGIT}+\.{DIGIT}+{EXPONENT}?|{DIGIT}+{EXPONENT}
 
 ROOT         {DIGIT}\#|{DIGIT}{DIGIT}\#
 
-INTEGER      {DIGIT}+|{ROOT}{HEXDIGIT}+|{BINDIGIT}+B|0x{HEXDIGIT}+|0X{HEXDIGIT}+|{DIGIT}{HEXDIGIT}*H|{DIGIT}{HEXDIGIT}*h|%{BINDIGIT}+
+INTEGER      {DIGIT}{DIGIT_}*|\${HEXDIGIT}{HEXDIGIT_}*|{ROOT}{HEXDIGIT}{HEXDIGIT_}*|{BINDIGIT}+B|0x{HEXDIGIT}+|0X{HEXDIGIT}+|{DIGIT}{HEXDIGIT}*H|{DIGIT}{HEXDIGIT}*h|%{BINDIGIT}+
 
 /* the "incl" state is used for picking up the name
  * of an include file
@@ -307,7 +308,7 @@ uses          BEGIN(use); /* Turbo Pascal */
     }
 }
 
-<use>[_a-z0-9A-Z]+ {
+<use>[_a-z0-9A-Z\.]+ {
                   /* got the include file name */
     char *fname = dprintf("%s.pas", yytext);
     for (char* p = fname; *p != '\0'; p++) *p = tolower(*p);
@@ -570,7 +571,7 @@ uses          BEGIN(use); /* Turbo Pascal */
 	           nm = nm_entry::add(text, TKN_IDENT);
 	           tag = TKN_IDENT;
 	       } else if (!preserve_case || tag != TKN_IDENT) {
-	           text = strdup(lc_buf);
+	           text = mystrdup(lc_buf);
 	       }
 	       return tkn(tag);
              }
