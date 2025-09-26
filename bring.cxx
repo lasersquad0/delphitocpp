@@ -9,7 +9,7 @@
 // Global data structures:
 
 // Ring where all global variables are entered
-b_ring b_ring::global_b_ring(b_ring::global);
+b_ring b_ring::global_b_ring(b_ring::SCOPE::global);
 
 // Current ring (record or procedure body)
 b_ring *b_ring::curr_b_ring = &b_ring::global_b_ring;
@@ -83,7 +83,7 @@ void b_ring::make_unique(symbol* sym)
   check_loop:
     //    for (spp = &top_b_ring->syms; (sp = *spp) != NULL; spp = &sp->next) {
     for (spp = &global_b_ring.syms; (sp = *spp) != NULL; spp = &sp->next) {
-	if (sp->out_name == sym->out_name) { 
+	if (sp->out_name == sym->out_name) { // NOTE! two pointers are compared here
 	    char buf[256];
 	    sprintf(buf, "%s%d", sym->in_name->text, ++version); 
         assert(strlen(buf) < sizeof(buf));
@@ -91,7 +91,7 @@ void b_ring::make_unique(symbol* sym)
 	    goto check_loop;
 	} 
     }
-    if (scope != global) {  
+    if (scope != SCOPE::global) {  
 	*spp = sp = new symbol; // this symbol will never be found
 	sp->ring = top_b_ring; 
 	sp->next = NULL; 
@@ -124,8 +124,8 @@ symbol* b_ring::add(nm_entry* in_name, nm_entry* out_name, int tag, tpexpr* type
 	}
     }
 
-    if (scope != record && 
-	(tag == symbol::s_proc || tag == symbol::s_type || scope == global)) 
+    if (scope != SCOPE::record && 
+	(tag == symbol::s_proc || tag == symbol::s_const /*|| scope == SCOPE::global*/))
     { 
         make_unique(sym); 
     }

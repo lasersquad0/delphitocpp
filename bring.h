@@ -33,7 +33,7 @@ class symbol : public heap_object {
 	f_defined	= 0x02, // 
         f_val_param     = 0x04, // variable is parameter passed by values
         f_var_param     = 0x08, // variable is VAR parameter passsed b
-	f_exported      = 0x10, // variable is accessed by nexted function
+	f_exported      = 0x10, // variable is accessed by nested function
 	f_static        = 0x20, // variable is static
 	f_syslib        = 0x40, // symbol from system library        
 	f_const         = 0x80, // integer constant is stored in "value"
@@ -58,7 +58,7 @@ class b_ring {
 
 
     // Kinds of binding contours
-    enum {
+    enum SCOPE {
 	block, record, proc, global
     };
 
