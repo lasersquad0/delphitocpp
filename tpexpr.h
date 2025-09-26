@@ -302,4 +302,10 @@ extern text_tp   text_type;
 extern ref_tp    pointer_type;
 extern varying_string_tp varying_string_type;
 
+extern tpexpr    cardinal_type;
+extern tpexpr    uint64_type;
+extern tpexpr    int64_type;
+extern tpexpr    smallint_type;
+
+
 #endif
