@@ -21,6 +21,8 @@ class nm_entry : public heap_object {
     void* operator new(size_t size, size_t len) { 
 	return heap.alloc(size + len); 
     }
+
+    void operator delete(void* ptr) { ::delete ptr; } // Standard delete
 };
 
 #endif
