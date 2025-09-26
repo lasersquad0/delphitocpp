@@ -14,5 +14,5 @@ char *dprintf (const char *fmt, ...) {
     len = vsprintf (tmp, fmt, args); 
     va_end (args);
     assert (len < sizeof (tmp));
-    return strdup(tmp);
+    return _strdup(tmp);
 }
