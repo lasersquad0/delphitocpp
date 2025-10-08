@@ -292,9 +292,9 @@ INTEGER      {DIGIT}{DIGIT_}*|\${HEXDIGIT}{HEXDIGIT_}*|{ROOT}{HEXDIGIT}{HEXDIGIT
 
 \%include     BEGIN(incl);
 \#include     BEGIN(incl);
-uses          BEGIN(use); /* Turbo Pascal */
+uses          BEGIN(use); /* go to the 'uses' section mode, Turbo Pascal */
 
-<use>[ \t\n\,]* {  /* skip whitespaces */
+<use>[ \t\n\,]* {  // skip whitespaces and commas in list of unit names from 'uses' section
     char* p = yytext;
     while(*p != '\0') {
 	if (*p++ == '\n') line += 1;
@@ -308,13 +308,13 @@ uses          BEGIN(use); /* Turbo Pascal */
     }
 }
 
-<use>[_a-z0-9A-Z\.]+ {
+<use>[_a-z0-9A-Z\.]+ { // file name can contain dot ('.') in its name
                   /* got the include file name */
     char *fname = dprintf("%s.pas", yytext);
     for (char* p = fname; *p != '\0'; p++) *p = tolower(*p);
 
     use_ctx* up;
-    for (up = use_chain;
+    for (up = use_chain; // check whether we processed this this earlier
 	 up != NULL && strcmp(fname, up->fname) != 0;
 	 up = up->next);
 
@@ -342,11 +342,12 @@ uses          BEGIN(use); /* Turbo Pascal */
 		scanner.attach(xname, in);
 		return 1;
 	    }
-	}
+	} // for
+
 	warning(line, pos, file_name, "can't include file %s", fname);
         curr_token = new token(dprintf("/*#include \"%s.h\"*/\n", yytext),
 	                       TKN_CMNT, line, pos);
-    } else {
+    } else { // the file has been processed earlier
         curr_token = new token(dprintf("#include \"%s.h\"\n", yytext),
 	                       TKN_CMNT, line, pos);
     }
