@@ -120,6 +120,7 @@ void zzerror(const char* text)
              REGISTER
              REINTRODUCE
              REPEAT
+	     RESOURCESTRING
              RETURN
              SAFECALL
              SET
@@ -169,9 +170,9 @@ void zzerror(const char* text)
 %type <tok>     packed
 %type <tok>     progend
 %type <tok>     otherwise
-//%type <tok>     class_or_object
-%type <tok>     access_specifier
-//%type <tok>     private
+%type <tok>     class_or_object
+%type <tok>     access_spec_tok
+%type <tok>     const
 
 %type <n_imp>   prog_param_list
 
@@ -228,15 +229,17 @@ void zzerror(const char* text)
 %type <n_decl>  decl_part_list
 %type <n_decl>  label_decl_part
 %type <n_decl>  const_def_part
-%type <n_decl>  object_fields 
+//%type <n_decl>  object_fields 
 %type <n_decl>  object_methods
-//%type <n_decl>  object_part
 %type <n_decl>  object_body
-//%type <n_decl>  strict_object_body
 %type <n_decl>  object_components
 %type <n_decl>  object_component
+%type <n_decl>  record_components
+%type <n_decl>  record_component
+%type <n_decl>  record_body
+%type <n_decl>  record_field_list
+%type <n_decl>  access_spec_decl
 
-%type <n_fldls> record_fields
 %type <n_cdef>  const_def_list
 %type <n_cdef>  const_def
 %type <n_decl>  type_def_part
@@ -300,7 +303,7 @@ void zzerror(const char* text)
 %printer { $$->print_debug(); } <toks> 
 %printer { fprintf (yyo, "%s", $$? ((literal_node*)$$)->value_tkn->in_text: "NULL"); } constant 
 %printer { $$->print_debug(); } <n_expr> 
-%printer { $$->print_debug(); } <n_stmt> 
+%printer { if($$) $$->print_debug(); } <n_stmt> 
 %printer { $$->print_debug(); } <n_tpd> 
 
 //%glr-parser
@@ -328,7 +331,7 @@ translation:
 {
   if (turbo_pascal) { 
     zzcnv_table[TKN_STRING] = STRING;
-    zzcnv_table[TKN_STR] = WRITE;
+//    zzcnv_table[TKN_STR] = WRITE;
     zzcnv_table[TKN_SHL] = SHL;
     zzcnv_table[TKN_SHR] = SHR;
     zzcnv_table[TKN_XOR] = XOR;
@@ -344,7 +347,7 @@ translation:
   } else { 
     zzcnv_table[TKN_ORIGIN] = ORIGIN;
   }      
-}
+}	
 input_file { 
     $2->attrib(ctx_program); 
     $2->translate(ctx_program); 
@@ -438,26 +441,25 @@ unit_decl: label_decl_part | const_def_part | type_def_part | var_decl_part
 */
 
 inherited: INHERITED { $$ = new inherited_node($1, NULL, NULL, NULL, NULL); }
-   | INHERITED IDENT
+    | INHERITED IDENT
         { $$ = new inherited_node($1, $2, NULL, NULL, NULL); }
-   | INHERITED IDENT '(' act_param_list ')' 
+    | INHERITED IDENT '(' act_param_list ')' 
         { $$ = new inherited_node($1, $2, $3, $4, $5); }
-
-//raise: RAISE access_expr {$$ = new raise_node($1, $2); }
 
 // probably we need separate class for try* nterminals
 try_finally: TRY sequence FINALLY sequence END
-    { $$ = new try_finally_node($1, $2, $3, $4, $5); }
+        { $$ = new try_finally_node($1, $2, $3, $4, $5); }
 
 try_except: TRY sequence EXCEPT except_many END
-    { $$ = new try_except_node($1, $2, $3, $4, NULL, NULL, $5); }
+        { $$ = new try_except_node($1, $2, $3, $4, NULL, NULL, $5); }
+    | TRY sequence EXCEPT except_many ELSE sequence END
+        { $$ = new try_except_node($1, $2, $3, $4, $5, $6, $7); }
 
-try_except: TRY sequence EXCEPT except_many ELSE sequence END
-    { $$ = new try_except_node($1, $2, $3, $4, $5, $6, $7); }
+except_many: except 
+    | except ';' except_many { $1->next = $3; $$ = $1; }
 
-except_many: except | except ';' except_many { $1->next = $3; $$ = $1; }
-
-except: ON IDENT ':' simple_type DO statement
+except: { $$ = NULL; }  
+    | ON IDENT ':' simple_type DO compoundst
         { $$ = new on_except_node($1, $2, $3, $4, $5, $6); }
 
 statement: { $$ = new empty_node(curr_token->prev_relevant()); }
@@ -695,7 +697,9 @@ label_list: ICONST { $$ = new token_list($1); }
           | IDENT { $$ = new token_list($1); } 
           | IDENT ',' label_list { $$ = new token_list($1, $3); }
 
-const_def_part: CONST const_def_list  
+const: CONST | RESOURCESTRING
+
+const_def_part: const const_def_list  
     { $$ = new const_def_part_node($1, $2); } 
 
 const_def_list: { $$ = NULL; } 
@@ -716,7 +720,7 @@ var_decl_part: VAR var_decl_list
      { $$ = new var_decl_part_node($1, $2); }
 
 var_decl_list: { $$ = NULL; }
-     | var_decl
+//     | var_decl
 // SCOPE was either 'external' or 'static' - remove it temporary since external or static keywords are not supported for variables any more 
 //     | var_decl ';' SCOPE 
 //       { 
@@ -783,11 +787,6 @@ qualifiers: qualifier { $$ = new token_list($1); }
      | qualifiers ';' qualifier
          { $$ = new token_list($3, $1); }
 
-//qualifiers: IDENT qualifiers { $$ = new token_list($1, $2); }
-//    | SCOPE qualifiers { $$ = new token_list($1, $2); }
-//    | IDENT { $$ = new token_list($1); }
-//    | SCOPE { $$ = new token_list($1); }
-
 
 formal_params: { $$ = NULL; } 
     | '(' formal_param_list ')' { $$ = new param_list_node($1, $2, $3); }
@@ -850,105 +849,80 @@ const_set_type: packed SET OF const_type { $$ = new set_tpd_node($1, $2, $3, $4)
 
 
 
-// **** NOTE: record can contain variant part declared in field_list while class cannot
-// replacing by object_components will not allow declaring variant part in the record.
+// **** NOTE: record can contain variant part declared in field_list nonterminal while class cannot
 
 
 
+record_type: packed RECORD record_body END 
+       { $$ = new record_tpd_node($1, $2, $3, $4); }
+    | packed RECORD END 
+       { $$ = new record_tpd_node($1, $2, NULL, $3); }
 
+record_body: record_field_list record_components 
+       { $1->next = $2; $$ = $1; }
+    | record_components
+    | record_field_list
 
-/* field_list for RECORD can contain variant part while object_fields cannot */
-record_type: packed RECORD record_fields object_methods END 
-       { $$ = new record_tpd_node($1, $2, $3, $4, $5); }
-//   | packed RECORD record_fields END 
-//       { $$ = new record_tpd_node($1, $2, $3, NULL, $4); }
-   | packed RECORD END 
-       { $$ = new record_tpd_node($1, $2, NULL, NULL, $3); }
-// Record forward declararions are not supported
-//   | packed RECORD 
-//       { $$ = new record_tpd_node($1, $2, NULL, NULL, NULL); }
-  
-//record_components: record_fields object_methods //record_component record_components
-//       { $1->next = $2; $$ = $1; }
-//    | record_component
+record_components: record_component record_components
+       { $1->next = $2; $$ = $1; }
+    | record_component
 
-//record_component: access_specifier { $$ = new object_part_node($1, NULL); } 
-//    | record_fields 
-//    | object_methods
-//    | const_def_part 
-//    | type_def_part 
+record_component: access_spec_decl
+    | access_spec_decl record_field_list
+       { $1->next = $2; $$ = $1; }
+    | VAR field_list
+       { $$ = new record_field_part_node($1, $2); } 
+    | object_methods
+    | const_def_part 
+    | type_def_part 
 
-record_fields: field_list
-//    { $$ = new field_list_node($1); }
+record_field_list: field_list
+       { $$ = new record_field_part_node(NULL, $1); }
 
-//class_or_object: OBJECT | CLASS
+class_or_object: OBJECT | CLASS
  
-class_type: CLASS object_body END
+class_type: class_or_object object_body END
        { $$ = new object_tpd_node($1, NULL, NULL, NULL, $2, $3); }  
-    | CLASS '(' IDENT ')' object_body END
+    | class_or_object '(' IDENT ')' object_body END
        { $$ = new object_tpd_node($1, $2, $3, $4, $5, $6); }
-    | CLASS '(' IDENT ')' END
+    | class_or_object '(' IDENT ')' END
        { $$ = new object_tpd_node($1, $2, $3, $4, NULL, $5); }
-    | CLASS END
+    | class_or_object END
        { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2); }
-//    | class_or_object
-//       { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
+ //   | class_or_object
+ //      { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
 
-object_body: object_components
+object_body: field_decl_list object_components
+       { $1->next = $2; $$ = $1; }
+    | object_components
+    | field_decl_list
+       { $$ = new var_decl_part_node(NULL, $1); }
 
-//object_body: strict_object_body | object_components 
-//    | object_components strict_object_body 
-//      { $1->next = $2; $$ = $1; }
+access_spec_tok: PRIVATE | PUBLIC | PROTECTED | PUBLISHED
 
-//object_sections: //{ $$ = NULL; }
-//    object_sections object_section
-//    | object_section
-//      { $1->next = $2; $$ = $1; }
-//    | object_components complete_object_parts
-//      { $1->next = $2; $$ = $1; }
-
-access_specifier: PRIVATE | PUBLIC | PROTECTED | PUBLISHED
-
-//object_section: access_specifier object_components
-//       { $$ = new object_part_node($1, $2); }
- //   | object_components
- //      { $$ = new object_part_node(NULL, $1); }
+access_spec_decl: access_spec_tok { $$ = new access_specifier_node($1); }
 
 object_components: object_component object_components
        { $1->next = $2; $$ = $1; }
     | object_component
 
-object_component: access_specifier { $$ = new object_part_node($1, NULL); } 
-    | object_fields 
+object_component: access_spec_decl 
+    | access_spec_decl field_decl_list
+       { $1->next = $2; $$ = $1; }
+    | field_decl_part 
     | object_methods
     | const_def_part 
     | type_def_part 
 
-  /* object_components: object_fields const_def_part object_methods 
-       { $1->next = $2; $2->next = $3; $$ = $1; } 
-    | const_def_part object_fields object_methods 
-       { $1->next = $2; $2->next = $3; $$ = $1; } 
-    | const_def_part object_methods  
-       { $1->next = $2; $$ = $1; } 
-    | object_fields object_methods
-       { $1->next = $2; $$ = $1; } 
-    | object_fields const_def_part
-       { $1->next = $2; $$ = $1; } 
-    | const_def_part object_fields
-       { $1->next = $2; $$ = $1; } 
-    | const_def_part
-    | object_fields
-    | object_methods
-  */
 
-object_fields: field_decl_list 
-      { $$ = new var_decl_part_node(NULL, $1); }
-    | field_decl_part
+//object_fields: field_decl_list 
+//      { $$ = new var_decl_part_node(NULL, $1); }
+//    | field_decl_part
 
 field_decl_part: VAR field_decl_list 
        { $$ = new var_decl_part_node($1, $2); }
 
-field_decl_list: //var_decl
+field_decl_list: 
      var_decl ';' { $$ = $1; }
     | var_decl ';' field_decl_list { $1->next = $3; $$ = $1; }
 
@@ -968,40 +942,35 @@ conformant_indices: conformant_index
     | conformant_index ';' conformant_indices { $1->next = $3; $$ = $1; }
 
 conformant_index: IDENT DOTS IDENT ':' type 
-    { $$ = new conformant_index_node($1, $2, $3, $4, $5); }
+        { $$ = new conformant_index_node($1, $2, $3, $4, $5); }
 
 indices: index_spec | index_spec ',' indices 
-    { $1->next = $3; $$ = $1; }
+        { $1->next = $3; $$ = $1; }
 
 index_spec: simple_type { $$ = new type_index_node($1); }
     | expr DOTS expr { $$ = new range_index_node($1, $2, $3); }
 
 
-field_list: 
-    fixed_part variant_part     
+field_list: fixed_part variant_part  //<n_vdcl>   
         { $$ = new field_list_node($1, $2); }
     | fixed_part                   
         { $$ = new field_list_node($1); }
 
-fixed_part: var_decl_list
+fixed_part: field_decl_list //var_decl_list //<n_vdcl>
 
 variant_part: CASE selector OF variant_list 
-{ 
-    $$ = new variant_part_node($1, $2, $3, $4); 
-}
+        { $$ = new variant_part_node($1, $2, $3, $4); }
 
 selector: IDENT ':' type { $$ = new selector_node($1, $2, $3); }
-        | type { $$ = new selector_node(NULL, NULL, $1); }
+    | type { $$ = new selector_node(NULL, NULL, $1); }
 
 
 variant_list: variant
-        | variant ';' { $$ = $1; }
-        | variant ';' variant_list { $1->next = $3; $$ = $1; }
+    | variant ';' { $$ = $1; }
+    | variant ';' variant_list { $1->next = $3; $$ = $1; }
 
 variant: expr_list ':' '(' field_list ')' 
-{ 
-    $$ = new variant_node($1, $2, $3, $4, $5); 
-}
+        { $$ = new variant_node($1, $2, $3, $4, $5); }
 
 %%
 
