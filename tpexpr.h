@@ -34,12 +34,12 @@ class tpd_node;
 
 class tpexpr : public heap_object {
   public:
-    int      tag;
+    int      tag; // enum type_tag {} 
     int      flags;
     char     *name;
     tpd_node *tpd; 
 
-    bool is_scalar() { 
+    bool is_scalar() { //TODO shall we add here tp_longint, tp_double and tp_bool?
         return tag == tp_char || tag == tp_integer 
 	    || tag == tp_real || tag == tp_range || tag == tp_enum; 
     }
@@ -50,10 +50,10 @@ class tpexpr : public heap_object {
     virtual bool is_array();
 
     tpexpr(int tp_tag, tpd_node* tp_tpd = NULL, char* tp_name = NULL) { 
-         tag = tp_tag;
-	 tpd = tp_tpd;
-	 name = tp_name;
-	 flags = 0;
+        tag = tp_tag;
+    	tpd = tp_tpd;
+	    name = tp_name;
+	    flags = 0;
     }
 };
 
@@ -200,18 +200,28 @@ class record_tp : public tpexpr, public b_ring {
   {}
 };
 
+class object_tp : public record_tp {
+public:
+    symbol* class_name;
+    object_tp(tpd_node* tpd, object_tp* super = NULL);
+};
+
 class unit_tp : public record_tp { 
   public: 
     unit_tp(tpd_node *tpd = NULL) : record_tp(tpd) { 
 	tag = tp_unit;
-    } 
+    }
 };
 
-class object_tp : public record_tp { 
-  public: 
-    symbol* class_name;
-    object_tp(tpd_node *tpd, object_tp* super = NULL); 
+class system_unit_tp : public unit_tp {
+public:
+    system_unit_tp(tpd_node* tpd = NULL) : unit_tp(tpd) { }
+
+    // redirect search to global ring
+    //symbol* search(token* t) override { return global_b_ring.search(t); }
+
 };
+
 
 class proc_tp; 
 
