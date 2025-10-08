@@ -9,14 +9,12 @@ token* curr_token;
 token token::dummy(CAT_SPEC, TKN_DUMMY);  // Initialize token DL-ring
 
 char* const token::token_name[] = { 
-#define DEF_TOKEN(m_text, m_cat, m_tag, m_keyword) \
-     m_text,
+#define DEF_TOKEN(m_text, m_cat, m_tag, m_keyword) m_text,
 #include "token.dpp"
 };
 
 int const token::token_cat[] = { 
-#define DEF_TOKEN(m_text, m_cat, m_tag, m_keyword) \
-      CAT_##m_cat,
+#define DEF_TOKEN(m_text, m_cat, m_tag, m_keyword) CAT_##m_cat,
 #include "token.dpp"
 };
 
@@ -86,11 +84,13 @@ token* token::get_first_token()
     return t->next_relevant(); 
 }
 
+// create copies of head...tail and insert all these new tokens before this
+// retrun pointer to clone of head
 token* token::copy(token* head, token* tail)
 {
     token* first = head;
     while (TRUE) { 
-         (new token(*head))->insert_b(this); 
+         (new token(*head))->insert_b(this); //insert new token (copy of head) before this 
 	 if (head == tail) break;
 	 head = head->next; 
     }
