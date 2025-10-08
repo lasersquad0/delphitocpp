@@ -9,13 +9,33 @@
 
 /*////////////////////////////////////
 
+DEF_TOKEN
+
 * whether Char translate to char or to wchar_t
 * whether string translate to string or wstring
 * how to translate AnsiChar and WideChar
 
-* если в ф-ции Result:= <smth> - транслируется неверно
-* const в определении параметров ф-ции транслируется неправильно
-
+* DONE - Built-in Result variable is not supported in functions. Result and <FuncName_result> variables share the same memory now using C++ union stmt.
+* DONE - const modificator is properly translated in function parameters
+* DONE - syntax of class inheritance from 0 or 1 parent class
+* DONE - access specifier in classes (private, public, protected, published)
+* DONE - defailt access specifier in class declaration - private (do not set to published for TPersistent descendants yet)
+* DONE - fields and methods declarations in classes (separately for each access section)
+* DONE - Exit or Exit(param) tranlated into 'return' and 'return param;', while Exit(par1, par2) translated into ordinary func call 
+* DONE - Added support for 'raise expr;' statements
+* DONE - added support for try...except and try...finally statements
+* DONE - add support for resourcestring keyword
+* DONE - added support for fields, methods and acccess specifiers in RECORDS.
+* 
+* 
+* не понимает определение ф-ции с пустыми скобками (function Fun():Integer;), без скобок совсем - понимает
+* check if var1.var2.funcall() works properly
+* System.exit() - does not recognize System as namespace/unit
+* Implement initialization/finalization sections
+* TArr = array of Integer - is not supported (dynamic arrays)
+* Class properties ar enot supported
+* RECORDS cannot contain published and protected sections
+* 
 *////////////////////////////////////
 
 extern int zzparse();
@@ -126,19 +146,22 @@ static void load_predefined()
 			symbol::s_type,
 			&text_type);
 
+		//unit_tp* type = new unit_tp();
+		//b_ring::global_b_ring.add(nm_entry::add("system", TKN_IDENT), symbol::s_var, type);
+
 		nested_comments = TRUE;
 	}
 }
 
 static void load_keywords() 
 { 
-    for (int tag = 0; tag < TKN_LAST; tag ++ )  {
-	if (token::token_cat[tag] == CAT_ID ||
-	    token::token_cat[tag] == CAT_KWD) 
-	{
-	    nm_entry::add(token::token_name[tag], tag); 
+	for (int tag = 0; tag < TKN_LAST; tag++) {
+		if (token::token_cat[tag] == CAT_ID ||
+			token::token_cat[tag] == CAT_KWD)
+		{
+			nm_entry::add(token::token_name[tag], tag);
+		}
 	}
-    }
 }
 
 #define MAX_NAME_LEN 1024
@@ -150,34 +173,36 @@ static void load_configuration(char* name) {
 
 	while (fscanf(cfg, "%s", buf) == 1) { 
 	    if (strcmp(buf, "#begin(reserved)") == 0) { 
-		while (fscanf(cfg, "%s", buf) == 1 
-		       && strcmp(buf, "#end(reserved)") != 0) 
-		{
-		    nm_entry::add(buf, TKN_RESERVED);
-                }
+			while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(reserved)") != 0) 
+			{
+				nm_entry::add(buf, TKN_RESERVED);
+            }
 	    } else if(strcmp(buf, "#begin(macro)") == 0) { 
-		while (fscanf(cfg, "%s", buf) == 1 
-		       && strcmp(buf, "#end(macro)") != 0) 
-		{
-		    nm_entry::add(buf, TKN_IDENT)->flags |= nm_entry::macro;
+			while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(macro)") != 0) 
+			{
+				nm_entry::add(buf, TKN_IDENT)->flags |= nm_entry::macro;
+			}
+		// #begin(library) - this is list of C and C++ standard identificators and keywords which cannot be used in C/C++ during translating from Pascal to C/C++
+		// We are adding then into global ring with s_dummy tag because they are actually C/C++ identificators. 
+		// When identificator with the same name has met in Pascal code, it will be automatically renamed to avoid conflicts.
 		}
-	    } else if(strcmp(buf, "#begin(library)") == 0) { 
-		while (fscanf(cfg, "%s", buf) == 1 
-		       && strcmp(buf, "#end(library)") != 0) 
+		else if (strcmp(buf, "#begin(library)") == 0)
 		{
-		    b_ring::global_b_ring.add(nm_entry::add(buf, TKN_IDENT),
-					      symbol::s_dummy, 
-					      NULL);
+			while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(library)") != 0)
+			{
+				b_ring::global_b_ring.add(nm_entry::add(buf, TKN_IDENT),
+					symbol::s_dummy,
+					NULL);
+			}
 		}
-	    } else if(strcmp(buf, "#begin(rename)") == 0) { 
-		while (fscanf(cfg, "%s", buf) == 1 
-		       && strcmp(buf, "#end(rename)") != 0) 
-		{
-		    nm_entry* nm_old = nm_entry::add(buf, TKN_IDENT);
-		    fscanf(cfg, "%s", buf);
-		    nm_entry* nm_new = nm_entry::add(buf, TKN_IDENT);
-		    rename_item::add(nm_new, nm_old);
-		}
+		else if (strcmp(buf, "#begin(rename)") == 0) {
+			while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(rename)") != 0) 
+			{
+				nm_entry* nm_old = nm_entry::add(buf, TKN_IDENT);
+				fscanf(cfg, "%s", buf);
+				nm_entry* nm_new = nm_entry::add(buf, TKN_IDENT);
+				rename_item::add(nm_new, nm_old);
+			}
 	    }
 	}
 	fclose(cfg);
@@ -423,10 +448,9 @@ int main(int argc, char* argv[])
 		 ? PREFIX "/share/ptoc/tptoc.pas" 
 		 : PREFIX "/share/ptoc/ptoc.pas")); 
 #else
-    token::input(dprintf("%s%s", prog_path, 
- 			 turbo_pascal ? "tptoc.pas" : "ptoc.pas")); 
+    token::input(dprintf("%s%s", prog_path, turbo_pascal ? "tptoc.pas" : "ptoc.pas")); 
 #endif
-    zzparse(); 
+    zzparse();
 
     compile_system_library = FALSE;
     token::reset();
@@ -441,7 +465,7 @@ int main(int argc, char* argv[])
 	}
 	catch (...)
 	{
-		dprintf("UNKNOWN ERROR!");
+		fprintf(stderr, "UNKNOWN ERROR CAUGHT!");
 	}
 
     token::output(output_file);
