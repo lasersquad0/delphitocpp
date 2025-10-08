@@ -29,15 +29,15 @@ class symbol : public heap_object {
     int		tag;
 
     enum {
-        f_used 		= 0x01, // 
-	f_defined	= 0x02, // 
-        f_val_param     = 0x04, // variable is parameter passed by values
-        f_var_param     = 0x08, // variable is VAR parameter passsed b
-	f_exported      = 0x10, // variable is accessed by nested function
-	f_static        = 0x20, // variable is static
-	f_syslib        = 0x40, // symbol from system library        
-	f_const         = 0x80, // integer constant is stored in "value"
-	f_lvalue        = 0x100 // variable is used as lvalue
+      f_used 		  = 0x01, // 
+	  f_defined	      = 0x02, // 
+      f_val_param     = 0x04, // variable is parameter passed by values
+      f_var_param     = 0x08, // variable is VAR parameter passsed by reference
+	  f_exported      = 0x10, // variable is accessed by nested function
+	  f_static        = 0x20, // variable is static
+	  f_syslib        = 0x40, // symbol from system library        
+	  f_const         = 0x80, // integer constant is stored in "value"
+	  f_lvalue        = 0x100 // variable is used as lvalue
     };
     int	        flags;
     int         value;  
@@ -54,19 +54,19 @@ class b_ring {
     b_ring	*outer;
     b_ring	*inherite;
     symbol	*syms;
-    symbol      *with; // WITH variable for RECORD ring  
+    symbol  *with; // WITH variable for RECORD ring  
 
 
     // Kinds of binding contours
     enum SCOPE {
-	block, record, proc, global
+	    block, record, proc, global
     };
 
     int    scope;
 
     static b_ring global_b_ring;
     static b_ring *curr_b_ring;
-    static b_ring *top_b_ring;
+    static b_ring *top_b_ring; //=global_b_ring by default. changed only by two classes program_node and unit_node
 
     static bool push(b_ring* r) {
         /*
@@ -99,8 +99,8 @@ class b_ring {
         return top;
     }
 
-    symbol* search(token* t);
-    symbol* shallow_search(token* t);
+    virtual symbol* search(token* t);
+    symbol* shallow_search(token* t) const;
     symbol* add(nm_entry* in_name, nm_entry* out_name, int tag, tpexpr* type);
     symbol* add(nm_entry* in_name, int tag, tpexpr* type) { 
         return add(in_name, in_name, tag, type);
