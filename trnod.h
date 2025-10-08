@@ -5,29 +5,30 @@
 #include "tpexpr.h"
 
 enum {
-  ctx_program,      // program
+  ctx_program,      // 0 program
   ctx_module,       // list of declaration
   ctx_object,       // list of object components
   ctx_value,        // value of expression
   ctx_rvalue,       // rvalue part of assignment
-  ctx_lvalue,       // lvalue part of assignment
+  ctx_lvalue,       // 5 lvalue part of assignment
   ctx_lvalarray,    // array element is used as lvalue
   ctx_procptr,      // pointer to procedure 
   ctx_apply,        // functions is applied to arguments
-  ctx_varpar,       // parameter passed by reference
-  ctx_valpar,       // parameter passed by value
+  ctx_varpar,       // 9 parameter passed by reference
+  ctx_valpar,       // 10 parameter passed by value
   ctx_statement,    // statement
   ctx_condition,    // result is used in condition expression
   ctx_component,    // type od array component
   ctx_block,        // block context
   ctx_access,       // result is used in access to record component operation
-  ctx_array,        // result is used as base value in index expression
+  ctx_array,        // 16 result is used as base value in index expression
   ctx_variant,      // variant part of record
   ctx_reftyp,       // reference definition type
   ctx_record,       // initializer for record constant
   ctx_union,        // record with only variant component
   ctx_constant,     // constant expression
-  ctx_toascii       // convertion of number to string
+  ctx_toascii,      // convertion of number to string
+  ctx_constpar      // 23 parameter passed as const by value
 };
   
 
@@ -321,8 +322,8 @@ public:
 
     try_except_node(token* t_try, stmt_node* body1, token* t_except, stmt_node* ex_many, token* t_else, stmt_node* body2, token* t_end);
 
-    virtual void attrib(int ctx) override;
-    virtual void translate(int ctx) override;
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
     void print_debug() override { fprintf(stderr, "try-except:"); body1->print_debug(); };
 };
 
@@ -330,9 +331,9 @@ class on_except_node : public stmt_node {
 public:
     token* t_on, *t_ident, *t_coln, * t_do;
     tpd_node* ex_type;
-    stmt_node* body;
+    compound_node* body;
 
-    on_except_node(token* t_on, token* t_ident, token* t_coln, tpd_node* ex_type, token* t_do, stmt_node* body);
+    on_except_node(token* t_on, token* t_ident, token* t_coln, tpd_node* ex_type, token* t_do, compound_node* body);
     
     void attrib(int ctx) override;
     void translate(int ctx) override;
@@ -472,8 +473,8 @@ class return_node : public stmt_node {
 
 class empty_node : public stmt_node {
   public:
-    token* last; 
-    empty_node(token* last);
+    token* t_last; 
+    empty_node(token* t_last);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1044,7 +1045,8 @@ class var_decl_node : public decl_node {
     virtual void translate(int ctx);
 };
 
-// used for function/proc parameters when parameters declared with 'var' or 'const' specifier
+// used for: 
+//      function/proc parameters when parameters declared with 'var' or 'const' specifier
 //      for object's field definitions
 //      for local and global variable definitions
 class var_decl_part_node : public decl_node { 
@@ -1057,6 +1059,19 @@ class var_decl_part_node : public decl_node {
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
+};
+
+class field_list_node;
+
+class record_field_part_node : public decl_node {
+public:
+    token* t_var;
+    field_list_node* flist;
+
+    record_field_part_node(token* t_var, field_list_node* flist);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
 
@@ -1202,7 +1217,7 @@ class tpd_node : public node {
   public:
     tpexpr*     type; /* Type which is designated by this typenode */
      
-    enum { tpd_simple, tpd_set, tpd_enum, tpd_range, tpd_proc, 
+    enum { tpd_simple, tpd_set, tpd_enum, tpd_range, tpd_proc, //TODO what is the difference from enum type_tag{} ? 
            tpd_array, tpd_string, tpd_ref, tpd_object, tpd_record, tpd_file };  
     int         tag;  
 
@@ -1462,29 +1477,28 @@ class record_tpd_node : public tpd_node {
     token*           t_packed;
     token*           t_record;
     token*           t_end; 
-    field_list_node* fields; 
-    decl_node*       methods;
+    decl_node*       parts; 
+    //decl_node*       methods;
     record_tpd_node* outer;
 
-    record_tpd_node(token* t_packed, token* t_record, 
-                    field_list_node* fields, decl_node* methods, token* t_end);
+    record_tpd_node(token* t_packed, token* t_record, decl_node* parts, token* t_end);
 
     void assign_name();
 
-    virtual void attrib(int ctx);
-    virtual void translate(int ctx);
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
 //
 // Borland Pascal object
 //
 
-class object_part_node : public decl_node {
+class access_specifier_node : public decl_node {
 public:
     token* t_access_lvl;
-    decl_node* components;
+  //  decl_node* components;
 
-    object_part_node(token* t_access_lvl, decl_node* components);
+    access_specifier_node(token* t_access_lvl/*, decl_node* components = NULL*/);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
