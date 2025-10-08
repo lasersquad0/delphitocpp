@@ -48,41 +48,43 @@ class token : public heap_object {
 
     token(int v_cat, int v_tag) 
     { 
-	next = prev = this;
-	cat = v_cat;
-	tag = v_tag;
-	fname = NULL;
-	clone = bind = NULL;
+	    next = prev = this;
+	    cat = v_cat;
+	    tag = v_tag;
+	    fname = NULL;
+	    clone = bind = NULL;
     }
+
     token(char const* v_text, int v_tag = TKN_GEN, int v_line = 0, int v_pos = 0,
 	  nm_entry *nm = NULL) 
     { 
         line = v_line;
-	attr = 0;
+	    attr = 0;
         pos = v_pos;
         tag = v_tag;
-	cat = token_cat[v_tag];
+	    cat = token_cat[v_tag];
         out_text = in_text = (char*)v_text; 
         fname = NULL;
         name = nm;
-	clone = bind = NULL;
+	    clone = bind = NULL;
     }	    
+
     token(token& t); 	    
 
     enum token_attributes { 
-	fix_pos = 1, 
-	from_include_file = 2 
+	    fix_pos = 1, 
+	    from_include_file = 2 
     }; 
 
     unsigned char  cat;		// Token category
-    unsigned char  attr;        // Attribute of token
+    unsigned char  attr;    // Attribute of token
     unsigned short tag;		// Exact token code
     unsigned short pos;		// Pos. within the line of token start
     unsigned short line;	// Line number where token was found
 
-    nm_entry*   name;           // Corresponded name entry (!=NULL for ID)
+    nm_entry*   name;       // Corresponded name entry (!=NULL for ID)
 
-    char*       in_text;        // Input text representation of token
+    char*       in_text;    // Input text representation of token
     char*       out_text;	// Output text representation of token
 
     char*       fname;          // Token file name
@@ -90,11 +92,11 @@ class token : public heap_object {
     token*      bind;           // token position of which is taken 	    
     token*      clone;          // cloned token 
     
-    token* insert_b(token* t) { // insert token before (returns this)
+    token* insert_b(token* t) { // insert token this before t (returns this)
         next = t; prev = t->prev;   
         return t->prev = t->prev->next = this;
     }
-    token* insert_a(token* t) { // insert token after (returns this)
+    token* insert_a(token* t) { // insert token this after t (returns this)
         prev = t; next = t->next;
         return t->next = t->next->prev = this;
     }
@@ -106,16 +108,16 @@ class token : public heap_object {
 
     token* prepend(char const* s) { 
         token* t = new token(s);
-	t->pos = pos;
+	    t->pos = pos;
         return t->insert_b(this);			    
     }
     token* append(char const* s) {
-	return (new token(s))->insert_a(this);
+	    return (new token(s))->insert_a(this);
     }
     void   disable() { 
-	if (cat != CAT_WSPC || tag < TKN_GEN) { 
-	    cat = CAT_WSPC; tag = TKN_GEN; out_text = NULL; 
-	}
+	    if (cat != CAT_WSPC || tag < TKN_GEN) { 
+	        cat = CAT_WSPC; tag = TKN_GEN; out_text = NULL; 
+	    }
     }
     void   disappear(); // disable token with all white spaces after it
 
@@ -123,11 +125,8 @@ class token : public heap_object {
 
     void   set_bind(token* t) { bind = t; } 
 
-    token* copy(token* from, token* till); // copy list of tokens before 
-					   // this token, return pointer to 
-                                           // image of 'from' token 
-    token* move(token* from, token* till); // move list of tokens before this 
-					   // token, return pointer to from
+    token* copy(token* from, token* till); // copy list of tokens before this token, return pointer to image of 'from' token 
+    token* move(token* from, token* till); // move list of tokens before this token, return pointer to from
     token* move_region(token* head, token* tail); 
                                            // move region (together with 
 					   // comments and white spaces)
