@@ -9,11 +9,12 @@
 
 #define items(a) (sizeof(a) / sizeof(*(a)))
 
-#define bool int
-#ifndef TRUE
+//#define bool int
+/*#ifndef TRUE
   #define TRUE 1
   #define FALSE 0
 #endif
+*/
 
 #define VERSION "3.50"
 

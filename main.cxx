@@ -33,7 +33,7 @@ DEF_TOKEN
 * System.exit() - does not recognize System as namespace/unit
 * Implement initialization/finalization sections
 * TArr = array of Integer - is not supported (dynamic arrays)
-* Class properties ar enot supported
+* Class properties are not supported
 * RECORDS cannot contain published and protected sections
 * 
 *////////////////////////////////////
@@ -149,7 +149,7 @@ static void load_predefined()
 		//unit_tp* type = new unit_tp();
 		//b_ring::global_b_ring.add(nm_entry::add("system", TKN_IDENT), symbol::s_var, type);
 
-		nested_comments = TRUE;
+		nested_comments = true;
 	}
 }
 
@@ -335,7 +335,7 @@ static void scan_opt (int argc, char **argv) {
  	    *opt[j].value = opt[j].defval;
         }
 	if (opt[j].flag != NULL) { 
-	    *(opt[j].flag) = FALSE; // Switch off flags
+	    *(opt[j].flag) = false; // Switch off flags
         }
     }
     for (i = 1; i < argc; i++) { // Skipping program name
@@ -347,11 +347,11 @@ static void scan_opt (int argc, char **argv) {
 	    input_file = argv[i];
 	    continue;
 	}
-	found = FALSE;
+	found = false;
 	for (j = 0; j < (sizeof(opt)/sizeof(opt_str)); j++) {
 	    if (strcmp (opt[j].str, argv[i]) == 0) { 
 		if (opt[j].flag != NULL) { 
-	            *(opt[j].flag) = TRUE;
+	            *(opt[j].flag) = true;
                 } 
 		if (opt[j].value != NULL) { 
 		    i++; 
@@ -361,7 +361,7 @@ static void scan_opt (int argc, char **argv) {
 		    }
 		    *opt[j].value = argv[i];
 		}
-		found = TRUE;
+		found = true;
 		break;
 	    }
 	}
@@ -383,7 +383,7 @@ static void scan_opt (int argc, char **argv) {
 	    }
 	    exit (1);
 	}
-	pio_init = TRUE;
+	pio_init = true;
     }
     if (input_file == NULL) { 
 	goto Help;
@@ -442,7 +442,7 @@ int main(int argc, char* argv[])
 	}
     }
 
-    compile_system_library = TRUE;
+    compile_system_library = true;
 #ifdef PREFIX
     token::input(turbo_pascal 
 		 ? PREFIX "/share/ptoc/tptoc.pas" 
@@ -452,7 +452,7 @@ int main(int argc, char* argv[])
 #endif
     zzparse();
 
-    compile_system_library = FALSE;
+    compile_system_library = false;
     token::reset();
 	
 	zzdebug = 1;
