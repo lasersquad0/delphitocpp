@@ -2123,11 +2123,11 @@ static char *include_name (char *src) {
             }
         }
     }
-    bool suffix = FALSE;
+    bool suffix = false;
     while(*src && !isspace(*src) && *src != ';' && *src != '\''
           && *src!='\n' && *src != '}')
     {
-        if (*src == '.') suffix = TRUE;
+        if (*src == '.') suffix = true;
 	*dst++ = tolower(*(unsigned char*)src++);
     }
     *dst = 0;
@@ -2988,9 +2988,9 @@ YY_RULE_SETUP
 
 	       if (turbo_pascal) {
 	           if (tag == TKN_TYPE || tag == TKN_VAR) {
-		       type_or_var_context = TRUE;
+		       type_or_var_context = true;
 	           } else if (tag == TKN_BEGIN || tag == TKN_CONST) {
-		       type_or_var_context = FALSE;
+		       type_or_var_context = false;
 		   } else if (tag == TKN_IMPLEMENTATION) {
 		       if (include_level > 0)  {
 		           scanner.pop();
@@ -4088,10 +4088,10 @@ void scan_ctx::pop() {
 bool scan_ctx::find(char* name) {
     for (int i = 0; i < sp; i ++ ) {
 	if (strcmp(stack[i].file_name, name) == 0) {
-	    return TRUE;
+	    return true;
 	}
     }
-    return FALSE;
+    return false;
 }
 
 
