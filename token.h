@@ -87,10 +87,10 @@ class token : public heap_object {
     char*       in_text;    // Input text representation of token
     char*       out_text;	// Output text representation of token
 
-    char*       fname;          // Token file name
+    char*       fname;      // Token file name
  
-    token*      bind;           // token position of which is taken 	    
-    token*      clone;          // cloned token 
+    token*      bind;       // token position of which is taken 	    
+    token*      clone;      // cloned token 
     
     token* insert_b(token* t) { // insert token this before t (returns this)
         next = t; prev = t->prev;   
@@ -125,14 +125,10 @@ class token : public heap_object {
 
     void   set_bind(token* t) { bind = t; } 
 
-    token* copy(token* from, token* till); // copy list of tokens before this token, return pointer to image of 'from' token 
-    token* move(token* from, token* till); // move list of tokens before this token, return pointer to from
-    token* move_region(token* head, token* tail); 
-                                           // move region (together with 
-					   // comments and white spaces)
-    static void swap(token* left_head, token* left_tail, 
-		     token* right_head, token* right_tail); 
-
+    token* copy(token* from, token* till); // copy list of tokens before 'this' token, return pointer to image of 'from' token 
+    token* move(token* from, token* till); // move list of tokens before 'this' token, return pointer to from
+    token* move_region(token* head, token* tail); // move region (together with comments and white spaces)
+    static void swap(token* left_head, token* left_tail, token* right_head, token* right_tail); 
 
     token* next_relevant();
     token* prev_relevant();
@@ -140,7 +136,7 @@ class token : public heap_object {
     static token* last_relevant();
 
     void   set_trans (char const* str) {
-        cat = CAT_GEN;	
+        cat = CAT_GEN;
         out_text = (char*)str;
     }    
 
