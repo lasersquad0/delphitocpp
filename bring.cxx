@@ -50,8 +50,8 @@ symbol* b_ring::shallow_search(token* t) const
 
 bool b_ring::find_scope(b_ring* type)
 {
-    for (b_ring* scope = this; scope != NULL; scope = scope->outer) {
-        if (type == scope) { 
+    for (b_ring* scp = this; scp != NULL; scp = scp->outer) {
+        if (type == scp) { 
             return true;
         }
     }
