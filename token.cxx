@@ -58,7 +58,7 @@ void   token::remove(token* head, token* tail)
 
 void   token::disable(token* head, token* tail)
 { 
-    while(TRUE) { 
+    while(true) {
 	if (head->tag != TKN_CMNT && head->tag != TKN_LN) { 
 	    head->disable();
         }
@@ -89,7 +89,7 @@ token* token::get_first_token()
 token* token::copy(token* head, token* tail)
 {
     token* first = head;
-    while (TRUE) { 
+    while (true) {
          (new token(*head))->insert_b(this); //insert new token (copy of head) before this 
 	 if (head == tail) break;
 	 head = head->next; 
@@ -263,9 +263,9 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
     FILE*  f;
     token* nt;
     int    tag;
-    bool   def_vars = FALSE;
-    bool   interface_module = FALSE;
-    bool   unit_implementation = FALSE;
+    bool   def_vars = false;
+    bool   interface_module = false;
+    bool   unit_implementation = false;
     bool   in_namespace = false;
     int file_name_len = 0;
 
@@ -277,7 +277,7 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
 	file_name_len = strrchr(file, '.') - file;
 	fprintf(ctx.file(), "#ifndef __%.*s_h__\n#define __%.*s_h__\n", 
 		file_name_len, file, file_name_len, file);
-	interface_module = TRUE;
+	interface_module = true;
     }
     for (; (tag = t->tag) != TKN_DUMMY; t = t->next) {
         switch (tag) {
@@ -286,11 +286,11 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
 	    inc_file = ip1 ? dprintf("%.*s.h", ip1 - file, file)
 		           : dprintf("%s.h", inc_file, file);
             fprintf(ctx.file(), "#include \"%s\"\n", inc_file);
-	    t = print_rec(inc_file, t->next, TRUE);
+	    t = print_rec(inc_file, t->next, true);
             if (t->tag == TKN_IMPLEMENTATION && use_namespaces) { 
                 file_name_len = strrchr(file, '.') - file;
                 fprintf(ctx.file(), "\nnamespace %.*s {\n", file_name_len, file);
-                unit_implementation = TRUE;
+                unit_implementation = true;
             }                
 	    continue;
           case TKN_PUSH_FILE:
@@ -298,12 +298,12 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
             ip1 = strrchr(t->in_text, '.');
             ip2 = strrchr(t->out_text, '.');
             assert (ip1 != NULL && ip2 != NULL);
-	    def_vars = FALSE;
+	    def_vars = false;
 	    if (extern_vars && !turbo_pascal 
 		&& strcmp(ip2, ".var") == 0
 		&& strncmp(t->out_text, file, ip2-t->out_text+1) == 0)
 	    {
-		def_vars = TRUE;
+		def_vars = true;
 	    } 
 	    if (strcmp(ip1, ".pas") == 0) { 
                 strcpy(ip1, ".h");
@@ -335,7 +335,7 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
 		    if (t->tag == TKN_UNIT_END)  nested -= 1;
 		} while(nested);
             } else { 
-		t = print_rec(inc_file, t->next, FALSE);
+		t = print_rec(inc_file, t->next, false);
 	    }
 	    if (tag != TKN_PUSH_UNIT) { 
 		for (nt = t->next; 
@@ -374,7 +374,7 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
 
 void token::output (char *file) 
 {
-    print_rec(file, dummy.next, FALSE);
+    print_rec(file, dummy.next, false);
 }
 
 
