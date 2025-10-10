@@ -36,9 +36,9 @@ token *tpexpr::insert_before(token *t)
 
 tpexpr* tpexpr::get_typedef() { return this; }
 
-bool tpexpr::is_reference() { return FALSE; }
+bool tpexpr::is_reference() { return false; }
 
-bool tpexpr::is_array() { return FALSE; }
+bool tpexpr::is_array() { return false; }
 
 //---------------------------------------------------------------------
 
@@ -57,7 +57,7 @@ ref_tp::ref_tp(tpexpr* tp, tpd_node* tpd)
     } 
 }
 
-bool ref_tp::is_reference() { return TRUE; }
+bool ref_tp::is_reference() { return true; }
 
 //---------------------------------------------------------------------
 
@@ -75,7 +75,7 @@ tpexpr* fwd_ref_tp::get_typedef()
         symbol *sym = b_ring::search_cur(ident);
         if (sym != NULL) {
             base_type = sym->type;
-	    tag = tp_ref;
+	        tag = tp_ref;
         }
     }
     return this;
@@ -96,7 +96,7 @@ void enum_tp::set_enumeration_name(tpexpr* type)
 	sym->type = type;
 	if (sym == first) break;
 	sym = sym->next;
-    } while (TRUE);
+    } while (true);
 }
     
 
@@ -119,7 +119,7 @@ array_tp::array_tp(tpexpr* tp, tpd_node* tpd)
     base = -1;
 }
 
-bool array_tp::is_array() { return TRUE; }
+bool array_tp::is_array() { return true; }
 
 void array_tp::insert_bounds_definition(symbol* array, token* block, int n)
 { 
@@ -327,10 +327,10 @@ proc_tp::proc_tp(tpexpr* rtype, tpd_node* tpd)
     last_temp = temp_list = NULL;
     n_temp = 0;
     n_subproc = 0;
-    make_all_constants_global = FALSE;
-    is_extern_c = FALSE;
-    is_constructor = FALSE;
-    is_destructor = FALSE;
+    make_all_constants_global = false;
+    is_extern_c = false;
+    is_constructor = false;
+    is_destructor = false;
 }
 
 void proc_tp::add_param(symbol *var) 
@@ -351,7 +351,7 @@ void proc_tp::add_extra_param(symbol *var)
     if (var->ring->scope == b_ring::proc && var->type
 	&& !var->type->is_scalar() && var->type->get_typedef() == var->type) 
     { 
-	((proc_tp*)var->ring)->make_all_constants_global = TRUE;
+	((proc_tp*)var->ring)->make_all_constants_global = true;
     }
 
     if (language_c && var->type->tag == tp_dynarray) { 
