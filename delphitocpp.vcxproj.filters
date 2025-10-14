@@ -51,6 +51,9 @@
     <ClInclude Include="io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="property.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="bring.cxx">

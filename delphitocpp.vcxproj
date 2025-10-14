@@ -26,6 +26,7 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="nmtbl.h" />
     <ClInclude Include="parser.h" />
+    <ClInclude Include="property.h" />
     <ClInclude Include="ptoc.h" />
     <ClInclude Include="token.h" />
     <ClInclude Include="tpexpr.h" />
