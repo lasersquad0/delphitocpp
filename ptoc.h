@@ -26,8 +26,8 @@ typedef const char*    asciiz;
 #endif               
 
 typedef unsigned char boolean; 
-#define true          (1)
-#define false         (0)
+//#define true          (1)
+//#define false         (0)
 
 #define nil           NULL
 
@@ -41,7 +41,9 @@ typedef unsigned char boolean;
 #include "array.h"
 #include "paslib.h"
 #include "set.h"
+#include "property.h"
 
 #endif
+
 
 
