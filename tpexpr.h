@@ -34,7 +34,7 @@ class tpd_node;
 
 class tpexpr : public heap_object {
   public:
-    int      tag; // enum type_tag {} 
+    int      tag;   // enum type_tag {} 
     int      flags;
     char     *name;
     tpd_node *tpd; 

@@ -136,13 +136,13 @@ void array_tp::insert_bounds_definition(symbol* array, token* block, int n)
     }
 }
 
-void array_tp::set_dim(char *low, char *high, 
-		       expr_node *low_expr, expr_node *high_expr)
+void array_tp::set_dim(char *lw, char *hgh, 
+		       expr_node *lw_expr, expr_node *hgh_expr)
 {
-    this->low = low;
-    this->high = high;
-    this->low_expr = low_expr;
-    this->high_expr = high_expr;
+    this->low = lw;
+    this->high = hgh;
+    this->low_expr = lw_expr;
+    this->high_expr = hgh_expr;
     
     if (low != NULL && strcmp(low, "0") == 0) { 
 	base = 0;
@@ -296,7 +296,7 @@ string_tp::string_tp() : array_tp(&char_type)
     name = "char*";
 }
 
-void string_tp::insert_dimensions(expr_node* e, array_tp* conf_arr, int n)
+void string_tp::insert_dimensions(expr_node* e, array_tp* /*conf_arr*/, int /*n*/)
 {
     e->f_tkn->prepend("array(");
     e->l_tkn->append(")");
