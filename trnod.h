@@ -577,23 +577,24 @@ class expr_node : public node {
     tpexpr*    type;
 
     bool       is_const_literal() {
-	return (flags & (tn_is_const|tn_is_literal)) == (tn_is_const|tn_is_literal); 
+	    return (flags & (tn_is_const|tn_is_literal)) == (tn_is_const|tn_is_literal); 
     } 
     
     bool       is_parameter();
 
-    expr_node(int expr_tag, int expr_flags = 0) { 
-	tag = expr_tag; 
-	parent_tag = tn_group;
-	type = NULL; 
-	flags = expr_flags; 
-	next = NULL; 
+    expr_node(int expr_tag, int expr_flags = 0) {
+        tag = expr_tag;
+        parent_tag = tn_group;
+        type = NULL;
+        flags = expr_flags;
+        next = NULL;
+        value = 0;
     }
 
     void print_debug() override 
     { 
         fprintf(stderr, "tag:%d val:%d", (int)(tag), value);
-    };
+    }
 };
 
 //=============================================================================
@@ -1249,12 +1250,14 @@ class fptr_tpd_node : public tpd_node {
     token*           t_params;
     param_list_node* params;
     tpd_node*        ret_type;
+    token*           t_of;
+    token*           t_object;
       
     fptr_tpd_node(token* t_proc, param_list_node* params, 
-		  token* t_coln = NULL, tpd_node* ret_type = NULL);
+		  token* t_coln = NULL, tpd_node* ret_type = NULL, token* t_of = NULL, token* t_object = NULL);
 
-    virtual void attrib(int ctx);
-    virtual void translate(int ctx);
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
 //
@@ -1513,7 +1516,7 @@ class object_tpd_node : public tpd_node {
     token*         t_end; 
     decl_node*     parts;         
 
-    symbol*          super;
+    symbol*        super;
     
     object_tpd_node(token* t_object, token* t_lbr, token* t_superclass, token* t_rbr, 
                     decl_node* parts, token* t_end);  
@@ -1558,6 +1561,160 @@ class set_tpd_node : public tpd_node {
  
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
+};
+
+//
+// Delphi Properties definition
+//
+
+class prop_index_node : public decl_node
+{
+public:
+    token* t_index;
+    expr_node* prop_index;
+
+    prop_index_node(token* t_index, expr_node* prop_index);
+
+    char* get_val()
+    {
+        return prop_index->f_tkn->in_text;
+    }
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class prop_type_def_node : public decl_node
+{
+public:
+    token* t_coln;
+    tpd_node* tpd;
+
+    char* val_type = NULL;
+
+    prop_type_def_node(token* t_coln, tpd_node* type);
+    
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class prop_array_node : public decl_node
+{
+public:
+    token* t_lbr;
+    token* t_ident;
+    prop_type_def_node* ind_type; // actually prop_type_def_node
+    token* t_rbr;
+
+    char* key_type = NULL;
+
+    prop_array_node(token* t_lbr, token* t_ident, decl_node* type, token* t_rbr);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class prop_read_node : public decl_node
+{
+public:
+    token* t_read;
+    token* t_ident;
+    symbol* sym = NULL;
+    char* func_name = NULL;
+
+    prop_read_node(token* t_read, token* t_ident);
+
+    bool is_function() const
+    {
+        assert(sym);
+        return sym->tag == symbol::s_proc;
+    }
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class prop_write_node : public decl_node
+{
+public:
+    token* t_write;
+    token* t_ident;
+    symbol* sym = NULL;
+    char* func_name = NULL;
+
+    prop_write_node(token* t_write, token* t_ident);
+
+    bool is_function() const
+    {
+        assert(sym);
+        return sym->tag == symbol::s_proc;
+    }
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class prop_stored_node : public decl_node
+{
+public:
+    token* t_stored;
+    token* t_truefalse;
+    prop_stored_node(token* t_stored, token* t_truefalse);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class prop_default_node : public decl_node
+{
+public:
+    token* t_default;
+    expr_node* def_value;
+    prop_default_node(token* t_default, expr_node* def_value);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class prop_default_directive_node : public decl_node
+{
+public:
+    token* t_default_d;
+    token* t_semi;
+    prop_default_directive_node(token* t_default_d, token* t_semi);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class property_node : public decl_node {
+public:
+    token* t_property;
+    token* t_ident;
+    prop_array_node* array;
+    prop_type_def_node* prop_type;
+    prop_index_node* index;
+    prop_read_node* read;
+    prop_write_node* write;
+    prop_stored_node* stored;
+    prop_default_node* dfault;
+    token* t_semi;
+    prop_default_directive_node* dfault_d;
+
+    property_node(token* t_property, token* t_ident, decl_node* array, decl_node* type, decl_node* index,
+        decl_node* read, decl_node* write, decl_node* stored, decl_node* dfault, token* t_semi, decl_node* dfault_d);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class property_decl_part_node : public decl_node {
+public:
+    decl_node* props; // actually this is property_node
+
+    property_decl_part_node(decl_node* props) { this->props = props; };
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
 
