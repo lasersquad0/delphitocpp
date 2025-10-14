@@ -26,8 +26,10 @@ DEF_TOKEN
 * DONE - added support for try...except and try...finally statements
 * DONE - add support for resourcestring keyword
 * DONE - added support for fields, methods and acccess specifiers in RECORDS.
-* 
-* 
+* DONE - в функциях если return type не определен то в union он устанавливается как void вместо например TBytes
+*
+* ifdef .h files guards cannot contain '.'. check it and remove dots from guards
+* если тип определен внутри класса например так type K = Cardinal; тогда в реализации ф-ции (вне класса, в .cpp файле) нужно делать так 'ClassName::K' а не просто 'K', иначе не компилится
 * не понимает определение ф-ции с пустыми скобками (function Fun():Integer;), без скобок совсем - понимает
 * check if var1.var2.funcall() works properly
 * System.exit() - does not recognize System as namespace/unit
