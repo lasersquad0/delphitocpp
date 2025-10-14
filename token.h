@@ -80,7 +80,8 @@ class token : public heap_object {
     unsigned char  attr;    // Attribute of token
     unsigned short tag;		// Exact token code
     unsigned short pos;		// Pos. within the line of token start
-    unsigned short line;	// Line number where token was found
+    unsigned short line;	// Line number where token was found 
+    //TODO shall we change line to unsigned int?
 
     nm_entry*   name;       // Corresponded name entry (!=NULL for ID)
 
