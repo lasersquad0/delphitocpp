@@ -4142,11 +4142,10 @@ void  var_decl_node::translate(int ctx)
     if (coln != NULL) {
 		token::disable(coln->prev_relevant()->next, tpd->f_tkn->prev); // disables two tokens ":" and "PascalType" in variable decl
     }
-    if (ctx == ctx_valpar || ctx == ctx_varpar || ctx == ctx_constpar) {
+    if (ctx == ctx_valpar || ctx == ctx_varpar || ctx == ctx_constpar) {  // working with fun/method parameters here
 		if (language_c && tp->tag == tp_dynarray) {
 			token *t = vars->ident->prev;
-			((array_tp*)tp->get_typedef())->
-			insert_bound_params(vars->ident);
+			((array_tp*)tp->get_typedef())->insert_bound_params(vars->ident);
 			if (var_decl_coln) {
 				t->next->set_bind(var_decl_coln);
 			}
@@ -4154,56 +4153,54 @@ void  var_decl_node::translate(int ctx)
         for (token_list* tkn = vars; tkn != NULL; tkn = tkn->next) {
 	    token *t;
 	    tkn->var->translate(tkn->ident);
-	    if (language_c) {
-		if (tpd != NULL) {
-		    if (tpd->tag == tpd_node::tpd_array) {
-			tpd_node* eltd = ((array_tpd_node*)tpd)->eltd;
-			t = tkn->ident->copy(eltd->f_tkn, eltd->l_tkn);
-			if (tp->tag == tp_dynarray) {
-			    tkn->ident->prepend(ctx == ctx_varpar
-						? "* " : " const* ");
-			} else {
-			    tkn->ident->prepend(ctx == ctx_varpar
-						? " " : "  const ");
-			    tkn->ident->next->copy(tpd->f_tkn, tpd->l_tkn);
-			}
-		    } else {
-			t = tkn->ident->prepend(ctx == ctx_varpar
+		if (language_c) {
+			if (tpd != NULL) {
+				if (tpd->tag == tpd_node::tpd_array) {
+					tpd_node* eltd = ((array_tpd_node*)tpd)->eltd;
+					t = tkn->ident->copy(eltd->f_tkn, eltd->l_tkn);
+					if (tp->tag == tp_dynarray) {
+						tkn->ident->prepend(ctx == ctx_varpar
+							? "* " : " const* ");
+					} else {
+						tkn->ident->prepend(ctx == ctx_varpar
+							? " " : "  const ");
+						tkn->ident->next->copy(tpd->f_tkn, tpd->l_tkn);
+					}
+				} else {
+					t = tkn->ident->prepend(ctx == ctx_varpar
 						? tp->tag == tp_array || tp->tag == tp_string ? " " : "* "
 						: tp->tag == tp_array ? " const " : " ")->
-			    copy(tpd->f_tkn, tpd->l_tkn);
-		    }
-		} else {
-		    t = tkn->ident->prepend("void* ");
-		}
-	    } else { // C++
-		if (tpd == NULL) {
-		    t = tkn->ident->prepend("void* ");
-		} else {
-		    char* modifier = " ";
-			if (ctx == ctx_varpar) {
-				if (tp->tag != tp_dynarray && tp->tag != tp_string) {
-					if (curr_proc->is_extern_c) {
-						if (tp->tag != tp_array) {
-							modifier = "* ";
+						copy(tpd->f_tkn, tpd->l_tkn);
+				}
+			} else {
+				t = tkn->ident->prepend("void* ");
+			}
+		} else { // C++
+			if (tpd == NULL) {
+				t = tkn->ident->prepend("void* ");
+			} else {
+				char* modifier = " ";
+				if (ctx == ctx_varpar) {
+					if (tp->tag != tp_dynarray && tp->tag != tp_string) {
+						if (curr_proc->is_extern_c) {
+							if (tp->tag != tp_array) modifier = "* ";
+						}
+						else {
+							modifier = "& ";
 						}
 					}
-					else {
-						modifier = "& ";
-					}
+				}
+				t = tkn->ident->prepend(modifier);
+				if (curr_proc->is_extern_c && tp->tag == tp_array) {
+					char* param_type_name = ((array_tp*)tp->get_typedef())->elem_type->name;
+					t->prepend(dprintf("%s* ", param_type_name ? param_type_name : "void"));
+				} else {
+					token* tt = t->copy(tpd->f_tkn, tpd->l_tkn);
+					if (ctx == ctx_constpar)
+						tt->prepend("const ");	// parameters are with const modificator
 				}
 			}
-		    t = tkn->ident->prepend(modifier);
-		    if (curr_proc->is_extern_c && tp->tag == tp_array) {
-				char* param_type_name = ((array_tp*)tp->get_typedef())->elem_type->name;
-				t->prepend(dprintf("%s* ", param_type_name ? param_type_name : "void"));
-		    } else {
-				token* tt = t->copy(tpd->f_tkn, tpd->l_tkn);
-				if(ctx == ctx_constpar)
-					tt->prepend("const ");	// parameters are with const modificator			
-		    }
 		}
-	    }
 	    if (var_decl_coln) {
 	        t->set_bind(var_decl_coln);
 	    } else {
@@ -4224,78 +4221,82 @@ void  var_decl_node::translate(int ctx)
             l_tkn->next_relevant()->set_trans(",");
         }
 
-    } else {
-	bool is_static = false;
-	for (token_list* tkn = vars; tkn != NULL; tkn = tkn->next) {
-	    if (tkn->var->out_name != tkn->ident->name) {
-		tkn->ident->set_trans(tkn->var->out_name->text);
-	    }
-	    if (language_c && ctx != ctx_record
-		&& (tp->get_typedef()->flags & tp_need_init))
-	    {
-		// initialize file structure
-		tkn->ident->append(
-		    (tp->tag == tp_file || tp->tag == tp_text)
-		    ? " = VOID_FILE" : " = {0}");
-	    }
-	    if (tkn->var->flags & symbol::f_static) {
-		is_static = true;
-	    }
 	}
-	if (language_c && tpd->tag == tpd_node::tpd_array) {
-	    tpd_node* eltd = ((array_tpd_node*)tpd)->eltd;
-	    f_tkn = f_tkn->prepend(" ");
-	    f_tkn = f_tkn->move(eltd->f_tkn, eltd->l_tkn);
-	    for (token_list* tkn = vars; tkn != NULL; tkn = tkn->next) {
-		tkn->ident->next->copy(tpd->f_tkn, tpd->l_tkn);
-	    }
-	    token::remove(tpd->f_tkn, tpd->l_tkn);
-	} else {
-	    if (language_c && tpd->tag == tpd_node::tpd_ref) {
-		for (token_list* tkn = vars->next; tkn != NULL; tkn=tkn->next){
-		    tkn->ident->prepend("*");
+	else { // working with var declaration here
+		bool is_static = false;
+		for (token_list* tkn = vars; tkn != NULL; tkn = tkn->next) {
+			if (tkn->var->out_name != tkn->ident->name)
+				tkn->ident->set_trans(tkn->var->out_name->text);
+
+			if (language_c && ctx != ctx_record
+				&& (tp->get_typedef()->flags & tp_need_init))
+			{
+				// initialize file structure
+				tkn->ident->append(
+					(tp->tag == tp_file || tp->tag == tp_text)
+					? " = VOID_FILE" : " = {0}");
+			}
+			if (tkn->var->flags & symbol::f_static) is_static = true;
 		}
-	    }
-	    f_tkn = f_tkn->prepend(" ");
-	    f_tkn = f_tkn->move(tpd->f_tkn, tpd->l_tkn);
-	}
-	if (ctx != ctx_record  && ctx != ctx_object
-	    && (unit_node::interface_part
-		|| (extern_vars
-		    && coln != NULL
-		    && (coln->attr & token::from_include_file))))
-        {
-	    f_tkn = f_tkn->prepend("EXTERN ");
-	} else if (scope != NULL) {
-	    f_tkn = f_tkn->prepend(scope->tag == TKN_EXTERNAL ? "extern " :
-				   scope->tag == TKN_STATIC ? "static " : "");
-	}
-        force_semicolon();
-	if (is_static) {
-	    assert(global_func_decl_level != NULL);
-	    for (token_list* tkn = vars; tkn != NULL; tkn = tkn->next) {
-		if (!(tkn->var->flags & symbol::f_static)) {
-		    tkn->var->flags |= symbol::f_static;
-		    tkn->var->ring->make_unique(tkn->var);
-		    tkn->var->translate(tkn->ident);
+
+		if (language_c && tpd->tag == tpd_node::tpd_array) {
+			tpd_node* eltd = ((array_tpd_node*)tpd)->eltd;
+			f_tkn = f_tkn->prepend(" ");
+			f_tkn = f_tkn->move(eltd->f_tkn, eltd->l_tkn);
+			for (token_list* tkn = vars; tkn != NULL; tkn = tkn->next) {
+				tkn->ident->next->copy(tpd->f_tkn, tpd->l_tkn);
+			}
+			token::remove(tpd->f_tkn, tpd->l_tkn);
+		} else {
+			if (language_c && tpd->tag == tpd_node::tpd_ref) {
+				for (token_list* tkn = vars->next; tkn != NULL; tkn = tkn->next) {
+					tkn->ident->prepend("*");
+				}
+			}
+			assert(tpd);
+			f_tkn = f_tkn->prepend(" ");
+			f_tkn = f_tkn->move(tpd->f_tkn, tpd->l_tkn);
+			if (attr & decl_flags::is_static) f_tkn = f_tkn->prepend("static ");  // variable with static modificator
 		}
-	    }
-	    f_tkn = f_tkn->prepend("static ");
-	    global_func_decl_level->move_region(f_tkn, l_tkn);
-	    global_func_decl_level->prepend("\n");
-	    (new token(NULL, TKN_BEG_SHIFT, f_tkn->line, f_tkn->pos))
-		->insert_b(f_tkn);
-	    (new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
+		if (ctx != ctx_record && ctx != ctx_object
+			&& (unit_node::interface_part
+				|| (extern_vars && coln != NULL && (coln->attr & token::from_include_file))))
+		{
+			f_tkn = f_tkn->prepend("EXTERN ");
+		} else if (scope != NULL) {
+			f_tkn = f_tkn->prepend(scope->tag == TKN_EXTERNAL ? "extern " :
+				scope->tag == TKN_STATIC ? "static " : "");
+		}
+		force_semicolon();
+		if (is_static) {
+			assert(global_func_decl_level != NULL);
+			for (token_list* tkn = vars; tkn != NULL; tkn = tkn->next) {
+				if (!(tkn->var->flags & symbol::f_static)) {
+					tkn->var->flags |= symbol::f_static;
+					tkn->var->ring->make_unique(tkn->var);
+					tkn->var->translate(tkn->ident);
+				}
+			}
+			f_tkn = f_tkn->prepend("static ");
+			global_func_decl_level->move_region(f_tkn, l_tkn);
+			global_func_decl_level->prepend("\n");
+			(new token(NULL, TKN_BEG_SHIFT, f_tkn->line, f_tkn->pos))
+				->insert_b(f_tkn);
+			(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
+		}
 	}
-    }
 }
 
-var_decl_part_node::var_decl_part_node(token* t_var, var_decl_node* vars)
+var_decl_part_node::var_decl_part_node(token* t_classvar, token* t_var, var_decl_node* vars)
 {
-    CONS2(t_var, vars);
+    CONS3(t_classvar, t_var, vars);
 	is_const = false;
 }
 
+// used for: 
+//      function/proc parameters when parameters declared with 'var', 'const' or 'out' specifier
+//      for object's field definitions
+//      for local and global variable definitions
 void var_decl_part_node::attrib(int ctx)
 {
 	is_const = (t_var) && (strcmp(t_var->in_text, "const") == 0);
@@ -4308,11 +4309,15 @@ void var_decl_part_node::attrib(int ctx)
 void var_decl_part_node::translate(int ctx)
 {
     f_tkn = l_tkn = t_var;
+
     for (decl_node* var = vars; var != NULL; var = var->next) 
 	{
+		if (t_classvar) var->attr |= decl_flags::is_static; // raise up is_static flag for variable
 		var->translate(ctx == ctx_valpar ? (is_const ? ctx_constpar : (int)ctx_varpar) : ctx);
 		l_tkn = var->l_tkn;
     }
+
+	if (t_classvar) t_classvar->disable();
 
     if (t_var) 
 		t_var->disappear();
@@ -4320,20 +4325,20 @@ void var_decl_part_node::translate(int ctx)
 		f_tkn = vars->f_tkn;
 
     //    token::disable(t_var, t_var->next_relevant()->prev);
-    if (ctx == ctx_module || ctx == ctx_program) {
-        (new token((char*)0, TKN_BEG_SHIFT, f_tkn->line,
-		   f_tkn->next_relevant()->pos))->insert_b(f_tkn);
-        (new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
-	if (unit_node::interface_part) {
-	    f_tkn = f_tkn->prepend(dprintf("\n#ifdef __%s_implementation__\n"
-					   "#undef EXTERN\n"
-					   "#define EXTERN\n"
-					   "#endif\n\n",
-					   unit_node::unit_name));
-	    l_tkn = l_tkn->append("\n#undef EXTERN\n"
-				  "#define EXTERN extern\n");
+	if (ctx == ctx_module || ctx == ctx_program) {
+		(new token((char*)0, TKN_BEG_SHIFT, f_tkn->line,
+			f_tkn->next_relevant()->pos))->insert_b(f_tkn);
+		(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
+		if (unit_node::interface_part) {
+			f_tkn = f_tkn->prepend(dprintf("\n#ifdef __%s_implementation__\n"
+				"#undef EXTERN\n"
+				"#define EXTERN\n"
+				"#endif\n\n",
+				unit_node::unit_name));
+			l_tkn = l_tkn->append("\n#undef EXTERN\n"
+				"#define EXTERN extern\n");
+		}
 	}
-    }
 }
 
 record_field_part_node::record_field_part_node(token* t_var, field_list_node* flist)
@@ -4441,6 +4446,20 @@ void proc_decl_part_node::translate(int ctx)
 	}*/
 }
 
+void method_decl_node::attrib(int ctx)
+{
+	proc->attrib(ctx);
+}
+
+void method_decl_node::translate(int ctx)
+{
+	proc->translate(ctx);
+
+	f_tkn = t_class ? t_class : proc->f_tkn;
+	l_tkn = proc->l_tkn;
+
+	if (t_class) t_class->set_trans("static ");
+}
 
 
 param_list_node::param_list_node(token* lpar, decl_node* params, token* rpar)
@@ -4725,6 +4744,9 @@ void proc_fwd_decl_node::attrib(int ctx)
 		}
 	}
 
+	if (is_static && (is_virtual || is_override || is_abstract))
+		warning(t_ident, "method '%s' marked as 'static' cannot be abstract, virtual or dynamic", t_ident->in_text);
+
 	if (is_abstract && !is_virtual)
 		warning(t_ident, "abstract method '%s' must be virtual or dynamic", t_ident->in_text);
 
@@ -4748,13 +4770,15 @@ void proc_fwd_decl_node::translate(int)
 
     insert_return_type();
 
-	if (qualifiers)
-	{
+//	if (qualifiers)
+//	{
 		if (is_external) {
 			f_tkn = f_tkn->prepend(type->is_extern_c && !language_c ? "extern \"C\" " : "extern ");
 		}
-		if (is_static)
-			f_tkn = f_tkn->prepend("static ");
+		// 'static' directive is not translated into C++ keyword 'static' because keyword 'class' tells us that method is static
+		// e.g. class procedure AAAA;. Compare to - class procedure AAAA; static;
+		//if (is_static)
+		//	f_tkn = f_tkn->prepend("static ");
 
 		if (is_virtual)
 			f_tkn = f_tkn->prepend("virtual ");
@@ -4776,11 +4800,12 @@ void proc_fwd_decl_node::translate(int)
 
 		if (is_final)
 			l_tkn = l_tkn->prepend(" final");
-	}
+		
+		// interfaces are translated as abstract classes. it means that methods of interface may not contain qualifiers but be abstract
+		if (is_abstract)
+			l_tkn = l_tkn->prepend(" = 0");
+//	}
 
-	// interfaces are translated as abstract classes. it means that methods of interface may not contain qualifiers but be abstract
-	if (is_abstract)
-		l_tkn = l_tkn->prepend(" = 0");
 
     var->translate(t_ident);
     insert_params();
@@ -4796,12 +4821,11 @@ void proc_fwd_decl_node::translate(int)
 object_tp* proc_def_node::self;
 
 proc_def_node::proc_def_node
-  (token* t_proc, token* t_class, token* t_dot, token* t_ident, param_list_node* params, token* t_coln,
-   tpd_node* ret_type, token* t_semi1, token* t_attrib, token* t_semi2,
-   block_node* block, token* t_semi3)
-: proc_decl_node(t_proc, t_ident, params, t_coln, ret_type)
+  (token* t_static, token* t_proc, token* t_class, token* t_dot, token* t_ident, param_list_node* params, token* t_coln,
+   tpd_node* ret_type, token* t_semi1, /*token* t_attrib, token* t_semi2,*/ block_node* block, token* t_semi3) 
+	   : proc_decl_node(t_proc, t_ident, params, t_coln, ret_type)
 {
-    CONS7(t_class, t_dot, t_semi1, t_attrib, t_semi2, block, t_semi3);
+    CONS6(t_static, t_class, t_dot, t_semi1, /*t_attrib, t_semi2,*/ block, t_semi3);
     use_forward = false;
     s_self = NULL;
     self = NULL;
@@ -4882,7 +4906,7 @@ void proc_def_node::translate(int ctx)
     proc_tp* save_proc = curr_proc;
     curr_proc = type;
 
-    if (t_attrib != NULL) token::remove(t_attrib, t_semi2);
+    //if (t_attrib != NULL) token::remove(t_attrib, t_semi2);
 
     if (use_forward) {
         f_tkn = t_proc->copy(type->forward->f_tkn, type->forward->t_semi1->prev);
@@ -4910,6 +4934,7 @@ void proc_def_node::translate(int ctx)
 	}
  
     if (t_dot) t_dot->set_trans("::");
+	if (t_static) t_static->set_trans("static ");
 
     if (ctx != ctx_block) {
 		global_func_decl_level = f_tkn;
@@ -4960,7 +4985,7 @@ void proc_def_node::translate(int ctx)
 		// define two variables that share the same memory.
 		// one is Delphi built-in 'Result' variable (works for functions only)
 		// TODO type->res_type->name will be 'void' for underfined types. needs to be fixed.
-	    first_stmt->prepend(dprintf("	%s %s_result;\n	%s& Result = %s_result;\n", type->res_type->name, type->proc_name, type->res_type->name, type->proc_name));
+	    first_stmt->prepend(dprintf("	%s %s_result;\n	%s& result = %s_result;\n", type->res_type->name, type->proc_name, type->res_type->name, type->proc_name));
 	    block->body->t_end->prepend(dprintf("return %s_result;\n", type->proc_name))->set_bind(first_stmt);
 	}
     } else if (type->is_constructor || type->is_destructor) {
@@ -5890,9 +5915,9 @@ void object_tpd_node::translate(int)
     t_end->set_bind(t_object);
 }
 
-access_specifier_node::access_specifier_node(token* t_access_lvl/*, decl_node* components*/)
+access_specifier_node::access_specifier_node(token* t_strict, token* t_access_lvl)
 {
-	this->t_access_lvl = t_access_lvl;
+	CONS2(t_strict, t_access_lvl);
 }
 
 void access_specifier_node::attrib(int)
@@ -5905,6 +5930,7 @@ void access_specifier_node::attrib(int)
 void access_specifier_node::translate(int)
 {
 	//TODO add special processing for Published access level
+	if(t_strict) t_strict->set_trans("/*strict */");
 	t_access_lvl->set_trans(t_access_lvl->in_text);
 	t_access_lvl->append(":\n");
 

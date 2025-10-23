@@ -919,10 +919,9 @@ class decl_node : public node {
   public:
     decl_node* next;
 
-    enum {
+    enum decl_flags {
 	is_toplevel = 1, // The declaration is at the top level of module
-	is_argument = 2, // The declaration is in the argument list of
-			 // procedure
+	is_argument = 2, // The declaration is in the argument list of procedure
 	is_static   = 4, // keyword 'static' must be prepended before decl
 	is_extern   = 8,
 	is_member   = 16
@@ -1067,19 +1066,20 @@ class var_decl_node : public decl_node {
 };
 
 // used for: 
-//      function/proc parameters when parameters declared with 'var' or 'const' specifier
+//      function/proc parameters when parameters declared with 'var', 'const' or 'out' specifier
 //      for object's field definitions
 //      for local and global variable definitions
 class var_decl_part_node : public decl_node { 
   public: 
+    token*           t_classvar;
     token*           t_var; 
     var_decl_node*   vars; 
     bool             is_const;
 
-    var_decl_part_node(token* t_var, var_decl_node* vars); 
+    var_decl_part_node(token* t_classvar, token* t_var, var_decl_node* vars);
 
-    virtual void attrib(int ctx);
-    virtual void translate(int ctx);
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
 class field_list_node;
@@ -1120,11 +1120,10 @@ public:
 
     proc_decl_part_node(decl_node* procs) { this->procs = procs; };
 
-    virtual void attrib(int ctx);
-    virtual void translate(int ctx);
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
- 
 
 //
 // Procedures and functions declarations and definition
@@ -1206,24 +1205,36 @@ class proc_fwd_decl_node : public proc_decl_node {
     virtual void translate(int ctx);
 };
 
+class method_decl_node : public decl_node
+{
+public:
+    token* t_class;
+    proc_decl_node* proc;
+
+    method_decl_node(token* t_cls, decl_node* prc) { t_class = t_cls; proc = (proc_decl_node*)prc; }
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
 
 class proc_def_node : public proc_decl_node {
   public: 
+    token*              t_static;
     token*              t_class;
     token*              t_dot;
     token*              t_semi1; 
     block_node*         block; 
-    token*              t_semi2; 
-    token*              t_attrib; 
+    //token*              t_semi2; 
+    //token*              t_attrib; 
     token*              t_semi3; 
     bool                use_forward; 
 
     static object_tp*   self;
     symbol*             s_self;
 
-    proc_def_node(token* t_proc, token* t_class, token* t_dot, token* t_ident, param_list_node* params, 
+    proc_def_node(token* t_static, token* t_proc, token* t_class, token* t_dot, token* t_ident, param_list_node* params,
 		  token* t_coln, tpd_node* ret_type, 
-		  token* t_semi1, token* t_attrib, token* t_semi2, block_node* block, token* t_semi3); 
+		  token* t_semi1, /*token* t_attrib, token* t_semi2,*/ block_node* block, token* t_semi3); 
   
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1526,10 +1537,10 @@ class record_tpd_node : public tpd_node {
 
 class access_specifier_node : public decl_node {
 public:
+    token* t_strict;
     token* t_access_lvl;
-  //  decl_node* components;
 
-    access_specifier_node(token* t_access_lvl/*, decl_node* components = NULL*/);
+    access_specifier_node(token* t_strict, token* t_access_lvl);
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
