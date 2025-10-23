@@ -136,7 +136,7 @@ static char *include_name (char *src) {
           && *src!='\n' && *src != '}')
     {
         if (*src == '.') suffix = true;
-	*dst++ = tolower(*(unsigned char*)src++);
+	    *dst++ = (char)tolower(*(unsigned char*)src++);
     }
     *dst = 0;
     if (!suffix) strcpy(dst, ".pas");
