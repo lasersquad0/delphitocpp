@@ -84,7 +84,7 @@ class memory_allocator {
 	ptr += size;
 	return t; 
     }
-    memory_allocator() { free = 0; }
+	memory_allocator() { free = 0; ptr = nullptr; }
 };
 
 extern memory_allocator heap;
