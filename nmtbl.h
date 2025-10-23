@@ -10,8 +10,9 @@ class nm_entry : public heap_object {
 
     enum { recursive=1, macro=2 }; 
     unsigned char  flags; 
+    char           text[1];    
+    enum { h_t_size = 1987 };
 
-    char           text[1];    enum { h_t_size = 1987 };
     static nm_entry* nm_table[h_t_size];
     static unsigned  hash(const char* name);
 
@@ -19,7 +20,7 @@ class nm_entry : public heap_object {
     static nm_entry* find(const char* name);
 
     void* operator new(size_t size, size_t len) { 
-	return heap.alloc(size + len); 
+	    return heap.alloc(size + len); 
     }
 
     void operator delete(void* ptr) { ::delete ptr; } // Standard delete

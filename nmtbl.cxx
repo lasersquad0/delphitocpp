@@ -16,6 +16,9 @@ inline unsigned nm_entry::hash(const char* name)
     return h % nm_entry::h_t_size;
 }
 
+// first find by hash
+// for equal hashes  - make full text compare (strcmp(name, ne->text))
+// for example for "finally" and "const" names function hash() generates the same value 1271
 nm_entry* nm_entry::find(const char* name)
 {
     unsigned h;
