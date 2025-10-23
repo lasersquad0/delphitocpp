@@ -85,8 +85,9 @@ void zzerror(const char* text)
              EXTERNAL
              FIL
              FINAL
+	     FINALIZATION
              FINALLY
-             FFALSE
+ //            FFALSE
              FAR
              FOR
              FORWARD
@@ -98,6 +99,7 @@ void zzerror(const char* text)
              IMPLEMENTATION
              INDEX
              INHERITED
+             INITIALIZATION
              INTERFACE
              LABEL
              LOOPHOLE
@@ -108,6 +110,7 @@ void zzerror(const char* text)
              OTHERWISE
              OVERLOAD
              OVERRIDE
+	     OUT
              PACKED
              PASCAL
              PROCEDURE
@@ -135,7 +138,7 @@ void zzerror(const char* text)
              STRING
              THEN
              TO
-             TTRUE
+//             TTRUE
              TRY
              TYPE
              UNTIL
@@ -179,7 +182,7 @@ void zzerror(const char* text)
 %type <tok>     class_or_object
 %type <tok>     access_spec_tok
 %type <tok>     const
-%type <tok>     boolean
+//%type <tok>     boolean
 
 %type <n_imp>   prog_param_list
 
@@ -236,6 +239,10 @@ void zzerror(const char* text)
 %type <n_decl>  decl_part_list
 %type <n_decl>  label_decl_part
 %type <n_decl>  const_def_part
+%type <n_decl>  var_const_decl_part_list
+%type <n_decl>  guid
+%type <n_decl>  interface_components
+%type <n_decl>  interface_component
 %type <n_decl>  object_properties 
 %type <n_decl>  object_methods
 %type <n_decl>  object_body
@@ -246,15 +253,16 @@ void zzerror(const char* text)
 %type <n_decl>  record_body
 %type <n_decl>  record_field_list
 %type <n_decl>  access_spec_decl
+%type <n_decl>  init_finit
 
-%type <n_decl> prop_type_def
-%type <n_decl> prop_array
-%type <n_decl> prop_index
-%type <n_decl> prop_read
-%type <n_decl> prop_write
-%type <n_decl> prop_stored
-%type <n_decl> prop_default
-%type <n_decl> prop_default_directive
+%type <n_decl>  prop_type_def
+%type <n_decl>  prop_array
+%type <n_decl>  prop_index
+%type <n_decl>  prop_read
+%type <n_decl>  prop_write
+%type <n_decl>  prop_stored
+%type <n_decl>  prop_default
+%type <n_decl>  prop_default_directive
 
 %type <n_cdef>  const_def_list
 %type <n_cdef>  const_def
@@ -262,6 +270,7 @@ void zzerror(const char* text)
 %type <n_tdef>  type_def_list
 %type <n_tdef>  type_def
 %type <n_decl>  var_decl_part
+%type <n_decl>  var_const_decl_part
 %type <n_decl>  field_decl_part
 %type <n_vdcl>  var_decl_list
 %type <n_vdcl>  field_decl_list
@@ -296,7 +305,7 @@ void zzerror(const char* text)
 %type <n_tpd>   set_type
 %type <n_tpd>   record_type
 %type <n_tpd>   class_type
-//%type <n_tpd>   fwd_object_type
+%type <n_tpd>   interface_type
 %type <n_tpd>   file_type
 
 %type <n_idx>   indices
@@ -305,7 +314,7 @@ void zzerror(const char* text)
 %type <n_idx>   index_spec
 
 %type <n_fldls> field_list
-%type <n_vdcl> fixed_part
+%type <n_vdcl>  fixed_part
 %type <n_varp>  variant_part
 %type <n_sel>   selector
 %type <n_vari>  variant_list
@@ -397,16 +406,27 @@ module: decl_part_list { $$ = new module_node(NULL, NULL, NULL, NULL, $1, NULL);
 /* Turbo Pascal specific */
 
 unit: UNIT IDENT ';' INTERFACE unit_decl_list IMPLEMENTATION unit_def_list END '.'
-        { $$ = new unit_node($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9); }
+        { $$ = new unit_node($1, $2, $3, $4, $5, $6, $7, NULL, NULL, $8, $9); }
     | UNIT IDENT ';' INTERFACE unit_decl_list IMPLEMENTATION unit_def_list compoundst '.'
-        { $$ = new unit_node($1, $2, $3, $4, $5, $6, $7, $8, NULL, $9); }
+        { $$ = new unit_node($1, $2, $3, $4, $5, $6, $7, $8, NULL, NULL, $9); }
     | INTERFACE unit_decl_list IMPLEMENTATION unit_def_list END '.'
-        { $$ = new unit_node(NULL, NULL, NULL, $1, $2, $3, $4, NULL, $5, $6); }
+        { $$ = new unit_node(NULL, NULL, NULL, $1, $2, $3, $4, NULL, NULL, $5, $6); }
     | INTERFACE unit_decl_list IMPLEMENTATION unit_def_list compoundst '.'
-        { $$ = new unit_node(NULL, NULL, NULL, $1, $2, $3, $4, $5, NULL, $6); }
+        { $$ = new unit_node(NULL, NULL, NULL, $1, $2, $3, $4, $5, NULL, NULL, $6); }
+    | UNIT IDENT ';' INTERFACE unit_decl_list IMPLEMENTATION unit_def_list init_finit END '.'
+        { $$ = new unit_node($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10); }
+  
+init_finit: INITIALIZATION var_const_decl_part_list compoundst ';'
+        { $$ = new init_finit_node($1, $2, $3, $4, NULL, NULL, NULL, NULL); }
+    | INITIALIZATION var_const_decl_part_list compoundst ';' FINALIZATION var_const_decl_part_list compoundst ';'
+        { $$ = new init_finit_node($1, $2, $3, $4, $5, $6, $7, $8); }
 
+var_const_decl_part_list: { $$ = NULL; } 
+    | var_const_decl_part var_const_decl_part_list { $1->next = $2; $$ = $1; }
+
+var_const_decl_part: const_def_part | var_decl_part 
+   
 unit_def_list: decl_part_list 
-
 
 prog_param_list: { $$ = NULL; } 
     | '(' ident_list ')' { $$ = new import_list_node($1, $2, $3); }
@@ -768,15 +788,14 @@ proc_decl:
     | FUNCTION IDENT formal_params ':' type 
                { $$ = new proc_decl_node($1, $2, $3, $4, $5); } 
     
-
 proc_fwd_decl: 
       PROCEDURE IDENT formal_params ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION IDENT formal_params ':' type ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
 
+
 property_decl: PROPERTY IDENT prop_array prop_type_def prop_index prop_read prop_write prop_stored prop_default ';' prop_default_directive
- 
         { $$ = new property_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); } 
 
 property_decl_list: property_decl
@@ -798,7 +817,7 @@ prop_write: { $$ = NULL; }
     | WRITE IDENT
        { $$ = new prop_write_node($1, $2); }
 prop_stored: { $$ = NULL; }
-    | STORED boolean
+    | STORED IDENT
        { $$ = new prop_stored_node($1, $2); }
 prop_default:  { $$ = NULL; }
     | DEFAULT constant
@@ -807,7 +826,7 @@ prop_default_directive:  { $$ = NULL; }
     | DEFAULT ';'
        { $$ = new prop_default_directive_node($1, $2); }
 
-boolean: TTRUE | FFALSE
+//boolean: TTRUE | FFALSE
 
 proc_spec: 
       PROCEDURE IDENT formal_params ';'
@@ -852,6 +871,7 @@ formal_param_list: formal_param
 
 formal_param: VAR param_decl { $$ = new var_decl_part_node($1, $2); }
     | CONST param_decl { $$ = new var_decl_part_node($1, $2); }
+    | OUT param_decl { $$ = new var_decl_part_node($1, $2); }
     | param_decl { $$ = $1; } 
     | proc_decl
 
@@ -865,7 +885,7 @@ param_type: simple_type | conformant_array_type
 
 /* Types definition */ 
 
-type: simple_type | array_type | record_type | class_type | set_type | file_type 
+type: simple_type | array_type | record_type | class_type | interface_type | set_type | file_type 
     | pointer_type | enum_type | range_type | string_type | fptr_type
 
 const_type: simple_type | const_array_type | record_type | const_set_type | string_type
@@ -881,7 +901,8 @@ fptr_type: FUNCTION formal_params ':' type
 
 string_type: STRING '[' expr ']' { $$ = new varying_tpd_node($1, $2, $3, $4); }
 
-simple_type: IDENT { $$ = new simple_tpd_node($1); } 
+simple_type: IDENT { $$ = new simple_tpd_node(NULL, NULL, $1); }
+    | IDENT '.' IDENT { $$ = new simple_tpd_node($1, $2, $3); }  
     | STRING { $$ = new string_tpd_node($1); }
 
 array_type: packed ARRAY '[' indices ']' OF type 
@@ -948,21 +969,55 @@ record_component: access_spec_decl
 record_field_list: field_list
        { $$ = new record_field_part_node(NULL, $1); }
 
+
+interface_type: INTERFACE guid interface_components END
+       { $$ = new interface_tpd_node($1, NULL, NULL, NULL, $2, $3, $4); }  
+    | INTERFACE '(' IDENT ')' guid interface_components END
+       { $$ = new interface_tpd_node($1, $2, $3, $4, $5, $6, $7); }
+    | INTERFACE '(' IDENT ')' END
+       { $$ = new interface_tpd_node($1, $2, $3, $4, NULL, NULL, $5); }
+    | INTERFACE END
+       { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, NULL, $2); }
+//  | INTERFACE
+ //      { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL, NULL); }
+
+interface_components: interface_component interface_components
+       { 
+         // special case when two lists under one roof. 
+         // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
+         decl_node** cpp;   
+         for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
+	 *cpp = $2;
+          $$ = $1; 
+       }
+    | interface_component
+
+interface_component: object_methods
+    | object_properties
+
+guid: { $$ = NULL; }
+    | '[' SCONST ']' 
+       { $$ = new guid_node($1, $2, $3); }
+
+
 class_or_object: OBJECT | CLASS
  
 class_type: class_or_object object_body END
        { $$ = new object_tpd_node($1, NULL, NULL, NULL, $2, $3); }  
-    | class_or_object '(' IDENT ')' object_body END
+    | class_or_object '(' ident_list ')' object_body END
        { $$ = new object_tpd_node($1, $2, $3, $4, $5, $6); }
-    | class_or_object '(' IDENT ')' END
+    | class_or_object '(' ident_list ')' END
        { $$ = new object_tpd_node($1, $2, $3, $4, NULL, $5); }
     | class_or_object END
        { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2); }
  //   | class_or_object
  //      { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
 
+
 object_body: field_decl_list object_components
        { 
+         // rare case when two lists under one roof. 
+         // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
          decl_node** cpp;   
          for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
 	 *cpp = $2;
@@ -978,11 +1033,13 @@ access_spec_decl: access_spec_tok { $$ = new access_specifier_node($1); }
 
 object_components: object_component object_components
        { 
+         // special case when two lists under one roof. 
+         // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
          decl_node** cpp;   
          for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
-	  *cpp = $2;
+	 *cpp = $2;
           $$ = $1; 
-	}
+       }
     | object_component
 
 object_component: access_spec_decl 
