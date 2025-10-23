@@ -94,7 +94,7 @@ class enum_tp : public tpexpr {
 
     void   set_enumeration_name(tpexpr* type);
 
-    enum_tp(tpd_node* tpd = NULL) : tpexpr(tp_enum, tpd) { max = NULL; }
+    enum_tp(tpd_node* tpd = NULL) : tpexpr(tp_enum, tpd) { max = NULL; first = last = NULL; n_elems = 0; }
     void set_bounds(symbol* name);
 };
 
@@ -114,8 +114,6 @@ class range_tp : public tpexpr {
     }
     void set_bounds(symbol* name);
 };
-
-// Node for varying string
 
 // Node for array type
 
@@ -151,6 +149,8 @@ class array_tp : public tpexpr {
 
     array_tp(tpexpr* tp = NULL, tpd_node* tpd = NULL);
 };
+
+// Node for varying string
 
 class string_tp : public array_tp { 
   public: 

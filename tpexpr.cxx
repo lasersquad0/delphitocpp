@@ -116,6 +116,7 @@ array_tp::array_tp(tpexpr* tp, tpd_node* tpd)
     flags |= tp->get_typedef()->flags & tp_need_init;
     low = high = NULL;
     low_expr = high_expr = NULL;
+    low_var = high_var = NULL;
     base = -1;
 }
 
@@ -349,13 +350,13 @@ void proc_tp::add_extra_param(symbol *var)
     if (var->ring == this) return; 
 
     if (var->ring->scope == b_ring::proc && var->type
-	&& !var->type->is_scalar() && var->type->get_typedef() == var->type) 
+    	&& !var->type->is_scalar() && var->type->get_typedef() == var->type) 
     { 
 	((proc_tp*)var->ring)->make_all_constants_global = true;
     }
 
     if (language_c && var->type->tag == tp_dynarray) { 
-	((array_tp*)var->type)->add_proc_param(this);
+	    ((array_tp*)var->type)->add_proc_param(this);
     }
     for (pp = &extra_params; (p = *pp) != NULL; pp = &p->next) { 
         if (p->var == var) return; 

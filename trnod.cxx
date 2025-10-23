@@ -87,6 +87,7 @@ program_node::program_node(token* program, token* name,
 			   token* semi, block_node* block, token* end)
 {
     CONS6(program, name, params, semi, block, end);
+	main = NULL;
 }
 
 void program_node::attrib(int)
@@ -372,6 +373,7 @@ void label_node::translate(int ctx)
 with_node::with_node(token* t_with, expr_node* ptrs, token* t_do, stmt_node* body)
 {
     CONS4(t_with, ptrs, t_do, body);
+	nested_counter = 0;
 }
 
 
@@ -996,9 +998,11 @@ void inherited_node::translate(int)
 {
 	// *** see function proc_def_node::attrib(int ctx) how to find class and work with it.
 	
-	auto r = (object_tp*)(curr_proc->forward->var->ring);
-	token* sc = ((object_tpd_node*)(r->tpd))->t_ancestorlist->ident;
-	auto fff = dynamic_cast<object_tpd_node*>(r->tpd);
+	auto r = dynamic_cast<object_tp*>(curr_proc->forward->var->ring);
+	assert(r);
+	auto otpd = dynamic_cast<object_tpd_node*>(r->tpd);
+	assert(otpd);
+	token* sc = otpd->t_ancestorlist->ident;
 	if (sc == NULL) 
 	{
 		warning(curr_proc->forward->f_tkn, "Class '%s' does not have superclass. Using 'inherited' does nothing.\n", curr_proc->forward->t_proc->out_text);
@@ -1007,7 +1011,6 @@ void inherited_node::translate(int)
 	}
 	else 
 	{
-		assert(fff);
 		t_inherited->set_trans(dprintf("%s::", sc->in_text)); 
 	}
 
@@ -1164,19 +1167,19 @@ void case_node::attrib(int ctx)
 
 void case_node::translate(int)
 {
-    if (list == NULL) {
-	assert(turbo_pascal ? coln->tag==TKN_ELSE : coln->tag==TKN_OTHERWISE);
-        coln->set_trans("default:");
-	stmt->translate(ctx_statement);
-	if (turbo_pascal) {
-	    for (stmt_node* st = stmt->next; st != NULL; st = st->next) {
-		st->translate(ctx_statement);
-	    }
-	}
-	f_tkn = coln;
-	l_tkn = stmt->l_tkn;
+	if (list == NULL) {
+		assert(turbo_pascal ? coln->tag == TKN_ELSE : coln->tag == TKN_OTHERWISE);
+		coln->set_trans("default:");
+		stmt->translate(ctx_statement);
+		if (turbo_pascal) {
+			for (stmt_node* st = stmt->next; st != NULL; st = st->next) {
+				st->translate(ctx_statement);
+			}
+		}
+		f_tkn = coln;
+		l_tkn = stmt->l_tkn;
 
-    } else {
+	} else {
 
 	for (expr_node* e = list; e != NULL; e = e->next) {
 	    e->translate(ctx_value);
@@ -1265,6 +1268,7 @@ for_node::for_node(token* t_for, token* t_ident, token* t_asg,
 	           token* t_do, stmt_node* body)
 {
     CONS8(t_for, t_ident, t_asg, from, t_to, till, t_do, body);
+	var = NULL;
 }
 
 void for_node::attrib(int)
@@ -1440,6 +1444,9 @@ bool expr_node::is_parameter()
 atom_expr_node::atom_expr_node(token* tkn) : expr_node(tn_atom)
 {
     CONS1(tkn);
+	var = NULL;
+	temp = NULL;
+	with = NULL;
 }
 
 void atom_expr_node::attrib(int ctx)
@@ -1804,19 +1811,19 @@ void string_node::translate(int ctx)
 		    *d++ = '\\';
 		    continue;
 		  case '\'':
-		    if (in_quotes) {
-			if (*s == '\'') {
-			    if (*(d-1) != '{') *d++ = ',';
-			    *d++ = '\'';
-			    *d++ = '\\';
-			    *d++ = '\'';
-			    *d++ = '\'';
-			    s += 1;
-			}
-			in_quotes = false;
-		    } else {
-			in_quotes = true;
-		    }
+			  if (in_quotes) {
+				  if (*s == '\'') {
+					  if (*(d - 1) != '{') *d++ = ',';
+					  *d++ = '\'';
+					  *d++ = '\\';
+					  *d++ = '\'';
+					  *d++ = '\'';
+					  s += 1;
+				  }
+				  in_quotes = false;
+			  } else {
+				  in_quotes = true;
+			  }
 		    continue;
 		  case '#':
 		    if (!in_quotes) {
@@ -2239,11 +2246,11 @@ void deref_expr_node::translate(int ctx)
 }
 
 
-
 access_expr_node::access_expr_node(expr_node* rec, token* pnt, token* field)
   : expr_node(tn_access)
 {
     CONS3(rec, pnt, field);
+	recfld = NULL;
 }
 
 void access_expr_node::attrib(int)
@@ -2361,6 +2368,7 @@ op_node::op_node(int tag, expr_node* left, token* op, expr_node* right)
 : expr_node(tag)
 {
     CONS3(left, op, right);
+	parent = NULL;
 }
 
 
@@ -2770,6 +2778,7 @@ fcall_node::fcall_node(expr_node* fptr, token* lpar, expr_node* args,
 : expr_node(tn_fcall)
 {
     CONS4(fptr, lpar, args, rpar);
+	temp = NULL;
 }
 
 void fcall_node::attrib(int ctx)
@@ -3417,6 +3426,7 @@ expr_group_node::expr_group_node(token* lpar, expr_node* expr, token* rpar)
 : expr_node(tn_group)
 {
     CONS3(lpar, expr, rpar);
+	ctx = -1; // becuase 0 is valid value (ctx_program)
 }
 
 static expr_node* aggregate_constant(expr_node* expr, symbol* component)
@@ -3539,15 +3549,20 @@ void write_param_node::attrib(int ctx)
 static char* make_fmt_string(char* src) {
     char buf[65536];
     char* dst = buf;
-    if (strcmp(src, "'\"'") == 0) return "\\\"";
-    src += 1; // skip '"'
-    while (*src != '\0') {
-	if (*src == '%') *dst++ = '%';
-	*dst++ = *src++;
-    }
-    *--dst = '\0'; // skip '"'
+    
+	if (strcmp(src, "'\"'") == 0) return "\\\"";
+    
+	src += 1; // skip '"'
+    
+	while (*src != '\0') {
+		if (*src == '%') *dst++ = '%'; // here we make %% from %
+		*dst++ = *src++;
+	}
+    
+	*--dst = '\0'; // skip '"'
     assert(dst < buf + sizeof(buf));
-    return _strdup(buf);
+    
+	return _strdup(buf);
 }
 
 void write_param_node::translate(int ctx)
@@ -3709,11 +3724,12 @@ void label_decl_part_node::translate(int)
 
 const_def_node* const_def_node::enumeration;
 
-const_def_node::const_def_node(token* ident, token* equal,
-			       expr_node* constant)
+const_def_node::const_def_node(token* ident, token* equal, expr_node* constant)
 {
     CONS3(ident, equal, constant);
+	sym = NULL;
 }
+
 
 void const_def_node::attrib(int)
 {
@@ -3895,6 +3911,7 @@ void const_def_part_node::translate(int ctx)
 type_def_node::type_def_node(token* ident, token* equal, tpd_node* tpd)
 {
     CONS3(ident, equal, tpd);
+	sym = NULL;
 }
 
 void type_def_node::attrib(int ctx)
@@ -4340,6 +4357,8 @@ var_origin_decl_node::var_origin_decl_node(token* t_ident,
 					   token* t_colon, tpd_node *tpd)
 {
     CONS5(t_ident, t_origin, addr, t_colon, tpd);
+	sym = NULL;
+	type = NULL;
 }
 
 
@@ -4458,6 +4477,8 @@ proc_decl_node::proc_decl_node(token* t_proc, token* t_ident,
 			       token* t_coln, tpd_node* ret_type)
 {
     CONS5(t_proc, t_ident, params, t_coln, ret_type);
+	var = NULL;
+	type = NULL;
 }
 
 void proc_decl_node::attrib(int ctx)
@@ -4610,6 +4631,18 @@ proc_fwd_decl_node::proc_fwd_decl_node
 : proc_decl_node(t_proc, t_ident, params, t_coln, ret_type)
 {
     CONS3(t_semi1, qualifiers, t_semi2);
+
+	is_external = false;
+	is_static = false;
+	is_virtual = false;
+	is_override = false;
+	is_overload = false;
+	is_stdcall = false;
+	is_pascal = false;
+	is_cdecl = false;
+	is_register = false;
+	is_final = false;
+	is_abstract = false;
 }
 
 void proc_fwd_decl_node::attrib(int ctx)
@@ -4627,18 +4660,6 @@ void proc_fwd_decl_node::attrib(int ctx)
 			type->is_destructor = true;
 		}
 	}
-
-    is_external = false;
-    is_static = false;
-    is_virtual = false;
-	is_override = false;
-	is_overload = false;
-	is_stdcall = false;
-	is_pascal = false;
-	is_cdecl = false;
-	is_register = false;
-	is_final = false;
-	is_abstract = false;
 
 	if ((var = b_ring::search_cur(t_ident)) == NULL || var->type == NULL
 		|| var->type->tag != tp_proc || var->ring != b_ring::curr_b_ring
@@ -5120,6 +5141,7 @@ range_tpd_node::range_tpd_node(expr_node* low, token* dots, expr_node* high)
 : tpd_node(tpd_range)
 {
     CONS3(low, dots, high);
+	ctype = NULL;
 }
 
 void range_tpd_node::attrib(int)
@@ -5216,6 +5238,7 @@ static array_tp* curr_array = NULL;
 type_index_node::type_index_node(tpd_node* tpd)
 {
     this->tpd = tpd;
+	type = NULL;
 }
 
 void type_index_node::attrib(int ctx)
@@ -5548,6 +5571,7 @@ variant_node::variant_node(expr_node* tag_list, token* t_coln,
 {
     CONS5(tag_list, t_coln, t_lpar, fields, t_rpar);
     next = NULL;
+	struct_name = NULL;
 }
 
 int variant_node::number;
@@ -5687,6 +5711,7 @@ field_list_node::field_list_node(var_decl_node* fix_part,
 				 variant_part_node* var_part)
 {
     CONS2(fix_part, var_part);
+	ctx = -1; // because 0 is valid value (ctx_program)
 }
 
 bool field_list_node::is_single()
@@ -5736,12 +5761,12 @@ guid_node::guid_node(token* t_lbr, token* t_guid, token* t_rbr)
 	CONS3(t_lbr, t_guid, t_rbr);
 }
 
-void guid_node::attrib(int ctx)
+void guid_node::attrib(int)
 {
 	f_tkn = t_lbr;
 	l_tkn = t_rbr;
 }
-void guid_node::translate(int ctx)
+void guid_node::translate(int)
 {
 }
 
@@ -5893,6 +5918,7 @@ record_tpd_node::record_tpd_node(token* t_packed, token* t_record, decl_node* pa
 : tpd_node(tpd_record)
 {
     CONS4(t_packed, t_record, parts, t_end);
+	outer = NULL;
 }
 
 void record_tpd_node::attrib(int ctx)
@@ -6089,11 +6115,11 @@ prop_array_node::prop_array_node(token* t_lbr, token* t_ident, decl_node* type, 
 	this->ind_type = (prop_type_def_node*)type;
 	this->t_rbr = t_rbr;
 }
-void prop_array_node::attrib(int ctx)
+void prop_array_node::attrib(int)
 {
 	//ind_type->attrib(ctx); DO NOT uncomment it
 }
-void prop_array_node::translate(int ctx)
+void prop_array_node::translate(int)
 {
 	//ind_type->translate(ctx); DO NOT uncomment it
 
@@ -6146,6 +6172,7 @@ void prop_stored_node::attrib(int)
 	f_tkn = t_stored;
 	l_tkn = t_truefalse;
 
+	//TODO think how to avoid strincmp here. Lexer should do this work for us.
 	if (strincmp(t_truefalse->in_text, "true", 4) != 0 && strincmp(t_truefalse->in_text, "false", 5) != 0)
 		error(t_truefalse, "property store value '%s' is incorrect, expecting 'true' or 'false'", t_truefalse->in_text);
 }

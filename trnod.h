@@ -674,7 +674,7 @@ class set_item_node : public node {
     set_item_node* next;
     tpexpr*        type;
 
-    set_item_node() { next = NULL; }
+    set_item_node() { next = NULL; type = NULL; }
 };  
 
 class set_elem_node : public set_item_node { 
@@ -1496,8 +1496,7 @@ class field_list_node : public decl_node {
 
     bool               is_single(); // list has single declaration
 
-    field_list_node(var_decl_node* fix_part, 
-                    variant_part_node* var_part = NULL); 
+    field_list_node(var_decl_node* fix_part, variant_part_node* var_part = NULL); 
    
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
