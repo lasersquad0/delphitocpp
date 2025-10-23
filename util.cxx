@@ -105,7 +105,7 @@ extern "C" char* strupper(const char* s)
     char* dst = new_s;
     unsigned char* src = (unsigned char*)s;
     do { 
-	*dst++ = toupper(*src);
+	*dst++ = (char)toupper(*src);
     } while (*src++ != 0);
     return new_s;
 }
