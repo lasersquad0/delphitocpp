@@ -135,6 +135,7 @@ void zzerror(const char* text)
              STATIC
              STDCALL
              STORED
+             STRICT
              STRING
              THEN
              TO
@@ -180,9 +181,9 @@ void zzerror(const char* text)
 %type <tok>     progend
 %type <tok>     otherwise
 %type <tok>     class_or_object
-%type <tok>     access_spec_tok
+%type <tok>     class_access_spec_tok
+%type <tok>     record_access_spec_tok
 %type <tok>     const
-//%type <tok>     boolean
 
 %type <n_imp>   prog_param_list
 
@@ -252,7 +253,8 @@ void zzerror(const char* text)
 %type <n_decl>  record_component
 %type <n_decl>  record_body
 %type <n_decl>  record_field_list
-%type <n_decl>  access_spec_decl
+%type <n_decl>  record_access_spec_decl
+%type <n_decl>  class_access_spec_decl
 %type <n_decl>  init_finit
 
 %type <n_decl>  prop_type_def
@@ -279,7 +281,8 @@ void zzerror(const char* text)
 
 %type <n_decl>  proc_decl
 %type <n_decl>  proc_fwd_decl
-%type <n_decl>  proc_fwd_decl_list
+%type <n_decl>  method_decl_list
+%type <n_decl>  method_decl
 %type <n_decl>  proc_spec
 %type <n_decl>  proc_def
 %type <n_decl>  property_decl
@@ -759,7 +762,7 @@ type_def_list: { $$ = NULL; }
 type_def: IDENT EQ type { $$ = new type_def_node($1, $2, $3); }
 
 var_decl_part: VAR var_decl_list 
-     { $$ = new var_decl_part_node($1, $2); }
+     { $$ = new var_decl_part_node(NULL, $1, $2); }
 
 var_decl_list: { $$ = NULL; }
 //     | var_decl
@@ -826,8 +829,6 @@ prop_default_directive:  { $$ = NULL; }
     | DEFAULT ';'
        { $$ = new prop_default_directive_node($1, $2); }
 
-//boolean: TTRUE | FFALSE
-
 proc_spec: 
       PROCEDURE IDENT formal_params ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
@@ -836,21 +837,28 @@ proc_spec:
 
 proc_def: 
       PROCEDURE IDENT formal_params ';' block ';' 
-               { $$ = new proc_def_node($1, NULL, NULL, $2, $3, NULL, NULL, $4, NULL, NULL, $5, $6); } 
+               { $$ = new proc_def_node(NULL, $1, NULL, NULL, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION IDENT formal_params ':' type ';' block ';' 
-               { $$ = new proc_def_node($1, NULL, NULL, $2, $3, $4, $5, $6, NULL, NULL, $7, $8); } 
+               { $$ = new proc_def_node(NULL, $1, NULL, NULL, $2, $3, $4, $5, $6, $7, $8); } 
     | PROCEDURE IDENT '.' IDENT formal_params ';' block ';' 
-               { $$ = new proc_def_node($1, $2, $3, $4, $5, NULL, NULL, $6, NULL, NULL, $7, $8); } 
+               { $$ = new proc_def_node(NULL, $1, $2, $3, $4, $5, NULL, NULL, $6, $7, $8); } 
     | FUNCTION IDENT '.' IDENT formal_params ':' type ';' block ';' 
-               { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, $7, $8, NULL, NULL, $9, $10); } 
-    | FUNCTION IDENT ';' block ';' 
-               { $$ = new proc_def_node($1, NULL, NULL, $2, NULL, NULL, NULL, $3, NULL, NULL, $4, $5); } 
-    | PROCEDURE IDENT formal_params ';' FAR ';' block ';' 
-               { $$ = new proc_def_node($1, NULL, NULL, $2, $3, NULL, NULL, $4, $5, $6, $7, $8); } 
-    | FUNCTION IDENT formal_params ':' type ';' FAR ';' block ';' 
-               { $$ = new proc_def_node($1, NULL, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10); } 
-    | FUNCTION IDENT ';' FAR ';' block ';' 
-               { $$ = new proc_def_node($1, NULL, NULL, $2, NULL, NULL, NULL, $3, $4, $5, $6, $7); } 
+               { $$ = new proc_def_node(NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10); } 
+    | CLASS PROCEDURE IDENT '.' IDENT formal_params ';' block ';' 
+               { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, NULL, NULL, $7, $8, $9); } 
+    | CLASS FUNCTION IDENT '.' IDENT formal_params ':' type ';' block ';' 
+               { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); } 
+ 
+ //  | FUNCTION IDENT ';' block ';' 
+  //             { $$ = new proc_def_node($1, NULL, NULL, $2, NULL, NULL, NULL, $3, NULL, NULL, $4, $5); } 
+  
+  /* we do not need FAR specifier any more */
+  //  | PROCEDURE IDENT formal_params ';' FAR ';' block ';' 
+  //             { $$ = new proc_def_node($1, NULL, NULL, $2, $3, NULL, NULL, $4, $5, $6, $7, $8); } 
+  //  | FUNCTION IDENT formal_params ':' type ';' FAR ';' block ';' 
+  //             { $$ = new proc_def_node($1, NULL, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10); } 
+  //  | FUNCTION IDENT ';' FAR ';' block ';' 
+  //             { $$ = new proc_def_node($1, NULL, NULL, $2, NULL, NULL, NULL, $3, $4, $5, $6, $7); } 
 
 fun_qualifier: FORWARD | OVERLOAD | REGISTER | PASCAL | CDECL | STDCALL | SAFECALL | WINAPI | VARARGS | EXTERNAL 
 
@@ -862,16 +870,15 @@ qualifiers: qualifier { $$ = new token_list($1); }
      | qualifiers ';' qualifier
          { $$ = new token_list($3, $1); }
 
-
 formal_params: { $$ = NULL; } 
     | '(' formal_param_list ')' { $$ = new param_list_node($1, $2, $3); }
 
 formal_param_list: formal_param 
     | formal_param ';' formal_param_list { $1->next = $3; $$ = $1; }
 
-formal_param: VAR param_decl { $$ = new var_decl_part_node($1, $2); }
-    | CONST param_decl { $$ = new var_decl_part_node($1, $2); }
-    | OUT param_decl { $$ = new var_decl_part_node($1, $2); }
+formal_param: VAR param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
+    | CONST param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
+    | OUT param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
     | param_decl { $$ = $1; } 
     | proc_decl
 
@@ -931,6 +938,7 @@ const_set_type: packed SET OF const_type { $$ = new set_tpd_node($1, $2, $3, $4)
 
 
 
+/* Record, Classes, Interface definitions */
 
 // **** NOTE: record can contain variant part declared in field_list nonterminal while class cannot
 
@@ -957,8 +965,8 @@ record_components: record_component record_components
          $$ = $1; }
     | record_component
 
-record_component: access_spec_decl
-    | access_spec_decl record_field_list
+record_component: record_access_spec_decl
+    | record_access_spec_decl record_field_list
        { $1->next = $2; $$ = $1; }
     | VAR field_list
        { $$ = new record_field_part_node($1, $2); } 
@@ -1025,11 +1033,18 @@ object_body: field_decl_list object_components
        }
     | object_components
     | field_decl_list    //<n_vdcl>
-       { $$ = new var_decl_part_node(NULL, $1); }
+       { $$ = new var_decl_part_node(NULL, NULL, $1); }
 
-access_spec_tok: PRIVATE | PUBLIC | PROTECTED | PUBLISHED
+record_access_spec_tok: PRIVATE | PUBLIC 
 
-access_spec_decl: access_spec_tok { $$ = new access_specifier_node($1); }
+class_access_spec_tok: record_access_spec_tok | PROTECTED | PUBLISHED
+
+record_access_spec_decl: record_access_spec_tok { $$ = new access_specifier_node(NULL, $1); }
+    | STRICT PRIVATE   { $$ = new access_specifier_node($1, $2); }
+
+class_access_spec_decl: class_access_spec_tok { $$ = new access_specifier_node(NULL, $1); }
+    | STRICT PRIVATE   { $$ = new access_specifier_node($1, $2); }
+    | STRICT PROTECTED { $$ = new access_specifier_node($1, $2); }
 
 object_components: object_component object_components
        { 
@@ -1042,8 +1057,8 @@ object_components: object_component object_components
        }
     | object_component
 
-object_component: access_spec_decl 
-    | access_spec_decl field_decl_list
+object_component: class_access_spec_decl 
+    | class_access_spec_decl field_decl_list
        { $1->next = $2; $$ = $1; } 
     | field_decl_part 
     | object_methods
@@ -1053,21 +1068,31 @@ object_component: access_spec_decl
 
 
 field_decl_part: VAR field_decl_list 
-       { $$ = new var_decl_part_node($1, $2); }
+       { $$ = new var_decl_part_node(NULL, $1, $2); }
+    | CLASS VAR field_decl_list 
+       { $$ = new var_decl_part_node($1, $2, $3); }
 
-field_decl_list: 
-     var_decl ';' { $$ = $1; }
+field_decl_list: var_decl ';' { $$ = $1; }
     | var_decl ';' field_decl_list { $1->next = $3; $$ = $1; }
 
-object_methods: proc_fwd_decl_list
-       { $$ = new proc_decl_part_node($1); }
+object_methods: method_decl_list
+    //   { $$ = new proc_decl_part_node($1); }
 
 object_properties: property_decl_list
        { $$ = new property_decl_part_node($1); }
 
-proc_fwd_decl_list: proc_fwd_decl | proc_spec
-    | proc_fwd_decl proc_fwd_decl_list { $1->next = $2; $$ = $1; }
-    | proc_spec     proc_fwd_decl_list { $1->next = $2; $$ = $1; }
+method_decl: proc_fwd_decl 
+       { $$ = new method_decl_node(NULL, $1); }
+    | proc_spec 
+       { $$ = new method_decl_node(NULL, $1); }
+    | CLASS proc_fwd_decl  
+       { $$ = new method_decl_node($1, $2); }
+    | CLASS proc_spec  
+       { $$ = new method_decl_node($1, $2); }
+
+method_decl_list: method_decl
+    | method_decl method_decl_list { $1->next = $2; $$ = $1; }
+  //  | proc_spec     proc_fwd_decl_list { $1->next = $2; $$ = $1; }
   
 
 file_type: packed FIL OF type { $$ = new file_tpd_node($1, $2, $3, $4); }
