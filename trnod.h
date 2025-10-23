@@ -149,15 +149,14 @@ class unit_node : public node {
     compound_node*        initializer; 
     token*                t_end;
     token*                t_dot; // '.'
+    decl_node*            init_finit;
     proc_tp*              main; 
 
     static bool           interface_part; // translate interface part of module
     static char*          unit_name;
 
-    unit_node(token* t_unit, token* t_name, token* t_semi, token* t_interface, 
-	      decl_node* unit_decl, token* t_implementation, 
-	      decl_node* unit_def, compound_node* initializer,
-	      token* t_end, token* t_dot);
+    unit_node(token* t_unit, token* t_name, token* t_semi, token* t_interface, decl_node* unit_decl, token* t_implementation, 
+	      decl_node* unit_def, compound_node* initializer, decl_node* init_finit, token* t_end, token* t_dot);
 
 
     virtual void attrib(int ctx);
@@ -583,10 +582,10 @@ class expr_node : public node {
     bool       is_parameter();
 
     expr_node(int expr_tag, int expr_flags = 0) {
-        tag = expr_tag;
+        tag = (char)expr_tag;
         parent_tag = tn_group;
         type = NULL;
-        flags = expr_flags;
+        flags = (char)expr_flags;
         next = NULL;
         value = 0;
     }
@@ -933,6 +932,27 @@ class decl_node : public node {
     decl_node() { next = NULL; attr = 0; }
 };
 
+//
+// unit initialization and finalization declaration
+//
+
+class init_finit_node : public decl_node {
+public:
+    token* t_initialization;
+    decl_node* init_defs;
+    compound_node* initializer;
+    token* t_semi1; // ';'
+    token* t_finalization;
+    decl_node* fini_defs;
+    compound_node* finalizer;
+    token* t_semi2; // ';'
+
+    init_finit_node(token* t_initialization, decl_node* init_defs, compound_node* initializer, token* t_semi,
+        token* t_finalization, decl_node* fini_defs, compound_node* finalizer, token* t_semi2);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
 
 
 //
@@ -1020,7 +1040,7 @@ public:
     token*          t_type; 
     type_def_node*  types; 
 
-    type_def_part_node(token* t_type, type_def_node* list); 
+    type_def_part_node(token* t_type, type_def_node* types); 
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1229,14 +1249,23 @@ class tpd_node : public node {
 
 class simple_tpd_node: public tpd_node {
   public:
-    token       *tkn;
-    symbol      *sym; 
+    token*      t_ident1; // always class/record name or null
+    token*      t_dot;
+    token*      t_ident2; // name of type (either single type of part of class.type expr)
+    symbol*     sym1;
+    symbol*     sym2;
 
-    simple_tpd_node(token* tkn);
+    simple_tpd_node(token* t_ident1, token* t_dot, token* t_ident2);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
-    void print_debug() override { fprintf(stderr, "%s", tkn?tkn->in_text: "NULL"); };
+    void print_debug() override 
+    { 
+        if(t_ident1) 
+            fprintf(stderr, "%s.%s", t_ident1->in_text, t_ident2->in_text);  
+        else 
+            fprintf(stderr, "%s", t_ident2->in_text); 
+    };
 };
 
 //
@@ -1493,7 +1522,7 @@ class record_tpd_node : public tpd_node {
 };
 
 //
-// Borland Pascal object
+// Borland Pascal objects
 //
 
 class access_specifier_node : public decl_node {
@@ -1503,29 +1532,58 @@ public:
 
     access_specifier_node(token* t_access_lvl/*, decl_node* components = NULL*/);
 
-    virtual void attrib(int ctx);
-    virtual void translate(int ctx);
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
 class object_tpd_node : public tpd_node { 
   public: 
     token*         t_object;
     token*         t_lbr;
-    token*         t_superclass;
+    token_list*    t_ancestorlist;
     token*         t_rbr;
     token*         t_end; 
     decl_node*     parts;         
 
     symbol*        super;
     
-    object_tpd_node(token* t_object, token* t_lbr, token* t_superclass, token* t_rbr, 
+    object_tpd_node(token* t_object, token* t_lbr, token_list* t_ancestorlist, token* t_rbr, 
                     decl_node* parts, token* t_end);  
 
-    virtual void attrib(int ctx);
-    virtual void translate(int ctx);
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
+class guid_node : public decl_node {
+public:
+    token* t_lbr;
+    token* t_guid;
+    token* t_rbr;
 
+    guid_node(token* t_lbr, token* t_guid, token* t_rbr);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class interface_tpd_node : public tpd_node {
+public:
+    token*      t_interface;
+    token*      t_lbr;
+    token*      t_superinterface;
+    token*      t_rbr;
+    token*      t_end;
+    decl_node*  guid;
+    decl_node*  components;
+
+    symbol* super;
+
+    interface_tpd_node(token* t_interface, token* t_lbr, token* t_superinterface, token* t_rbr,
+        decl_node* guid, decl_node* components, token* t_end);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
 
 
 //
