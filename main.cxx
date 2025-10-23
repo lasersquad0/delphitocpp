@@ -33,8 +33,13 @@
 * DONE - added support for 'out' parameters without specified type. they are translated into void*.
 * DONE - added support of compound types like MyClass.Typ in function parameters and return values
 * DONE - class can now be inherited from one ascent class and many interfaces
+* DONE - class variables and class methods are supported.
+* DONE - strict private and strict published are implemented
 * 
-* class methods, strict private, static methods
+* 
+* определения переменных вида a: MyClass; транслировать в MyClass* a; ???? (только для классов).
+* но тогда понадобится так же транслировать access operators из '.' в '->'
+* 
 * how to translate this: if Supports(Allocator, IMalloc) then ...
 * добавить проверку на правильность структуры guid (строки)
 * не понимает определение ф-ции с пустыми скобками (function Fun():Integer;), без скобок совсем - понимает
