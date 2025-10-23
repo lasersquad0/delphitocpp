@@ -9,8 +9,6 @@
 
 /*////////////////////////////////////
 
-DEF_TOKEN
-
 * whether Char translate to char or to wchar_t
 * whether string translate to string or wstring
 * how to translate AnsiChar and WideChar
@@ -27,15 +25,22 @@ DEF_TOKEN
 * DONE - add support for resourcestring keyword
 * DONE - added support for fields, methods and acccess specifiers in RECORDS.
 * DONE - в функциях если return type не определен то в union он устанавливается как void вместо например TBytes
-*
-* ifdef .h files guards cannot contain '.'. check it and remove dots from guards
-* если тип определен внутри класса например так type K = Cardinal; тогда в реализации ф-ции (вне класса, в .cpp файле) нужно делать так 'ClassName::K' а не просто 'K', иначе не компилится
+* DONE - если тип определен внутри класса например так type K = Cardinal; тогда в реализации ф-ции (вне класса, в .cpp файле) нужно делать так 'ClassName::K' а не просто 'K', иначе не компилится
+* DONE - Delphi properties are properly translated to C++ now 
+* DONE - ifdef .h files guards cannot contain '.'. check it and remove dots from guards
+* DONE - Implement initialization/finalization sections
+* DONE - declaration of interfaces is translated properly (all methods in C++ are marked as abstract)
+* DONE - added support for 'out' parameters without specified type. they are translated into void*.
+* DONE - added support of compound types like MyClass.Typ in function parameters and return values
+* DONE - class can now be inherited from one ascent class and many interfaces
+* 
+* class methods, strict private, static methods
+* how to translate this: if Supports(Allocator, IMalloc) then ...
+* добавить проверку на правильность структуры guid (строки)
 * не понимает определение ф-ции с пустыми скобками (function Fun():Integer;), без скобок совсем - понимает
 * check if var1.var2.funcall() works properly
 * System.exit() - does not recognize System as namespace/unit
-* Implement initialization/finalization sections
 * TArr = array of Integer - is not supported (dynamic arrays)
-* Class properties are not supported
 * RECORDS cannot contain published and protected sections
 * 
 *////////////////////////////////////
@@ -416,13 +421,15 @@ int main(int argc, char* argv[])
     if (input_file == NULL) { 
 	fputs("Input file was not specified\n", stderr);
         exit(1); 
-    } 
-    if (output_file == NULL) { 
-	char* ext = strrchr(input_file, '.');
-        int file_name_len = ext ? ext - input_file : strlen(input_file); 
-	if (language_c) output_suf = ".c";
-	output_file = dprintf("%.*s%s", file_name_len, input_file, output_suf);  
-    } 
+    }
+
+	if (output_file == NULL) {
+		char* ext = strrchr(input_file, '.');
+		int file_name_len = ext ? ext - input_file : strlen(input_file);
+		if (language_c) output_suf = ".c";
+		output_file = dprintf("%.*s%s", file_name_len, input_file, output_suf);
+	}
+
     load_predefined(); 
     load_keywords();
     load_configuration(dprintf("%s%s", prog_path, CONFIG_FILE));
@@ -460,6 +467,7 @@ int main(int argc, char* argv[])
 	zzdebug = 1;
 
 	token::input(input_file);
+
 
 	try
 	{
