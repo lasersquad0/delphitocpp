@@ -175,51 +175,54 @@ static void load_keywords()
 
 static void load_configuration(char* name) { 
     FILE* cfg = fopen(name, "r");
-    if (cfg != NULL) { 
-	char buf[MAX_NAME_LEN];
 
-	while (fscanf(cfg, "%s", buf) == 1) { 
-	    if (strcmp(buf, "#begin(reserved)") == 0) { 
-			while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(reserved)") != 0) 
-			{
-				nm_entry::add(buf, TKN_RESERVED);
-            }
-	    } else if(strcmp(buf, "#begin(macro)") == 0) { 
-			while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(macro)") != 0) 
-			{
-				nm_entry::add(buf, TKN_IDENT)->flags |= nm_entry::macro;
+	if (cfg != NULL) {
+
+		char buf[MAX_NAME_LEN]{0};
+
+		while (fscanf(cfg, "%s", buf) == 1) {
+			if (strcmp(buf, "#begin(reserved)") == 0) {
+				while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(reserved)") != 0)
+				{
+					nm_entry::add(buf, TKN_RESERVED);
+				}
+			} 
+			else if (strcmp(buf, "#begin(macro)") == 0) {
+				while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(macro)") != 0)
+				{
+					nm_entry::add(buf, TKN_IDENT)->flags |= nm_entry::macro;
+				}
+				// #begin(library) - this is list of C and C++ standard identificators and keywords which cannot be used in C/C++ during translating from Pascal to C/C++
+				// We are adding then into global ring with s_dummy tag because they are actually C/C++ identificators. 
+				// When identificator with the same name has met in Pascal code, it will be automatically renamed to avoid conflicts.
 			}
-		// #begin(library) - this is list of C and C++ standard identificators and keywords which cannot be used in C/C++ during translating from Pascal to C/C++
-		// We are adding then into global ring with s_dummy tag because they are actually C/C++ identificators. 
-		// When identificator with the same name has met in Pascal code, it will be automatically renamed to avoid conflicts.
+			else if (strcmp(buf, "#begin(library)") == 0)
+			{
+				while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(library)") != 0)
+				{
+					b_ring::global_b_ring.add(nm_entry::add(buf, TKN_IDENT),
+						symbol::s_dummy,
+						NULL);
+				}
+			}
+			else if (strcmp(buf, "#begin(rename)") == 0) {
+				while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(rename)") != 0)
+				{
+					nm_entry* nm_old = nm_entry::add(buf, TKN_IDENT);
+					fscanf(cfg, "%s", buf);
+					nm_entry* nm_new = nm_entry::add(buf, TKN_IDENT);
+					rename_item::add(nm_new, nm_old);
+				}
+			}
 		}
-		else if (strcmp(buf, "#begin(library)") == 0)
-		{
-			while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(library)") != 0)
-			{
-				b_ring::global_b_ring.add(nm_entry::add(buf, TKN_IDENT),
-					symbol::s_dummy,
-					NULL);
+		fclose(cfg);
+		if (turbo_pascal) { // sizeof is builtin Pascal function
+			nm_entry* nm_sizeof = nm_entry::find("sizeof");
+			if (nm_sizeof) {
+				*nm_sizeof->text = 'S';
 			}
 		}
-		else if (strcmp(buf, "#begin(rename)") == 0) {
-			while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(rename)") != 0) 
-			{
-				nm_entry* nm_old = nm_entry::add(buf, TKN_IDENT);
-				fscanf(cfg, "%s", buf);
-				nm_entry* nm_new = nm_entry::add(buf, TKN_IDENT);
-				rename_item::add(nm_new, nm_old);
-			}
-	    }
-	}
-	fclose(cfg);
-	if (turbo_pascal) { // sizeof is builtin Pascal function
-	    nm_entry* nm_sizeof = nm_entry::find("sizeof");
-	    if (nm_sizeof) {
-		*nm_sizeof->text = 'S';
-	    }
-	}
-    } else { 
+	} else {
 	fprintf(stderr, "Can't open configuration file '%s'\n", 
 		name);
     }
@@ -425,7 +428,7 @@ int main(int argc, char* argv[])
 
 	if (output_file == NULL) {
 		char* ext = strrchr(input_file, '.');
-		int file_name_len = ext ? ext - input_file : strlen(input_file);
+		int file_name_len = ext ? ext - input_file : (int)strlen(input_file);
 		if (language_c) output_suf = ".c";
 		output_file = dprintf("%.*s%s", file_name_len, input_file, output_suf);
 	}
@@ -438,18 +441,18 @@ int main(int argc, char* argv[])
         nested_comments = 1;
         ignore_preprocessor_directives = 1;
     }
-    if (use_call_graph) { 
-	call_graph_file = fopen(CALL_GRAPH_FILE, "a");
-	FILE* f = fopen(RECURSIVE_PROC_FILE, "r");
-	if (f != NULL) { 
-	    char name[256];
-	    while (fscanf(f, "%s", name) == 1) { 
-            assert(strlen(name) < sizeof(name));
-            nm_entry::add(name, TKN_IDENT)->flags |= nm_entry::recursive;
-	    }
-	    fclose(f);
+	if (use_call_graph) {
+		call_graph_file = fopen(CALL_GRAPH_FILE, "a");
+		FILE* f = fopen(RECURSIVE_PROC_FILE, "r");
+		if (f != NULL) {
+			char name[256]{ 0 };
+			while (fscanf(f, "%s", name) == 1) {
+				assert(strlen(name) < sizeof(name));
+				nm_entry::add(name, TKN_IDENT)->flags |= nm_entry::recursive;
+			}
+			fclose(f);
+		}
 	}
-    }
 
     compile_system_library = true;
 #ifdef PREFIX
