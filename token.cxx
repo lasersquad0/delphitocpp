@@ -84,13 +84,13 @@ token* token::get_first_token()
     return t->next_relevant(); 
 }
 
-// create copies of head...tail and insert all these new tokens before this
-// retrun pointer to clone of head
+// create copies of head...tail and insert all these new tokens before 'this'
+// returns pointer to clone of head
 token* token::copy(token* head, token* tail)
 {
     token* first = head;
     while (true) {
-         (new token(*head))->insert_b(this); //insert new token (copy of head) before this 
+         (new token(*head))->insert_b(this); //insert new token (copy of head) before 'this' 
 	 if (head == tail) break;
 	 head = head->next; 
     }
@@ -117,6 +117,7 @@ void token::swap(token* left_head, token* left_tail,
     left_tail->next = t; 
 }  
 
+// move list of tokens before 'this' token, return pointer to head
 token* token::move(token* head, token* tail)
 {
     head->prev->next = tail->next; 
@@ -256,6 +257,22 @@ void output_context::output(token* t)
 
 extern bool output_not_existed_hdr;
 
+// replace all '.' and ' ' (space) by underscore ('_') in file name
+// required for .h file guards because they must not contain dots in their id
+static char* normalize_file_name(char* file)
+{
+    char* nfile = _strdup(file);
+    char* f = nfile;
+    int len = strrchr(f, '.') - nfile;
+
+    while (len-- > 0) {
+        if (*f == '.' || *f == ' ') *f = '_';
+        f++;
+    }
+
+    return nfile;
+}
+
 static token* print_rec (char *file, token *t, bool unit_spec) {
     output_context ctx(file);	
     char *ip1, *ip2;
@@ -272,99 +289,108 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
     printf ("Output file %s\n", file);
 
     if (t->prev->tag == TKN_DUMMY) { 
-	fputs("#include \"ptoc.h\"\n\n", ctx.file());
-    } else if (unit_spec) { 
-	file_name_len = strrchr(file, '.') - file;
-	fprintf(ctx.file(), "#ifndef __%.*s_h__\n#define __%.*s_h__\n", 
-		file_name_len, file, file_name_len, file);
-	interface_module = true;
+	    fputs("#include \"ptoc.h\"\n\n", ctx.file());
+    } else if (unit_spec) {
+        char* nfile = normalize_file_name(file);
+        file_name_len = strrchr(nfile, '.') - nfile;
+        fprintf(ctx.file(), "#ifndef __%.*s_h__\n#define __%.*s_h__\n",
+            file_name_len, nfile, file_name_len, nfile);
+        interface_module = true;
     }
+
     for (; (tag = t->tag) != TKN_DUMMY; t = t->next) {
         switch (tag) {
-	  case TKN_INTERFACE:
-	    ip1 = strrchr(file, '.');
-	    inc_file = ip1 ? dprintf("%.*s.h", ip1 - file, file)
-		           : dprintf("%s.h", inc_file, file);
-            fprintf(ctx.file(), "#include \"%s\"\n", inc_file);
-	    t = print_rec(inc_file, t->next, true);
-            if (t->tag == TKN_IMPLEMENTATION && use_namespaces) { 
-                file_name_len = strrchr(file, '.') - file;
-                fprintf(ctx.file(), "\nnamespace %.*s {\n", file_name_len, file);
-                unit_implementation = true;
-            }                
-	    continue;
-          case TKN_PUSH_FILE:
-          case TKN_PUSH_UNIT:
+        case TKN_INTERFACE:
+        {
+            token* prev = t->prev_relevant(); // goes directly to UNIT keyword because ident and ';' have already disabled.
+            // separate interface unit section from interface which is class-like object without fields.
+            if (prev->tag == TKN_UNIT)
+            { 
+                ip1 = strrchr(file, '.');
+                inc_file = ip1 ? dprintf("%.*s.h", ip1 - file, file) : dprintf("%s.h", inc_file, file);
+                fprintf(ctx.file(), "#include \"%s\"\n", inc_file);
+                t = print_rec(inc_file, t->next, true);
+                if (t->tag == TKN_IMPLEMENTATION && use_namespaces) {
+                    file_name_len = strrchr(file, '.') - file;
+                    fprintf(ctx.file(), "\nnamespace %.*s {\n", file_name_len, file);
+                    unit_implementation = true;
+                }
+                continue;          
+            }
+            ctx.output(t); // interface as a class-like object
+            break;
+        }
+        case TKN_PUSH_FILE:
+        case TKN_PUSH_UNIT:
             ip1 = strrchr(t->in_text, '.');
             ip2 = strrchr(t->out_text, '.');
-            assert (ip1 != NULL && ip2 != NULL);
-	    def_vars = false;
-	    if (extern_vars && !turbo_pascal 
-		&& strcmp(ip2, ".var") == 0
-		&& strncmp(t->out_text, file, ip2-t->out_text+1) == 0)
-	    {
-		def_vars = true;
-	    } 
-	    if (strcmp(ip1, ".pas") == 0) { 
+            assert(ip1 != NULL && ip2 != NULL);
+            def_vars = false;
+            if (extern_vars && !turbo_pascal
+                && strcmp(ip2, ".var") == 0
+                && strncmp(t->out_text, file, ip2 - t->out_text + 1) == 0)
+            {
+                def_vars = true;
+            }
+            if (strcmp(ip1, ".pas") == 0) {
                 strcpy(ip1, ".h");
-		strcpy(ip2, ".h");
-            } else { 
-		*ip1 = '_'; 
-		*ip2 = '_'; 
-		strcat(ip1, ".h");
-		strcat(ip2, ".h");
-	    }
-	    if (tag == TKN_PUSH_UNIT) { 
-		fprintf(ctx.file(), "#include \"%s\"\n", t->out_text);
-	    } else { 
-		fprintf(ctx.file(), "#include \"%s\"", t->out_text);
-	    }
-	    inc_file = t->in_text;
-	    f = NULL;
-	    if (tag == TKN_PUSH_UNIT 
-		|| (output_not_existed_hdr 
-		    && (f = fopen(inc_file, "r")) != NULL)) 
-	    {
-		int nested = 1;
-		if (f) fclose(f);
-		do {
-		    t = t->next;
-		    if (t->tag == TKN_POP_FILE)  nested -= 1;
-		    if (t->tag == TKN_PUSH_FILE) nested += 1;
-		    if (t->tag == TKN_PUSH_UNIT) nested += 1;
-		    if (t->tag == TKN_UNIT_END)  nested -= 1;
-		} while(nested);
-            } else { 
-		t = print_rec(inc_file, t->next, false);
-	    }
-	    if (tag != TKN_PUSH_UNIT) { 
-		for (nt = t->next; 
-		     nt != NULL && nt->cat == CAT_WSPC &&
-		     (nt->tag == TKN_SPACE || nt->tag == TKN_CMNT);
-		     nt = nt->next);
-		if (nt && nt->tag != TKN_LN) { 
-		    fputc('\n', ctx.file());
-		}
-	    }
+                strcpy(ip2, ".h");
+            } else {
+                *ip1 = '_';
+                *ip2 = '_';
+                strcat(ip1, ".h");
+                strcat(ip2, ".h");
+            }
+            if (tag == TKN_PUSH_UNIT) {
+                fprintf(ctx.file(), "#include \"%s\"\n", t->out_text);
+            } else {
+                fprintf(ctx.file(), "#include \"%s\"", t->out_text);
+            }
+            inc_file = t->in_text;
+            f = NULL;
+            if (tag == TKN_PUSH_UNIT
+                || (output_not_existed_hdr
+                    && (f = fopen(inc_file, "r")) != NULL))
+            {
+                int nested = 1;
+                if (f) fclose(f);
+                do {
+                    t = t->next;
+                    if (t->tag == TKN_POP_FILE)  nested -= 1;
+                    if (t->tag == TKN_PUSH_FILE) nested += 1;
+                    if (t->tag == TKN_PUSH_UNIT) nested += 1;
+                    if (t->tag == TKN_UNIT_END)  nested -= 1;
+                } while (nested);
+            } else {
+                t = print_rec(inc_file, t->next, false);
+            }
+            if (tag != TKN_PUSH_UNIT) {
+                for (nt = t->next;
+                    nt != NULL && nt->cat == CAT_WSPC &&
+                    (nt->tag == TKN_SPACE || nt->tag == TKN_CMNT);
+                    nt = nt->next);
+                if (nt && nt->tag != TKN_LN) {
+                    fputc('\n', ctx.file());
+                }
+            }
             continue;
-          case TKN_IMPLEMENTATION:
-          case TKN_UNIT_END:
-          case TKN_POP_FILE:
-	    if (interface_module) { 
-		if (!unit_spec && use_namespaces) { 
-		    fprintf(ctx.file(), "}\nusing namespace %.*s;\n", 
-			    file_name_len, file);
-		}
-		fprintf(ctx.file(), "#endif\n");
-	    }
+        case TKN_IMPLEMENTATION:
+        case TKN_UNIT_END:
+        case TKN_POP_FILE:
+            if (interface_module) {
+                if (!unit_spec && use_namespaces) {
+                    fprintf(ctx.file(), "}\nusing namespace %.*s;\n", file_name_len, file);
+                }
+                fprintf(ctx.file(), "#endif\n");
+            }
             return t;
-          default:
-            if (t->tag > TKN_CMNT && unit_spec && use_namespaces) {             
+        default:
+            if (t->tag > TKN_CMNT && unit_spec && use_namespaces) {
                 fprintf(ctx.file(), "namespace %.*s {\n", file_name_len, file);
                 unit_spec = false;
             }
             ctx.output(t);
-        }
+        } //switch
     }
     if (unit_implementation) {
         fprintf(ctx.file(), "}\n");

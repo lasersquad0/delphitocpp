@@ -49,24 +49,31 @@ class token : public heap_object {
     token(int v_cat, int v_tag) 
     { 
 	    next = prev = this;
-	    cat = v_cat;
-	    tag = v_tag;
+	    cat = (unsigned char)v_cat;
+	    tag = (unsigned short)v_tag;
 	    fname = NULL;
 	    clone = bind = NULL;
+        
+        line = 0;
+        attr = 0;
+        pos = 0;
+        name = NULL;
+        out_text = in_text = NULL;
     }
 
-    token(char const* v_text, int v_tag = TKN_GEN, int v_line = 0, int v_pos = 0,
-	  nm_entry *nm = NULL) 
+    token(char const* v_text, int v_tag = TKN_GEN, int v_line = 0, int v_pos = 0, nm_entry *nm = NULL) 
     { 
         line = v_line;
 	    attr = 0;
-        pos = v_pos;
-        tag = v_tag;
-	    cat = token_cat[v_tag];
+        pos = (unsigned short)v_pos;
+        tag = (unsigned short)v_tag;
+	    cat = (unsigned char)token_cat[v_tag]; //TODO shall we change stored type in token_cat?
         out_text = in_text = (char*)v_text; 
         fname = NULL;
         name = nm;
 	    clone = bind = NULL;
+
+        next = prev = NULL;
     }	    
 
     token(token& t); 	    
@@ -80,7 +87,7 @@ class token : public heap_object {
     unsigned char  attr;    // Attribute of token
     unsigned short tag;		// Exact token code
     unsigned short pos;		// Pos. within the line of token start
-    unsigned short line;	// Line number where token was found 
+    unsigned int   line; // short line;	// Line number where token was found 
     //TODO shall we change line to unsigned int?
 
     nm_entry*   name;       // Corresponded name entry (!=NULL for ID)
@@ -126,8 +133,8 @@ class token : public heap_object {
 
     void   set_bind(token* t) { bind = t; } 
 
-    token* copy(token* from, token* till); // copy list of tokens before 'this' token, return pointer to image of 'from' token 
-    token* move(token* from, token* till); // move list of tokens before 'this' token, return pointer to from
+    token* copy(token* head, token* tail); // copy list of tokens before 'this' token, return pointer to clone of 'head' token 
+    token* move(token* head, token* tail); // move list of tokens before 'this' token, return pointer to head
     token* move_region(token* head, token* tail); // move region (together with comments and white spaces)
     static void swap(token* left_head, token* left_tail, token* right_head, token* right_tail); 
 
