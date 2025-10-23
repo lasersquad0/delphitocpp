@@ -151,6 +151,7 @@
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
       <ExceptionHandling>Async</ExceptionHandling>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
