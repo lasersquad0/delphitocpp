@@ -13,8 +13,8 @@ enum {
   ctx_lvalue,       // 5 lvalue part of assignment
   ctx_lvalarray,    // array element is used as lvalue
   ctx_procptr,      // pointer to procedure 
-  ctx_apply,        // functions is applied to arguments
-  ctx_varpar,       // 9 parameter passed by reference
+  ctx_apply,        // function is applied to arguments
+  ctx_varpar,       // parameter passed by reference
   ctx_valpar,       // 10 parameter passed by value
   ctx_statement,    // statement
   ctx_condition,    // result is used in condition expression
@@ -508,7 +508,7 @@ enum {
 //-----------------------------------------------------------------------------
 // Values for expression tags
 
-enum {
+enum expr_tag {
     tn_add,         // addition
     tn_sub,         // subtraction
     tn_mod,         // modulo
@@ -519,7 +519,7 @@ enum {
     tn_minus,       // unary minus
     tn_deref,       // dereferencing pointer
     tn_filevar,     // dereferencing file variable
-    tn_address,     // dereference operation eaten by getting address (&*x)
+    tn_address,     // 10 dereference operation eaten by getting address (&*x)
     tn_access,      // access to component of record
     tn_ref,         // reference to variable: &v
     tn_index,       // indiexation in array
@@ -549,7 +549,7 @@ enum {
     tn_or,          // logical(bit) OR
     tn_xor,         // bit eXclusive-OR
     tn_atom,        // atom expresion (variable)
-    tn_self,        // atom expresion (variable)
+    tn_self,        // 40 atom expresion (variable)
     tn_intnum,      // integer constant
     tn_realnum,     // real constant
     tn_string,      // string constant
@@ -559,7 +559,7 @@ enum {
     tn_fcall,       // function call
     tn_loophole,    // type conversion
     tn_skip,        // skipped optional positional parameter
-    tn_wrp,         // write parameter
+    tn_wrp,         // 50 write parameter
     tn_retarr,      // result of function is assigned to array
     tn_case_range,  // case items range
     tn_record_const // record constant
@@ -567,15 +567,15 @@ enum {
 
 class expr_node : public node {
   public:
-    expr_node* next; 
+    expr_node* next;
 
-    char       tag;
+    char       tag;   // enum expr_tag{}
     char       parent_tag;  
     char       flags;
     int        value; // value of constant expression
     tpexpr*    type;
 
-    bool       is_const_literal() {
+    bool       is_const_literal() const {
 	    return (flags & (tn_is_const|tn_is_literal)) == (tn_is_const|tn_is_literal); 
     } 
     
@@ -772,8 +772,7 @@ class fcall_node : public expr_node {
     token           *rpar;
     char            *temp; // temporary variable used for returning array
 
-    fcall_node(expr_node* fptr, token* lpar, expr_node* args, 
-               token* rpar);
+    fcall_node(expr_node* fptr, token* lpar, expr_node* args, token* rpar);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1150,8 +1149,7 @@ class unit_spec_node : public decl_node {
     
     decl_node* decls;
 
-    unit_spec_node(token* t_unit, token* t_name, token* t_semi,
-		   token* t_interface, decl_node* decls);
+    unit_spec_node(token* t_unit, token* t_name, token* t_semi, token* t_interface, decl_node* decls);
   
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1548,7 +1546,7 @@ public:
 
 class object_tpd_node : public tpd_node { 
   public: 
-    token*         t_object;
+    token*         t_class;
     token*         t_lbr;
     token_list*    t_ancestorlist;
     token*         t_rbr;
@@ -1557,7 +1555,7 @@ class object_tpd_node : public tpd_node {
 
     symbol*        super;
     
-    object_tpd_node(token* t_object, token* t_lbr, token_list* t_ancestorlist, token* t_rbr, 
+    object_tpd_node(token* t_class, token* t_lbr, token_list* t_ancestorlist, token* t_rbr, 
                     decl_node* parts, token* t_end);  
 
     void attrib(int ctx) override;
