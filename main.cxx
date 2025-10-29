@@ -35,8 +35,18 @@
 * DONE - class can now be inherited from one ascent class and many interfaces
 * DONE - class variables and class methods are supported.
 * DONE - strict private and strict published are implemented
+* DONE - class forward declarations work now (type TFwdClass = class; => class TFwdClass;)
+* DONE - Variables of object types are translated into pointers to objects e.g. var a,b: TMyClass; => TMyClass *a, *b. 
+* DONE - constructor calls are properly translated into C++ 'new' calls e.g. a := TTestClass.Create(...); => a = new TTestClass(...)
+* DONE - Delphi constructor declarations and definitions are translated into C++ constructors
+* DONE - destructors declarations and definitions are translated into C++ destructors. 
+         This may require manual fixes in code because Delphi destructors can have parameters while C++ - not.
 * 
 * 
+* если в конструкторе inherited идет первой строчкой тогда parent можно вызывать так (часто это и единственный компилируемый метод). TTest::TTest(int a): TParent(a, 4);
+* добавить в tptoc.pas либо в passlib.h ф-ции Move, SetLength, Copy, Assert
+* посмотреть каких реализаций из tptoc.pas нехватает в paslib.h 
+* решить вопрос с Index keyword и когда переменная имеет название Index
 * определения переменных вида a: MyClass; транслировать в MyClass* a; ???? (только для классов).
 * но тогда понадобится так же транслировать access operators из '.' в '->'
 * 
@@ -480,17 +490,17 @@ int main(int argc, char* argv[])
 	try
 	{
 		zzparse();
+
+    token::output(output_file);
+
+    if (call_graph_file) fclose(call_graph_file);
+
 	}
 	catch (...)
 	{
 		fprintf(stderr, "UNKNOWN ERROR CAUGHT!");
 	}
 
-    token::output(output_file);
-
-    if (call_graph_file) { 
-	fclose(call_graph_file);
-    }
     return 0; 
 }
 
