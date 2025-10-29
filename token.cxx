@@ -32,6 +32,7 @@ void token::remove()
     next->prev = prev;
 }
 
+// looks for next non-space token (token where cat != CAT_WSPC) 
 token* token::next_relevant() 
 {
     token* t; 
@@ -71,8 +72,8 @@ void   token::disappear()
 { 
     token* t = this;
     do { 
-	t->disable();
-	t = t->next;
+	    t->disable();
+	    t = t->next;
     } while (t->tag == TKN_SPACE || t->tag == TKN_LN);
 }    
 
@@ -283,7 +284,7 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
     bool   def_vars = false;
     bool   interface_module = false;
     bool   unit_implementation = false;
-    bool   in_namespace = false;
+    //bool   in_namespace = false;
     int file_name_len = 0;
 
     printf ("Output file %s\n", file);
