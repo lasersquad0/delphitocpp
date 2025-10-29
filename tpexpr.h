@@ -6,11 +6,11 @@
 #include "bring.h"
 
 enum type_tag {
-    tp_void, tp_any, 
-    tp_real, tp_double, tp_integer, tp_longint, 
-    tp_char, tp_string, tp_varying_string, tp_bool, tp_set, 
-    tp_enum, tp_range, tp_proc, tp_array, tp_dynarray, tp_record, tp_ref,
-    tp_file, tp_text, tp_fwd_ref, tp_unit, tp_object,
+    tp_void, tp_any, //1
+    tp_real, tp_double, tp_integer, tp_longint, //5
+    tp_char, tp_string, tp_varying_string, tp_bool, tp_set, //10
+    tp_enum, tp_range, tp_proc, tp_array, tp_dynarray, tp_record, tp_ref, //17
+    tp_file, tp_text, tp_fwd_ref, tp_unit, tp_object, //22
     tp_last	// Not a type really
 };
 enum type_flags { 

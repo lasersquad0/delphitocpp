@@ -315,8 +315,7 @@ varying_string_tp::varying_string_tp() : array_tp(&char_type)
 
 //---------------------------------------------------------------------
 
-proc_tp::proc_tp(tpexpr* rtype, tpd_node* tpd) 
-: tpexpr(tp_proc, tpd), b_ring(b_ring::proc)
+proc_tp::proc_tp(tpexpr* rtype, tpd_node* tpd) : tpexpr(tp_proc, tpd), b_ring(b_ring::proc)
 { 
     params = last = NULL;
     extra_params = NULL; 
