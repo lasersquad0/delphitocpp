@@ -39,7 +39,7 @@ class tpexpr : public heap_object {
     char     *name;
     tpd_node *tpd; 
 
-    bool is_scalar() { //TODO shall we add here tp_longint, tp_double and tp_bool?
+    bool is_scalar() const { //TODO shall we add here tp_longint, tp_double and tp_bool?
         return tag == tp_char || tag == tp_integer 
 	    || tag == tp_real || tag == tp_range || tag == tp_enum; 
     }
@@ -193,26 +193,26 @@ class text_tp : public file_tp {
 
 // Node for record type
 class record_tp : public tpexpr, public b_ring {
-  public:
+public:
     void calc_flags(); 
-    record_tp(tpd_node *tpd = NULL) 
-	: tpexpr(tp_record, tpd), b_ring(b_ring::record)
-  {}
+    record_tp(tpd_node *tpd = NULL): tpexpr(tp_record, tpd), b_ring(b_ring::record) {}
 };
 
 class object_tp : public record_tp {
 public:
     symbol* class_name;
+
     object_tp(tpd_node* tpd, object_tp* super = NULL);
 };
 
 class unit_tp : public record_tp { 
   public: 
     unit_tp(tpd_node *tpd = NULL) : record_tp(tpd) { 
-	tag = tp_unit;
+	    tag = tp_unit;
     }
 };
 
+/*
 class system_unit_tp : public unit_tp {
 public:
     system_unit_tp(tpd_node* tpd = NULL) : unit_tp(tpd) { }
@@ -221,7 +221,7 @@ public:
     //symbol* search(token* t) override { return global_b_ring.search(t); }
 
 };
-
+*/
 
 class proc_tp; 
 
