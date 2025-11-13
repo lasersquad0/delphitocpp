@@ -6,9 +6,10 @@
 class nm_entry : public heap_object {
   public:
     nm_entry*      next;
-    int            tag;
+    int            tag; // Exact token code from enum lex_token
 
     enum { recursive=1, macro=2 }; 
+
     unsigned char  flags; 
     char           text[1];    
     enum { h_t_size = 1987 };
