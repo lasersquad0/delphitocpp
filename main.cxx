@@ -41,12 +41,14 @@
 * DONE - Delphi constructor declarations and definitions are translated into C++ constructors
 * DONE - destructors declarations and definitions are translated into C++ destructors. 
          This may require manual fixes in code because Delphi destructors can have parameters while C++ - not.
-* 
-* 
+* DONE - result := nil правильно транслируетс€ в result = nullptr;
+* ¬ў“” - решить вопрос с Index keyword и когда переменна€ имеет название Index (ценой дополнительного warning в грамматике)
+*
+* особенности реализации inherited -  In this case, inherited takes no explicit parameters, but passes to the inherited method the same parameters with which the enclosing method was called.
+* плохо работает грамматика если в implementation обь€вл€ешь 2 ф-ции c директивой overload. тогда срабатывает proc_fwd_decl а proc_def Ќ≈ срабатывает 
 * если в конструкторе inherited идет первой строчкой тогда parent можно вызывать так (часто это и единственный компилируемый метод). TTest::TTest(int a): TParent(a, 4);
 * добавить в tptoc.pas либо в passlib.h ф-ции Move, SetLength, Copy, Assert
 * посмотреть каких реализаций из tptoc.pas нехватает в paslib.h 
-* решить вопрос с Index keyword и когда переменна€ имеет название Index
 * определени€ переменных вида a: MyClass; транслировать в MyClass* a; ???? (только дл€ классов).
 * но тогда понадобитс€ так же транслировать access operators из '.' в '->'
 * 
@@ -90,9 +92,9 @@ static void load_predefined()
     b_ring::add_cur(nm_entry::add("false", TKN_IDENT), 
 				  symbol::s_const, 
 				  &bool_type);
-    b_ring::add_cur(nm_entry::add("nil", TKN_IDENT), 
+    b_ring::add_cur(nm_entry::add("nil", TKN_IDENT), nm_entry::add("nullptr", TKN_IDENT),
 				  symbol::s_const, 
-				  &void_type);
+				  &any_type);
 
     if (hp_pascal) { 
         nm_entry::add("addr", TKN_ADDR);
