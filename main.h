@@ -61,7 +61,7 @@ extern bool  use_call_graph;
 extern bool  pio_init;
 extern bool  short_set; 
 extern FILE* call_graph_file;
-bool is_recursive_proc(const char* name); 
+//bool is_recursive_proc(const char* name); 
 
 void scanner_input(char *file); 
 
