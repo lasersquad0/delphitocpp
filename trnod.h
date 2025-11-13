@@ -139,18 +139,18 @@ class module_node : public node {
 
 class unit_node : public node { 
   public: 
-    token*                t_unit; 
-    token*                t_name; 
-    token*                t_semi; 
-    token*                t_interface; 
-    decl_node*            unit_decl;         
+    token*                t_unit;
+    token*                t_name;
+    token*                t_semi;
+    token*                t_interface;
+    decl_node*            unit_decl;       
     token*                t_implementation;
     decl_node*            unit_def;       
     compound_node*        initializer; 
     token*                t_end;
     token*                t_dot; // '.'
     decl_node*            init_finit;
-    proc_tp*              main; 
+    proc_tp*              main;
 
     static bool           interface_part; // translate interface part of module
     static char*          unit_name;
@@ -206,7 +206,12 @@ class stmt_node : public node {
     stmt_node*   next;
     stmt_node() : next(NULL) {}
 
-    virtual bool is_compound(); 
+    virtual bool is_compound();
+    virtual stmt_node* find_last() { 
+        stmt_node* last; 
+        for (last = this; last->next != NULL; last = last->next); 
+        return last;
+    };
 };
 
 class label_node : public stmt_node {
@@ -263,8 +268,8 @@ class write_list_node;
 
 class write_node : public stmt_node { 
   public:
-    token*              t_write; 
-    write_list_node*    params;
+    token*           t_write; 
+    write_list_node* params;
 
     write_node(token* t_write, write_list_node* params = NULL);
 
@@ -275,7 +280,8 @@ class write_node : public stmt_node {
 
 class compound_node : public stmt_node {
   public:
-    token        *t_begin, *t_end;
+    token*       t_begin;
+    token*       t_end;
     stmt_node*   body;
 
     compound_node(token* t_begin,  stmt_node* body, token* t_end);
@@ -328,11 +334,15 @@ public:
 
 class on_except_node : public stmt_node {
 public:
-    token* t_on, *t_ident, *t_coln, * t_do;
-    tpd_node* ex_type;
-    compound_node* body;
+    token*          t_on;
+    token*          t_ident;
+    token*          t_coln;
+    token*          t_do;
+    tpd_node*       ex_type;
+    //compound_node*  body;
+    stmt_node*      body;
 
-    on_except_node(token* t_on, token* t_ident, token* t_coln, tpd_node* ex_type, token* t_do, compound_node* body);
+    on_except_node(token* t_on, token* t_ident, token* t_coln, tpd_node* ex_type, token* t_do, stmt_node* body);
     
     void attrib(int ctx) override;
     void translate(int ctx) override;
@@ -341,14 +351,17 @@ public:
 
 class inherited_node : public stmt_node {
 public:
-    token* t_inherited, *t_ident, *t_lpar, *t_rpar;
+    token*     t_inherited;
+    token*     t_ident;
+    token*     t_lpar;
+    token*     t_rpar;
     expr_node* params;
 
     inherited_node(token* t_inherited, token* t_ident, token* t_lpar, expr_node* params, token* t_rpar);
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
-    void print_debug() override { fprintf(stderr, "inherited:%s", t_ident->in_text); };
+    void print_debug() override { fprintf(stderr, "inherited:%s", t_ident? t_ident->in_text: "<no name>"); };
 };
 
 
@@ -790,7 +803,7 @@ class skipped_node : public expr_node {
 
 
 class tpd_node;
-
+/*
 class loophole_node : public expr_node {
   public:
     token           *t_loophole;
@@ -806,7 +819,7 @@ class loophole_node : public expr_node {
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
-
+*/
 class expr_group_node : public expr_node {
   public:
     token          *lpar;
@@ -938,15 +951,15 @@ class init_finit_node : public decl_node {
 public:
     token* t_initialization;
     decl_node* init_defs;
-    compound_node* initializer;
+    stmt_node* initializer;
     token* t_semi1; // ';'
     token* t_finalization;
     decl_node* fini_defs;
-    compound_node* finalizer;
+    stmt_node* finalizer;
     token* t_semi2; // ';'
 
-    init_finit_node(token* t_initialization, decl_node* init_defs, compound_node* initializer, token* t_semi,
-        token* t_finalization, decl_node* fini_defs, compound_node* finalizer, token* t_semi2);
+    init_finit_node(token* t_initialization, decl_node* init_defs, stmt_node* initializer, token* t_semi,
+        token* t_finalization, decl_node* fini_defs, stmt_node* finalizer, token* t_semi2);
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
@@ -1227,7 +1240,7 @@ class proc_def_node : public proc_decl_node {
     token*              t_semi3; 
     bool                use_forward; 
 
-    static object_tp*   self;
+    static record_tp* self; //object_tp*   self;
     symbol*             s_self;
 
     proc_def_node(token* t_static, token* t_proc, token* t_class, token* t_dot, token* t_ident, param_list_node* params,
@@ -1667,13 +1680,15 @@ class prop_array_node : public decl_node
 {
 public:
     token* t_lbr;
-    token* t_ident;
-    prop_type_def_node* ind_type; // actually prop_type_def_node
+    var_decl_node* decls; // actually list of variable declarations
     token* t_rbr;
 
-    char* key_type = NULL;
+    int varcnt = 0;
+    char* type_list = NULL;    // comma separated list of param types e.g. 'int, K, char'
+    char* param_list = NULL;  // full translated param list as string e.g. 'int key1, K key2, char key3'
+    char* var_list = NULL;    // list of param naes ony e.g. 'key1, key2, key3'
 
-    prop_array_node(token* t_lbr, token* t_ident, decl_node* type, token* t_rbr);
+    prop_array_node(token* t_lbr, var_decl_node* decls, token* t_rbr);
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
