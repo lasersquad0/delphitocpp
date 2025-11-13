@@ -85,10 +85,9 @@ class token : public heap_object {
 
     unsigned char  cat;		// Token category
     unsigned char  attr;    // Attribute of token
-    unsigned short tag;		// Exact token code
+    unsigned short tag;		// Exact token code from enum lex_token
     unsigned short pos;		// Pos. within the line of token start
-    unsigned int   line; // short line;	// Line number where token was found 
-    //TODO shall we change line to unsigned int?
+    unsigned int   line;    // short line;	// Line number where token was found 
 
     nm_entry*   name;       // Corresponded name entry (!=NULL for ID)
 
