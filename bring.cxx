@@ -20,11 +20,10 @@ rename_item* rename_item::list;
 
 void symbol::translate(token* t)
 {
-    if( path != NULL) {  
-	t->set_trans(dprintf("%s%s", path, out_name->text)); 
-    } else { 
-	t->set_trans(out_name->text); 
-    }
+    if( path != NULL)
+	    t->set_trans(dprintf("%s%s", path, out_name->text)); 
+    else
+	    t->set_trans(out_name->text); 
 } 
 
 // Constructor for ring
