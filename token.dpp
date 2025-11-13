@@ -5,7 +5,7 @@
 // Token Categories are put into: int token::token_cat[TKN_*] array with prefix CAT_ (e.g. CAT_KWD, CAT_ID, ...). TKN_* used as an index in this array.
 // Token Class/Tag represented by enum (must not contain repeating values): enum lex_token {...,TKN_LPAR, ...TKN_CLASS, TKN_END_SHIFT,... TKN_LAST}    
 // Yacc Token Value is put into array: int zzcnv_table[TKN_*] {...ICONST, ...'[',...INHERITED,...AND,... }. TKN_* used as an index in this array.
-// All terminal tokens defined in parser.y file put int enum: enum yytokentype {...ABSTRACT=258,... PROCEDURE=297,...AND=357...}
+// All terminal tokens (yacc token values) are defined in parser.y file and put into enum: enum yytokentype {...ABSTRACT=258,... PROCEDURE=297,...AND=357...}
 // Also there is a table with tag names: char* token_tag_name[] = {..."TKN_LPAR" , ..."TKN_CLASS", "TKN_END_SHIFT",... "TKN_LAST"}
 // All available token categories defined in: enum category {CAT_ID,CAT_STR,CAT_NUM,CAT_KWD,CAT_WSPC,CAT_PUT,CAT_SPEC,CAT_GEN}
 
@@ -78,7 +78,7 @@ DEF_TOKEN("dynamic", ID, TKN_DYNAMIC, DYNAMIC)
 DEF_TOKEN("else", KWD, TKN_ELSE, ELSE)
 DEF_TOKEN("end", KWD, TKN_END, END)
 DEF_TOKEN("except", KWD, TKN_EXCEPT, EXCEPT)
-DEF_TOKEN("external", ID, TKN_EXTERNAL, EXTERNAL)
+DEF_TOKEN("external", ID, TKN_EXTERNAL, EXTERNAL) //60
 DEF_TOKEN("exit", ID, TKN_EXIT, IDENT)
 //DEF_TOKEN("ffalse", KWD, TKN_FALSE, FFALSE)
 DEF_TOKEN("far", KWD, TKN_FAR, IDENT)
@@ -89,27 +89,29 @@ DEF_TOKEN("finally", KWD, TKN_FINALLY, FINALLY)
 DEF_TOKEN("for", KWD, TKN_FOR, FOR)
 DEF_TOKEN("forward", ID, TKN_FORWARD, FORWARD)
 DEF_TOKEN("function", KWD, TKN_FUNCTION, FUNCTION)
-DEF_TOKEN("goto", KWD, TKN_GOTO, GOTO)
-DEF_TOKEN("ident", KWD, TKN_IDENT, IDENT) //69
+DEF_TOKEN("goto", KWD, TKN_GOTO, GOTO) //70
+DEF_TOKEN("ident", KWD, TKN_IDENT, IDENT)
 DEF_TOKEN("if", KWD, TKN_IF, IF)
 DEF_TOKEN("halt", ID, TKN_HALT, IDENT)
 DEF_TOKEN("implementation", KWD, TKN_IMPLEMENTATION, IDENT)
-DEF_TOKEN("index", ID, TKN_INDEX, INDEX)
+DEF_TOKEN("index", KWD, TKN_INDEX, IDENT)
+//DEF_TOKEN("index", ID, TKN_INDEX2, IDENT)
 DEF_TOKEN("inherited", KWD, TKN_INHERITED, INHERITED)
 DEF_TOKEN("initialization", KWD, TKN_INITIALIZATION, INITIALIZATION)
-DEF_TOKEN("interface", KWD, TKN_INTERFACE, IDENT) //78
+DEF_TOKEN("interface", KWD, TKN_INTERFACE, IDENT)
 DEF_TOKEN("in", KWD, TKN_IN, IN)
-DEF_TOKEN("label", KWD, TKN_LABEL, LABEL)
-DEF_TOKEN("loophole", KWD, TKN_LOOPHOLE, LOOPHOLE)
+DEF_TOKEN("label", KWD, TKN_LABEL, LABEL) //80
+//DEF_TOKEN("loophole", KWD, TKN_LOOPHOLE, LOOPHOLE)
 DEF_TOKEN("mod", KWD, TKN_MOD, MOD)
+DEF_TOKEN("nil", KWD, TKN_NIL, IDENT)
 DEF_TOKEN("not", KWD, TKN_NOT, NOT)
-DEF_TOKEN("object", KWD, TKN_OBJECT, OBJECT) //80
+DEF_TOKEN("object", KWD, TKN_OBJECT, OBJECT)
 DEF_TOKEN("of", KWD, TKN_OF, OF)
 DEF_TOKEN("on", KWD, TKN_ON, ON)
 DEF_TOKEN("or", KWD, TKN_OR, OR)
 DEF_TOKEN("origin", KWD, TKN_ORIGIN, IDENT)
-DEF_TOKEN("otherwise", KWD, TKN_OTHERWISE, OTHERWISE)
-DEF_TOKEN("overload", ID, TKN_OVERLOAD, OVERLOAD)
+DEF_TOKEN("otherwise", KWD, TKN_OTHERWISE, OTHERWISE) 
+DEF_TOKEN("overload", ID, TKN_OVERLOAD, OVERLOAD) //90
 DEF_TOKEN("override", ID, TKN_OVERRIDE, OVERRIDE)
 DEF_TOKEN("out", KWD, TKN_OUT, OUT)
 DEF_TOKEN("packed", KWD, TKN_PACKED, PACKED)
@@ -127,10 +129,10 @@ DEF_TOKEN("raise", KWD, TKN_RAISE, RAISE)
 DEF_TOKEN("record", KWD, TKN_RECORD, RECORD)
 DEF_TOKEN("register", ID, TKN_REGISTER, REGISTER)
 DEF_TOKEN("reintroduce", ID, TKN_REINTRODUCE, REINTRODUCE)
-DEF_TOKEN("repeat", KWD, TKN_REPEAT, REPEAT) //106
+DEF_TOKEN("repeat", KWD, TKN_REPEAT, REPEAT)
 DEF_TOKEN("resourcestring", KWD, TKN_RESOURCESTRING, RESOURCESTRING)
 DEF_TOKEN("safecall", ID, TKN_SAFECALL, SAFECALL)
-DEF_TOKEN("self", ID, TKN_SELF, IDENT)
+DEF_TOKEN("self", ID, TKN_SELF, IDENT) //110
 DEF_TOKEN("set", KWD, TKN_SET, SET)
 DEF_TOKEN("shl", KWD, TKN_SHL, IDENT)
 DEF_TOKEN("shr", KWD, TKN_SHR, IDENT)
@@ -140,21 +142,21 @@ DEF_TOKEN("stored", KWD, TKN_STORED, STORED)
 DEF_TOKEN("strict", KWD, TKN_STRICT, STRICT)
 DEF_TOKEN("string", ID, TKN_STRING, IDENT)
 DEF_TOKEN("then", KWD, TKN_THEN, THEN)
-DEF_TOKEN("to", KWD, TKN_TO, TO)
+DEF_TOKEN("to", KWD, TKN_TO, TO) //120
 //DEF_TOKEN("ttrue", KWD, TKN_TRUE, TTRUE)
 DEF_TOKEN("try", KWD, TKN_TRY, TRY)
 DEF_TOKEN("type", KWD, TKN_TYPE, TYPE)
 DEF_TOKEN("until", KWD, TKN_UNTIL, UNTIL)
-DEF_TOKEN("unit", KWD, TKN_UNIT, IDENT) //122
+DEF_TOKEN("unit", KWD, TKN_UNIT, IDENT)
 DEF_TOKEN("var", KWD, TKN_VAR, VAR)
 DEF_TOKEN("varargs", ID, TKN_VARARGS, VARARGS)
 DEF_TOKEN("virtual", ID, TKN_VIRTUAL, VIRTUAL)
 DEF_TOKEN("while", KWD, TKN_WHILE, WHILE)
-DEF_TOKEN("winapi", ID, TKN_WINAPI, WINAPI)
+DEF_TOKEN("winapi", ID, TKN_WINAPI, WINAPI) //130
 DEF_TOKEN("with", KWD, TKN_WITH, WITH)
 DEF_TOKEN("xor", KWD, TKN_XOR, IDENT)
 
-//131...
+//133...
 DEF_TOKEN("succ",      ID, TKN_SUCC, IDENT)
 DEF_TOKEN("pred",      ID, TKN_PRED, IDENT)
 DEF_TOKEN("inc",       ID, TKN_INC, IDENT)
