@@ -102,7 +102,7 @@ void zzerror(const char* text)
              INITIALIZATION
              INTERFACE
              LABEL
-             LOOPHOLE
+//             LOOPHOLE
              OBJECT
              OF
              ON
@@ -240,6 +240,7 @@ void zzerror(const char* text)
 %type <n_decl>  decl_part_list
 %type <n_decl>  label_decl_part
 %type <n_decl>  const_def_part
+//%type <n_decl>  init_const_def_part
 %type <n_decl>  var_const_decl_part_list
 %type <n_decl>  guid
 %type <n_decl>  interface_components
@@ -267,19 +268,24 @@ void zzerror(const char* text)
 %type <n_decl>  prop_default_directive
 
 %type <n_cdef>  const_def_list
+//%type <n_cdef>  init_const_def_list
 %type <n_cdef>  const_def
 %type <n_decl>  type_def_part
 %type <n_tdef>  type_def_list
 %type <n_tdef>  type_def
 %type <n_decl>  var_decl_part
+//%type <n_decl>  init_var_decl_part
 %type <n_decl>  var_const_decl_part
 %type <n_decl>  field_decl_part
 %type <n_vdcl>  var_decl_list
+//%type <n_vdcl>  init_var_decl_list
 %type <n_vdcl>  field_decl_list
 %type <n_vdcl>  var_decl
 %type <n_vdcl>  param_decl
+%type <n_vdcl>  prop_param_decl
+%type <n_vdcl>  prop_param_list
 
-%type <n_decl>  proc_decl
+//%type <n_decl>  proc_decl
 %type <n_decl>  proc_fwd_decl
 %type <n_decl>  method_decl_list
 %type <n_decl>  method_decl
@@ -338,7 +344,7 @@ void zzerror(const char* text)
 %no-lines
 %define parse.trace
 
-%printer { auto obj = (object_tpd_node*)$$; fprintf (yyo, "%s", obj->t_object->in_text); } class_type
+%printer { auto obj = (object_tpd_node*)$$; fprintf (yyo, "%s", obj->t_class->in_text); } class_type
 %printer { if($$) $$->print_debug(); } <tok> 
 %printer { $$->print_debug(); } <toks> 
 %printer { fprintf (yyo, "%s", $$? ((literal_node*)$$)->value_tkn->in_text: "NULL"); } constant 
@@ -419,16 +425,30 @@ unit: UNIT IDENT ';' INTERFACE unit_decl_list IMPLEMENTATION unit_def_list END '
     | UNIT IDENT ';' INTERFACE unit_decl_list IMPLEMENTATION unit_def_list init_finit END '.'
         { $$ = new unit_node($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10); }
   
-init_finit: INITIALIZATION var_const_decl_part_list compoundst ';'
-        { $$ = new init_finit_node($1, $2, $3, $4, NULL, NULL, NULL, NULL); }
-    | INITIALIZATION var_const_decl_part_list compoundst ';' FINALIZATION var_const_decl_part_list compoundst ';'
-        { $$ = new init_finit_node($1, $2, $3, $4, $5, $6, $7, $8); }
+init_finit: INITIALIZATION var_const_decl_part_list sequence
+        { $$ = new init_finit_node($1, $2, $3, NULL, NULL, NULL, NULL, NULL); }
+    | INITIALIZATION var_const_decl_part_list sequence FINALIZATION var_const_decl_part_list sequence
+        { $$ = new init_finit_node($1, $2, $3, NULL, $4, $5, $6, NULL); }
 
 var_const_decl_part_list: { $$ = NULL; } 
     | var_const_decl_part var_const_decl_part_list { $1->next = $2; $$ = $1; }
 
 var_const_decl_part: const_def_part | var_decl_part 
-   
+  
+/*
+init_const_def_part: CONST init_const_def_list  
+    { $$ = new const_def_part_node($1, $2); } 
+
+init_const_def_list: const_def
+    | const_def ';' const_def_list { $1->next = $3; $$ = $1; }
+
+init_var_decl_part: VAR init_var_decl_list  
+    { $$ = new var_decl_part_node($1, $2); } 
+
+init_var_decl_list: var_decl
+    | var_decl ';' init_var_decl_list { $1->next = $3; $$ = $1; }
+ */
+
 unit_def_list: decl_part_list 
 
 prog_param_list: { $$ = NULL; } 
@@ -504,7 +524,7 @@ except_many: except
     | except ';' except_many { $1->next = $3; $$ = $1; }
 
 except: { $$ = NULL; }  
-    | ON IDENT ':' simple_type DO compoundst
+    | ON IDENT ':' simple_type DO statement //compoundst
         { $$ = new on_except_node($1, $2, $3, $4, $5, $6); }
 
 statement: { $$ = new empty_node(curr_token->prev_relevant()); }
@@ -651,7 +671,7 @@ primary: constant
    | primary '.' IDENT { $$ = new access_expr_node($1, $2, $3); }
    | primary '^' { $$ = new deref_expr_node($1, $2); }
    | primary '[' expr_list ']' { $$ = new idx_expr_node($1, $2, $3, $4); }
-   | LOOPHOLE '(' type ',' expr ')' { $$ = new loophole_node($1, $2, $3, $4, $5, $6); }
+//   | LOOPHOLE '(' type ',' expr ')' { $$ = new loophole_node($1, $2, $3, $4, $5, $6); }
 
 constant: record_constant
         | ICONST { $$ = new integer_node($1); }
@@ -785,12 +805,15 @@ var_decl: ident_list ':' type { $$ = new var_decl_node($1, $2, $3); }
    //  | IDENT ORIGIN expr ':' simple_type 
    //    { $$ = (var_decl_node*)new var_origin_decl_node($1, $2, $3, $4, $5); }
 
+/* Temporary comment it out. Since we have proc_spec that does everything we need.
+   The only problem need to be checked is having proc_decl in formal_params 
 proc_decl: 
       PROCEDURE IDENT formal_params  
                { $$ = new proc_decl_node($1, $2, $3); } 
     | FUNCTION IDENT formal_params ':' type 
                { $$ = new proc_decl_node($1, $2, $3, $4, $5); } 
-    
+  */  
+
 proc_fwd_decl: 
       PROCEDURE IDENT formal_params ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
@@ -805,10 +828,10 @@ property_decl_list: property_decl
     | property_decl property_decl_list { $1->next = $2; $$ = $1; }
 
 prop_array: { $$ = NULL; }
-    | '[' IDENT prop_type_def ']'
-       { $$ = new prop_array_node($1, $2, $3, $4); }
+    | '[' prop_param_list ']'
+       { $$ = new prop_array_node($1, $2, $3); }
 prop_index: { $$ = NULL; } 
-    | INDEX constant     //TODO we may need expt type here instead of 'constant' to be able to handle 'property ... index IND+3 ...' statements 
+    | IDENT constant     //TODO we may need expr type here instead of 'constant' to be able to handle 'property ... index IND+3 ...' statements 
        { $$ = new prop_index_node($1, $2); }
 prop_type_def: { $$ = NULL; }
     | ':' type 
@@ -828,6 +851,12 @@ prop_default:  { $$ = NULL; }
 prop_default_directive:  { $$ = NULL; }
     | DEFAULT ';'
        { $$ = new prop_default_directive_node($1, $2); }
+
+prop_param_list: prop_param_decl 
+    | prop_param_decl ';' prop_param_list { $1->next = $3; $$ = $1; }
+
+prop_param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3); }
+
 
 proc_spec: 
       PROCEDURE IDENT formal_params ';'
@@ -849,9 +878,8 @@ proc_def:
     | CLASS FUNCTION IDENT '.' IDENT formal_params ':' type ';' block ';' 
                { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); } 
  
- //  | FUNCTION IDENT ';' block ';' 
+  //  | FUNCTION IDENT ';' block ';' 
   //             { $$ = new proc_def_node($1, NULL, NULL, $2, NULL, NULL, NULL, $3, NULL, NULL, $4, $5); } 
-  
   /* we do not need FAR specifier any more */
   //  | PROCEDURE IDENT formal_params ';' FAR ';' block ';' 
   //             { $$ = new proc_def_node($1, NULL, NULL, $2, $3, NULL, NULL, $4, $5, $6, $7, $8); } 
@@ -880,7 +908,7 @@ formal_param: VAR param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
     | CONST param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
     | OUT param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
     | param_decl { $$ = $1; } 
-    | proc_decl
+    //| proc_decl - see comment to proc_decl definition
 
 param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3); }
     |  ident_list ':' param_type EQ constant { $$ = new var_decl_node($1, $2, $3, $4, $5); }
@@ -1018,8 +1046,8 @@ class_type: class_or_object object_body END
        { $$ = new object_tpd_node($1, $2, $3, $4, NULL, $5); }
     | class_or_object END
        { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2); }
- //   | class_or_object
- //      { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
+    | class_or_object
+       { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
 
 
 object_body: field_decl_list object_components
