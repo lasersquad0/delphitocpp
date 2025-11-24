@@ -25,21 +25,20 @@ class conf_array {
   public:
     const integer low, high; 
 
-    conf_array(integer l, integer h, Type* ptr) 
-      : low(l), high(h), buf(ptr) {} 
+    conf_array(integer l, integer h, Type* ptr) : low(l), high(h), buf(ptr) {} 
 
     conf_array(Type const* ptr); /* intialization with string literal */
 
     conf_array(Type elem); /* intialization with character literal */
 
     void copy(void* buf_copy) { 
-	memcpy(buf_copy, buf, (high-low+1)*sizeof(Type));
-	buf = (Type*)buf_copy;
+	    memcpy(buf_copy, buf, (high-low+1)*sizeof(Type));
+	    buf = (Type*)buf_copy;
     }
 
     Type& operator[](integer index) { 
         assert(BETWEEN(low, index, high));
-	return buf[index-low]; 
+	    return buf[index-low]; 
     }
 
     integer size() const { return high - low + 1; }
@@ -49,15 +48,17 @@ class conf_array {
     Type* body() { return buf; }
     
     void operator = (conf_array const& src) { 
-	assert(low == src.low && high == src.high); 
-	memcpy(buf, src.buf, sizeof(Type)*(high-low+1)); 
+	    assert(low == src.low && high == src.high); 
+	    memcpy(buf, src.buf, sizeof(Type)*(high-low+1)); 
     }
+
     void assign(conf_array const& src) { 
-	assert(low == src.low && high == src.high); 
-	memcpy(buf, src.buf, sizeof(Type)*(high-low+1)); 
+	    assert(low == src.low && high == src.high); 
+	    memcpy(buf, src.buf, sizeof(Type)*(high-low+1)); 
     }
+
     friend char* lpsz(conf_array const& a) { 
-	return lpsz(a.low, a.high, (char*)a.buf); 
+	    return lpsz(a.low, a.high, (char*)a.buf); 
     }
   protected: 
     Type *buf;  
@@ -68,11 +69,9 @@ class conf_array {
 //#define TEMPLATE_SPEC
 #define TEMPLATE_SPEC  template <>
 
-TEMPLATE_SPEC inline conf_array<char>::conf_array(char const* str) 
-: low(1), high(strlen(str)), buf((char*)str) {}
+TEMPLATE_SPEC inline conf_array<char>::conf_array(char const* str) : low(1), high(strlen(str)), buf((char*)str) {}
 
-TEMPLATE_SPEC inline conf_array<char>::conf_array(char ch) 
-: low(1), high(1), buf(&ch) {}
+TEMPLATE_SPEC inline conf_array<char>::conf_array(char ch) : low(1), high(1), buf(&ch) {}
 
 #endif /* not Turbo Pascal */
 
@@ -82,18 +81,19 @@ class array {
     Type buf[high_bound-low_bound+1];
 
     enum array_bounds { 
-	low = low_bound, 
-	high = high_bound 
+	    low = low_bound, 
+    	high = high_bound 
     };
+    
     integer size() const { return high_bound - low_bound + 1; }
 
     Type& operator[](int index) {
-	assert(BETWEEN(low_bound, index, high_bound));
-	return buf[index-low_bound];
+	    assert(BETWEEN(low_bound, index, high_bound));
+	    return buf[index-low_bound];
     }
     Type operator[](int index) const {
-	assert(BETWEEN(low_bound, index, high_bound));
-	return buf[index-low_bound];
+	    assert(BETWEEN(low_bound, index, high_bound));
+	    return buf[index-low_bound];
     }
  
     Type*       body() { return buf; }
@@ -103,206 +103,204 @@ class array {
 
 #ifndef TURBO_PASCAL
     operator conf_array<Type>() const { /* Convert to dynamic_array */
-	return conf_array<Type>(low_bound, high_bound, (Type*)buf);
+	    return conf_array<Type>(low_bound, high_bound, (Type*)buf);
     }      
 #endif
 
     int compare( const Type* ptr) const { 
-	return memcmp(buf, ptr, sizeof(buf)); 
+	    return memcmp(buf, ptr, sizeof(buf)); 
     }
     
     boolean operator >  (const array &arr) const { 
-	return compare(arr.buf) > 0; 
+	    return compare(arr.buf) > 0; 
     }
     boolean operator >= (const array &arr) const { 
-	return compare(arr.buf) >= 0; 
+	    return compare(arr.buf) >= 0; 
     }
     boolean operator <  (const array &arr) const { 
-	return compare(arr.buf) < 0; 
+	    return compare(arr.buf) < 0; 
     }
     boolean operator <= (const array &arr) const { 
-	return compare(arr.buf) <= 0; 
+	    return compare(arr.buf) <= 0; 
     }
     boolean operator == (const array &arr) const { 
-	return compare(arr.buf) == 0; 
+	    return compare(arr.buf) == 0; 
     }
     boolean operator != (const array &arr) const { 
-	return compare(arr.buf) != 0; 
+	    return compare(arr.buf) != 0; 
     }
-    
+
     boolean operator >  (const Type* ptr) const { 
-	return compare(ptr) > 0; 
+	    return compare(ptr) > 0; 
     }
     boolean operator >= (const Type* ptr) const { 
-	return compare(ptr) >= 0; 
+	    return compare(ptr) >= 0; 
     }
     boolean operator <  (const Type* ptr) const { 
-	return compare(ptr) < 0; 
+	    return compare(ptr) < 0; 
     }
     boolean operator <= (const Type* ptr) const { 
-	return compare(ptr) <= 0; 
+	    return compare(ptr) <= 0; 
     }
     boolean operator == (const Type* ptr) const { 
-	return compare(ptr) == 0; 
+	    return compare(ptr) == 0; 
     }
     boolean operator != (const Type* ptr) const { 
-	return compare(ptr) != 0; 
+	    return compare(ptr) != 0; 
     }
     
     boolean operator >  (Type elem) const { 
-	return compare(&elem) > 0; 
+	    return compare(&elem) > 0; 
     }
     boolean operator >= (Type elem) const { 
-	return compare(&elem) >= 0; 
+	    return compare(&elem) >= 0; 
     }
     boolean operator <  (Type elem) const { 
-	return compare(&elem) < 0; 
+	    return compare(&elem) < 0; 
     }
     boolean operator <= (Type elem) const { 
-	return compare(&elem) <= 0; 
+	    return compare(&elem) <= 0; 
     }
     boolean operator == (Type elem) const { 
-	return compare(&elem) == 0; 
+	    return compare(&elem) == 0; 
     }
     boolean operator != (Type elem) const { 
-	return compare(&elem) != 0; 
+	    return compare(&elem) != 0; 
     }
 
     friend text& operator << (text& t, array a)
     { 
-	pio_output_string((text_descriptor*)&t, (char*)a.buf, 
-			  high_bound-low_bound+1, NULL); 
-	return t; 
+	    pio_output_string((text_descriptor*)&t, (char*)a.buf, high_bound-low_bound+1, NULL); 
+	    return t; 
     } 
 
     friend text& operator >> (text& t, array& a)
     {
-	pio_input_string((text_descriptor*)&t, (char*)a.buf, 
-		     high_bound-low_bound+1, true); 
-	return t; 
+	    pio_input_string((text_descriptor*)&t, (char*)a.buf, high_bound-low_bound+1, true); 
+	    return t; 
     } 
 
-    friend format_string<high_bound-low_bound+1> format(array const& a, 
-							int width)
+    friend format_string<high_bound-low_bound+1> format(array const& a, int width)
     {
-	return format_string<high_bound-low_bound+1>((char*)a.buf, width);
+	    return format_string<high_bound-low_bound+1>((char*)a.buf, width);
     }
 
 #ifndef NO_ARRAY_ASSIGN_OPERATOR
-    void operator = (const Type* ptr) { 
-	if (sizeof(Type) == 1) { /* array of char */
-	    size_t len = strlen((char*)ptr);
-	    if (len > sizeof(buf)) {
-		memcpy(buf, ptr, sizeof(buf));
-	    } else {
-		memcpy(buf, ptr, len);
-		if (len < sizeof(buf)) { 
-		    memset(buf+len, ' ', sizeof(buf) - len);
-		}
-	    }
-	} else { 
-	    memcpy(buf, ptr, sizeof(buf));
-	}
+    void operator = (const Type* ptr) {
+        if (sizeof(Type) == 1) { /* array of char */
+            size_t len = strlen((char*)ptr);
+            if (len > sizeof(buf)) {
+                memcpy(buf, ptr, sizeof(buf));
+            } else {
+                memcpy(buf, ptr, len);
+                if (len < sizeof(buf)) {
+                    memset(buf + len, ' ', sizeof(buf) - len);
+                }
+            }
+        } else {
+            memcpy(buf, ptr, sizeof(buf));
+        }
     }
-    void operator = (Type elem) { 
-    	buf[0] = elem;
-	if (sizeof(Type) == 1 && sizeof(buf) > 1) {
-	    memset(buf+1, ' ', sizeof(buf) - 1);
-	}
+
+    void operator = (Type elem) {
+        buf[0] = elem;
+        if (sizeof(Type) == 1 && sizeof(buf) > 1) {
+            memset(buf + 1, ' ', sizeof(buf) - 1);
+        }
     }
 #else   
     void assign(array const& a) { 
 	memcpy(buf, a.buf, sizeof(buf));
     }
-    void assign(const Type* ptr) { 
-	if (sizeof(Type) == 1) { /* array of char */
-	    size_t len = strlen((char*)ptr);
-	    if (len > sizeof(buf)) {
-		memcpy(buf, ptr, sizeof(buf));
-	    } else {
-		memcpy(buf, ptr, len);
-		if (len < sizeof(buf)) { 
-		    memset(buf + len, ' ', sizeof(buf) - len);
-		}
-	    }
-	} else { 
-	    memcpy(buf, ptr, sizeof(buf));
-	}
+    void assign(const Type* ptr) {
+        if (sizeof(Type) == 1) { /* array of char */
+            size_t len = strlen((char*)ptr);
+            if (len > sizeof(buf)) {
+                memcpy(buf, ptr, sizeof(buf));
+            } else {
+                memcpy(buf, ptr, len);
+                if (len < sizeof(buf)) {
+                    memset(buf + len, ' ', sizeof(buf) - len);
+                }
+            }
+        } else {
+            memcpy(buf, ptr, sizeof(buf));
+        }
     }
-    void assign(Type elem) { 
-    	buf[0] = elem;
-	if (sizeof(Type) == 1 && sizeof(buf) > 1) {
-	    memset(buf+1, ' ', sizeof(buf) - 1);
-	}
+    void assign(Type elem) {
+        buf[0] = elem;
+        if (sizeof(Type) == 1 && sizeof(buf) > 1) {
+            memset(buf + 1, ' ', sizeof(buf) - 1);
+        }
     }
 #endif   
 
     /* constructor of array from string */
-    static array make(Type const* ptr) { 
-	array a;
-	if (sizeof(Type) == 1) { /* array of char */
-	    size_t len = strlen((char*)ptr);
-	    if (len > sizeof(a.buf)) { 			
-		memcpy(a.buf, ptr, sizeof(a.buf));
-	    } else { 
-		memcpy(a.buf, ptr, len);
-		if (len < sizeof(a.buf)) { 
-		    memset(a.buf + len, ' ', sizeof(a.buf) - len);
-		}
-	    }
-	} else { 
-	    memcpy(a.buf, ptr, sizeof(a.buf));
-	}
-	return a;
+    static array make(Type const* ptr) {
+        array a;
+        if (sizeof(Type) == 1) { /* array of char */
+            size_t len = strlen((char*)ptr);
+            if (len > sizeof(a.buf)) {
+                memcpy(a.buf, ptr, sizeof(a.buf));
+            } else {
+                memcpy(a.buf, ptr, len);
+                if (len < sizeof(a.buf)) {
+                    memset(a.buf + len, ' ', sizeof(a.buf) - len);
+                }
+            }
+        } else {
+            memcpy(a.buf, ptr, sizeof(a.buf));
+        }
+        return a;
     }
 #if !defined(__GNUC__) || __GNUC_MINOR__+0 < 8
     static array make(Type elem1, ...) {
-	va_list ap;
-	int argno = 0;
-	array a;
-	va_start(ap, elem1);
-	a.buf[0] = elem1;
-	va_arg(ap, Type);
-	while (argno < high_bound-low_bound) { 
-	    a.buf[++argno] = va_arg(ap, Type);
-	}
-	va_end(ap);
-	return a;
+        va_list ap;
+        int argno = 0;
+        array a;
+        va_start(ap, elem1);
+        a.buf[0] = elem1;
+        va_arg(ap, Type);
+        while (argno < high_bound - low_bound) {
+            a.buf[++argno] = va_arg(ap, Type);
+        }
+        va_end(ap);
+        return a;
     }
 #else
     /* Bug in GCC 2.8.1 */
     static array make(Type elem1) {
-	array a;
-	a.buf[0] = elem1;
-	return a;
+        array a;
+        a.buf[0] = elem1;
+        return a;
     }
     static array make(Type elem1, Type elem2) {
-	array a;
-	assert(high_bound-low_bound > 0);
-	a.buf[0] = elem1;
-	a.buf[1] = elem2;
-	return a;
+        array a;
+        assert(high_bound - low_bound > 0);
+        a.buf[0] = elem1;
+        a.buf[1] = elem2;
+        return a;
     }
     static array make(Type elem1, Type elem2, Type elem3) {
-	array a;
-	assert(high_bound-low_bound > 1);
-	a.buf[0] = elem1;
-	a.buf[1] = elem2;
-	a.buf[2] = elem3;
-	return a;
+        array a;
+        assert(high_bound - low_bound > 1);
+        a.buf[0] = elem1;
+        a.buf[1] = elem2;
+        a.buf[2] = elem3;
+        return a;
     }
     static array make(Type elem1, Type elem2, Type elem3, Type elem4) {
-	array a;
-	assert(high_bound-low_bound > 2);
-	a.buf[0] = elem1;
-	a.buf[1] = elem2;
-	a.buf[2] = elem3;
-	a.buf[3] = elem4;
-	return a;
+        array a;
+        assert(high_bound - low_bound > 2);
+        a.buf[0] = elem1;
+        a.buf[1] = elem2;
+        a.buf[2] = elem3;
+        a.buf[3] = elem4;
+        return a;
     }
 #endif
     friend char* lpsz(array const& a) { 
-	return lpsz(low_bound, high_bound, (char*)a.buf); 
+	    return lpsz(low_bound, high_bound, (char*)a.buf); 
     }
 };
 
@@ -332,128 +330,126 @@ class varying_string_header {
     char* get_body() const { return (char*)(&len + 1); }
 
     friend integer length(const varying_string_header& str) { 
-	return str.len; 
+	    return str.len; 
     }
     integer length() const { 
-	return len;
+	    return len;
     }
     friend void set_length(varying_string_header& str, integer new_length) { 
-	str.len = new_length;
+	    str.len = new_length;
     }
     void set_length(integer new_length) { 
-	len = new_length;
+	    len = new_length;
     }
-    void to_array(char* dst_buf, size_t dst_buf_size) const { 
-	size_t size = length(); 
-	if (size > dst_buf_size) { 
-	    size = dst_buf_size;
-	}
-	memcpy(dst_buf, get_body(), size);
-	if (size < dst_buf_size) {
-	    dst_buf[size] = '\0';
-	}
+    void to_array(char* dst_buf, size_t dst_buf_size) const {
+        size_t size = length();
+        if (size > dst_buf_size) {
+            size = dst_buf_size;
+        }
+        memcpy(dst_buf, get_body(), size);
+        if (size < dst_buf_size) {
+            dst_buf[size] = '\0';
+        }
     }
 
     char& operator*() { return *get_body(); }
 
-    int compare(const char* str) const { 
-	size_t right_len = strlen(str);
-	size_t left_len = length();
-	size_t min_len = left_len < right_len ? left_len : right_len;
-	int diff = memcmp(get_body(), str, min_len);
-	return diff == 0 ? (int)(left_len - right_len) : diff; 
+    int compare(const char* str) const {
+        size_t right_len = strlen(str);
+        size_t left_len = length();
+        size_t min_len = left_len < right_len ? left_len : right_len;
+        int diff = memcmp(get_body(), str, min_len);
+        return diff == 0 ? (int)(left_len - right_len) : diff;
     }
-    int compare(const varying_string_header& str) const { 
-	size_t left_len = length();
-	size_t right_len = str.length();
-	size_t min_len = left_len < right_len ? left_len : right_len;
-	int diff = memcmp(get_body(), str.get_body(), min_len);
-	return diff == 0 ? (int)(left_len - right_len) : diff; 
+    int compare(const varying_string_header& str) const {
+        size_t left_len = length();
+        size_t right_len = str.length();
+        size_t min_len = left_len < right_len ? left_len : right_len;
+        int diff = memcmp(get_body(), str.get_body(), min_len);
+        return diff == 0 ? (int)(left_len - right_len) : diff;
     }
-    int compare(char ch) const { 
-	unsigned len = length();
-	return len == 0 ? -(unsigned char)ch : ch == *get_body()
-	    ? len - 1 
-	    : (unsigned char)ch - (unsigned char)*get_body();
+    int compare(char ch) const {
+        unsigned len = length();
+        return len == 0 ? -(unsigned char)ch : ch == *get_body()
+            ? len - 1
+            : (unsigned char)ch - (unsigned char)*get_body();
     }
 
     boolean operator >  (const varying_string_header& str) const { 
-	return compare(str) > 0; 
+	    return compare(str) > 0; 
     }
     boolean operator >= (const varying_string_header& str) const { 
-	return compare(str) >= 0; 
+	    return compare(str) >= 0; 
     }
     boolean operator < (const varying_string_header& str) const { 
-	return compare(str) < 0; 
+	    return compare(str) < 0; 
     }
     boolean operator <= (const varying_string_header& str) const { 
-	return compare(str) <= 0; 
+	    return compare(str) <= 0; 
     }
     boolean operator == (const varying_string_header& str) const { 
-	return compare(str) == 0; 
+	    return compare(str) == 0; 
     }
     boolean operator != (const varying_string_header& str) const { 
-	return compare(str) != 0; 
+	    return compare(str) != 0; 
     }
     
     boolean operator >  (const char* ptr) const { 
-	return compare(ptr) > 0; 
+	    return compare(ptr) > 0; 
     }
     boolean operator >= (const char* ptr) const { 
-	return compare(ptr) >= 0; 
+	    return compare(ptr) >= 0; 
     }
     boolean operator < (const char* ptr) const { 
-	return compare(ptr) < 0; 
+	    return compare(ptr) < 0; 
     }
     boolean operator <= (const char* ptr) const { 
-	return compare(ptr) <= 0; 
+	    return compare(ptr) <= 0; 
     }
     boolean operator == (const char* ptr) const { 
-	return compare(ptr) == 0; 
+	    return compare(ptr) == 0; 
     }
     boolean operator != (const char* ptr) const { 
-	return compare(ptr) != 0; 
+	    return compare(ptr) != 0; 
     }
     
     boolean operator >  (char ch) const { 
-	return compare(ch) > 0; 
+	    return compare(ch) > 0; 
     }
     boolean operator >= (char ch) const { 
-	return compare(ch) >= 0; 
+	    return compare(ch) >= 0; 
     }
     boolean operator < (char ch) const { 
-	return compare(ch) < 0; 
+	    return compare(ch) < 0; 
     }
     boolean operator <= (char ch) const { 
-	return compare(ch) <= 0; 
+	    return compare(ch) <= 0; 
     }
     boolean operator == (char ch) const { 
-	return compare(ch) == 0; 
+	    return compare(ch) == 0; 
     }
     boolean operator != (char ch) const { 
-	return compare(ch) != 0; 
+	    return compare(ch) != 0; 
     }
     
     friend text& operator << (text& t, varying_string_header const& str)
     { 
-	pio_output_string((text_descriptor*)&t, str.get_body(), 
-			  str.length(), NULL); 
-	return t; 
+	    pio_output_string((text_descriptor*)&t, str.get_body(), str.length(), NULL); 
+    	return t; 
     } 
 
-    friend format_varying_string format(varying_string_header const& str, 
-					int width)
+    friend format_varying_string format(varying_string_header const& str, int width)
     {
-	return format_varying_string(str.get_body(), str.length(), width);
+	    return format_varying_string(str.get_body(), str.length(), width);
     }
 };
 
 
 template<size_t max_size>
-class varying_string : public varying_string_header { 
-  public: 
+class varying_string : public varying_string_header {
+public:
     char body[max_size];
-    typedef varying_string<MAX_STRING_SIZE> string; 
+    typedef varying_string<MAX_STRING_SIZE> string;
 
 #define STRING_FETCH_OPERATOR(index_type, modifier) \
     char modifier& operator[](index_type index) modifier { \
@@ -474,45 +470,45 @@ class varying_string : public varying_string_header {
     STRING_FETCH_OPERATOR(unsigned, const);
 #undef STRING_FETCH_OPERTATOR 
 
-    operator char const*() const { 
-	size_t len = length();
-	if (len < max_size) { 
-	    *((char*)body + len) = '\0';
-	    return body;
-	} else { 
-	    return lpsz(1, len, body);
-	}
+    operator char const* () const {
+        size_t len = length();
+        if (len < max_size) {
+            *((char*)body + len) = '\0';
+            return body;
+        } else {
+            return lpsz(1, len, body);
+        }
     }
 
     friend text& operator >> (text& t, varying_string& str)
     {
-	str.set_length(pio_input_string((text_descriptor*)&t, str.get_body(), 
-					max_size, false));
-	return t; 
-    } 
-
-    void operator = (const char* str) { 
-	size_t len = strlen(str);
-	if (len > max_size) len = max_size;
-	memcpy(body, str, len);
-	set_length((integer)len);
-    }
-    void operator = (char elem) { 
-	body[0] = elem;
-	set_length(1);
-    }
-    void operator = (const varying_string_header& str) { 
-	size_t len = str.length();
-	if (len > max_size) len = max_size;
-	memcpy(body, str.get_body(), len);
-	set_length(len);
+        str.set_length(pio_input_string((text_descriptor*)&t, str.get_body(),
+            max_size, false));
+        return t;
     }
 
-    void operator = (const varying_string& str) { 
-	size_t len = str.length();
-	if (len > max_size) len = max_size;
-	memcpy(body, str.get_body(), len);
-	set_length((integer)len);
+    void operator = (const char* str) {
+        size_t len = strlen(str);
+        if (len > max_size) len = max_size;
+        memcpy(body, str, len);
+        set_length((integer)len);
+    }
+    void operator = (char elem) {
+        body[0] = elem;
+        set_length(1);
+    }
+    void operator = (const varying_string_header& str) {
+        size_t len = str.length();
+        if (len > max_size) len = max_size;
+        memcpy(body, str.get_body(), len);
+        set_length(len);
+    }
+
+    void operator = (const varying_string& str) {
+        size_t len = str.length();
+        if (len > max_size) len = max_size;
+        memcpy(body, str.get_body(), len);
+        set_length((integer)len);
     }
 
     string operator + (const varying_string_header& str) const;
@@ -521,30 +517,30 @@ class varying_string : public varying_string_header {
 
     string operator + (char ch) const;
 
-    string operator + (unsigned char ch) const; 
+    string operator + (unsigned char ch) const;
 
-    string operator + (new_line_marker&) const; 
+    string operator + (new_line_marker&) const;
 
-    varying_string(const varying_string_header& str) { 
-	size_t len = str.length();
-	if (len > max_size) len = max_size;
-	memcpy(body, str.get_body(), len);
-	set_length(len);
-    }	
+    varying_string(const varying_string_header& str) {
+        size_t len = str.length();
+        if (len > max_size) len = max_size;
+        memcpy(body, str.get_body(), len);
+        set_length(len);
+    }
     varying_string(const char* str) {
-	size_t len = strlen(str);
-	if (len > max_size) len = max_size;
-	memcpy(body, str, len);
-	set_length((integer)len);
+        size_t len = strlen(str);
+        if (len > max_size) len = max_size;
+        memcpy(body, str, len);
+        set_length((integer)len);
     }
     varying_string(char ch) {
-	if (max_size >= 1) { 
-	    set_length(1);
-	    body[0] = ch;
-	}
+        if (max_size >= 1) {
+            set_length(1);
+            body[0] = ch;
+        }
     }
-    varying_string() { 	
-	set_length(0);
+    varying_string() {
+        set_length(0);
     }
 };
 
@@ -552,8 +548,7 @@ typedef varying_string<MAX_STRING_SIZE> string;
 
 
 template<size_t max_size>
-inline string varying_string<max_size>::operator + 
-(const varying_string_header& str) const 
+inline string varying_string<max_size>::operator + (const varying_string_header& str) const 
 { 
     string result;
     size_t left_len = length();    
@@ -785,33 +780,32 @@ class conf_matrix {
     conf_matrix(integer l1, integer h1, integer l2, integer h2, Type* ptr)
       : low1(l1), high1(h1), low2(l2), high2(h2), buf(ptr) {}
 
-    void copy(void* buf_copy) { 
-	memcpy(buf_copy, buf, (high1-low1+1) * (high2-low2+1) * sizeof(Type));
-	buf = (Type*)buf_copy;
+    void copy(void* buf_copy) {
+        memcpy(buf_copy, buf, (high1 - low1 + 1) * (high2 - low2 + 1) * sizeof(Type));
+        buf = (Type*)buf_copy;
     }
 
     conf_array<Type> operator[](integer index) {
         assert(BETWEEN(low1, index, high1)); 
-        return conf_array<Type>(low2, high2, 
-				buf+(index-low1)*(high2-low2+1)); 
+        return conf_array<Type>(low2, high2, buf+(index-low1)*(high2-low2+1)); 
     }
 
     void operator =(conf_matrix const& src) {
         assert(low1 == src.low1 && high1 == src.high1 &&
                low2 == src.low2 && high2 == src.high2);
-	memcpy(buf, src.buf, size_in_bytes());
+	    memcpy(buf, src.buf, size_in_bytes());
     }
     void assign(conf_matrix const& src) {
         assert(low1 == src.low1 && high1 == src.high1 &&
                low2 == src.low2 && high2 == src.high2);
-	memcpy(buf, src.buf, size_in_bytes());
+	    memcpy(buf, src.buf, size_in_bytes());
     }
     
     integer size()  const { 
-	return (high1 - low1 + 1) * (high2 - low2 + 1); 
+	    return (high1 - low1 + 1) * (high2 - low2 + 1); 
     }
     integer size_in_bytes() const { 
-	return (high1 - low1 + 1) * (high2 - low2 + 1) * sizeof(Type); 
+	    return (high1 - low1 + 1) * (high2 - low2 + 1) * sizeof(Type); 
     }
 
     Type* body() { return buf; }
@@ -827,18 +821,18 @@ class conf_matrix {
  */
 
 template<integer low_1,integer high_1,integer low_2,integer high_2,class Type>
-class matrix { 
-  public:
-    array<low_2,high_2,Type> buf[high_1-low_1+1];
+class matrix {
+public:
+    array<low_2, high_2, Type> buf[high_1 - low_1 + 1];
 
-    array<low_2,high_2,Type>& operator[](integer index) {
-	assert(BETWEEN(low_1, index, high_1)); 
-	return buf[index-low_1]; 
+    array<low_2, high_2, Type>& operator[](integer index) {
+        assert(BETWEEN(low_1, index, high_1));
+        return buf[index - low_1];
     }
 
-    array<low_2,high_2,Type> const& operator[](integer index) const {
-	assert(BETWEEN(low_1, index, high_1)); 
-	return buf[index-low_1]; 
+    array<low_2, high_2, Type> const& operator[](integer index) const {
+        assert(BETWEEN(low_1, index, high_1));
+        return buf[index - low_1];
     }
 
 #ifndef TURBO_PASCAL
@@ -847,28 +841,28 @@ class matrix {
     }
 #endif
 
-    enum matrix_bounds { 
-	low1  = low_1, 
-	high1 = high_1, 
-	low2  = low_2, 
-	high2 = high_2 
+    enum matrix_bounds {
+        low1 = low_1,
+        high1 = high_1,
+        low2 = low_2,
+        high2 = high_2
     };
 
-    integer size()  const { return (high_1-low_1+1)*(high_2-low_2+1); }
+    integer size()  const { return (high_1 - low_1 + 1) * (high_2 - low_2 + 1); }
 
     Type* body() { return (Type*)buf; }
     Type const* body() const { return (Type const*)buf; }
 
 #ifndef NO_ARRAY_ASSIGN_OPERATOR
     void operator = (matrix const& m) {
-	memcpy(buf, m.buf, sizeof(buf));
+        memcpy(buf, m.buf, sizeof(buf));
     }
 #else	
-    void assign(matrix const& m) { 
-	memcpy(buf, m.buf, sizeof(buf));
+    void assign(matrix const& m) {
+        memcpy(buf, m.buf, sizeof(buf));
     }
 #endif
-}; 
+};
 
 #else /* language C */
 
