@@ -129,7 +129,7 @@ symbol* b_ring::add(nm_entry* in_name, nm_entry* out_name, int tag, tpexpr* type
         }
     }
 
-    // if ring is global then make_uniwue is called for all name entries 
+    // if ring is global then make_unique is called for all name entries 
     // if ring's scope=record - make_unique never called for these name entries
     // if ring's scope is proc or block name_unique is called for s_proc and s_const tags only 
     if (scope != SCOPE::record && 
@@ -146,13 +146,13 @@ symbol* b_ring::add(nm_entry* in_name, nm_entry* out_name, int tag, tpexpr* type
 
 void b_ring::make_vars_static() 
 { 
-    for (symbol *sym = syms; sym != NULL; sym = sym->next) {
-	if ((sym->flags & (symbol::f_exported|symbol::f_val_param|symbol::f_var_param))
-	    == symbol::f_exported) 
-	{
-	    sym->flags |= symbol::f_static;
-	    sym->ring->make_unique(sym); 
-	} 
+    for (symbol* sym = syms; sym != NULL; sym = sym->next) {
+        if ( (sym->flags & (symbol::f_exported | symbol::f_val_param | symbol::f_var_param))
+            == symbol::f_exported)
+        {
+            sym->flags |= symbol::f_static;
+            sym->ring->make_unique(sym);
+        }
     }
 }
 	
