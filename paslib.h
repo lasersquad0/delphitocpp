@@ -3,6 +3,7 @@
 
 #define maxint ((int)(1 << (sizeof(integer)*8-1)) - 1)
 
+/*
 #ifdef __cplusplus
 extern "C" { 
 #endif
@@ -20,21 +21,22 @@ double sqrt(double);
 #ifdef __cplusplus
 } 
 #endif
+*/
+
 
 /*
  * Macros for some Pascal standard functions
  */
 
-
-#define trunc(x)  ((integer)(x))
+//#define trunc(x)  ((integer)(x))
 
 #define pred(type,x) ((type)((x) - 1))
 
 #define succ(type,x) ((type)((x) + 1))
 
-#define pack(a_l,a_h,a,i,z) memcpy(z, &(a)[(i)-(a_l)], sizeof(z))
-
-#define unpack(z,a_l,a_h,a,i) memcpy(&(a)[(i)-(a_l)], (z), sizeof(z))
+//conflict with '#pragma pack' directive  
+//#define pack(a_l,a_h,a,i,z) memcpy(z, &(a)[(i)-(a_l)], sizeof(z))
+//#define unpack(z,a_l,a_h,a,i) memcpy(&(a)[(i)-(a_l)], (z), sizeof(z))
 
 #define bitsize(x) (sizeof(x)*8)
 
@@ -53,8 +55,9 @@ inline short         abs(short x)       { return x < 0 ? -x : x; }
 inline int           abs(int x)         { return x < 0 ? -x : x; }
 inline long          abs(long x)        { return x < 0 ? -x : x; }
 #endif
-inline float         abs(float x)       { return  x < 0 ? -x : x; }
-inline double        abs(double x)      { return  x < 0 ? -x : x; }
+//ROMA abs for real also defined in stdlib
+//inline float         abs(float x)       { return  x < 0 ? -x : x; }
+//inline double        abs(double x)      { return  x < 0 ? -x : x; }
 #endif
 
 inline int           sqr(signed char x)    { return x*x; } 
@@ -68,12 +71,15 @@ inline unsigned long sqr(unsigned long x)  { return x*x; }
 inline float         sqr(float x)          { return x*x; } 
 inline double        sqr(double x)         { return x*x; } 
 
-extern "C" void timestamp(integer* day,  integer* month, integer* year, 
+//extern "C" 
+extern void timestamp(integer* day,  integer* month, integer* year,
 			  integer* hour, integer* min,   integer* sec);
 
-extern "C" real get_realtime();
+//extern "C" 
+extern real get_realtime();
 
-extern "C" integer round(real);
+//extern "C" 
+//extern integer round(real);
 
 inline void timestamp(integer& day,  integer& month, integer& year, 
 		      integer& hour, integer& min,   integer& sec)
@@ -129,11 +135,16 @@ const double pi = 3.14159265359;
 #define upcase(c)        ((char)toupper(c))
 #define lowcase(c)       ((char)tolower(c))
 
-extern "C" int paramcount;
-extern "C" char const* const* param_array;
-extern "C" boolean directvideo;
-extern "C" pointer exitproc;
-extern "C" unsigned randseed;
+//extern "C" 
+extern int paramcount;
+//extern "C" 
+extern char const* const* param_array;
+//extern "C" 
+extern boolean directvideo;
+//extern "C" 
+//extern pointer exitproc;
+//extern "C" 
+extern unsigned randseed;
 
 inline string paramstr(int index) { 
     assert(index <= paramcount);
@@ -145,9 +156,12 @@ inline void halt(int code = EXIT_FAILURE) { exit(code); }
 #define getmem(ptr,size)  ptr = malloc(size)
 #define freemem(ptr,size) free(ptr)
 
-extern "C" void     Randomize();
-extern "C" unsigned randint(unsigned range);
-extern "C" double   randreal();
+//extern "C" 
+extern void     Randomize();
+//extern "C" 
+extern unsigned randint(unsigned range);
+//extern "C" 
+extern double   randreal();
 
 inline unsigned Random(unsigned range) { return randint(range); }
 inline double   Random() { return randreal(); }

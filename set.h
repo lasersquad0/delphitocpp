@@ -14,9 +14,12 @@ typedef integer       SetArrayElemType;
 #define BITS_PER_WORD (sizeof(SetArrayElemType)*8)
 #define ALL_BITS_SET  ((SetArrayElemType)-1)
 
+#define SET_LENGTH (MAX_SET_CARD/BITS_PER_WORD)
+
 #ifdef __cplusplus
 
-extern "C" void pascal_set_construct(SetArrayElemType* set_array, 
+//extern "C" 
+void pascal_set_construct(SetArrayElemType* set_array, 
 				     size_t set_card, 
 				     int param1, 
 				     va_list params);
@@ -91,8 +94,6 @@ typedef set_template<MAX_SET_CARD> set;
 #define set_of_enum(e) set_template<last_##e>
 
 #else /* language C */
-
-#define SET_LENGTH (MAX_SET_CARD/BITS_PER_WORD)
 
 typedef struct { 
     SetArrayElemType setarray[SET_LENGTH];

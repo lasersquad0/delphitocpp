@@ -1,10 +1,10 @@
 #ifndef __ARRAY_H__
 #define __ARRAY_H__
 
-
 #ifdef __cplusplus
 
-extern "C" char* lpsz(int low, int high, const char* ptr);
+//extern "C" 
+char* lpsz(int low, int high, const char* ptr);
 
 #define BETWEEN(down, value, up)  \
                 (unsigned(value) - down <= unsigned(up - down))
@@ -315,7 +315,7 @@ class array {
 
 #ifdef TURBO_PASCAL
 
-inline int length(const char* str) { return strlen(str); }
+inline size_t length(const char* str) { return strlen(str); }
 
 #ifndef MAX_STRING_SIZE
 #define MAX_STRING_SIZE 255
@@ -361,14 +361,14 @@ class varying_string_header {
 	size_t left_len = length();
 	size_t min_len = left_len < right_len ? left_len : right_len;
 	int diff = memcmp(get_body(), str, min_len);
-	return diff == 0 ? left_len - right_len : diff; 
+	return diff == 0 ? (int)(left_len - right_len) : diff; 
     }
     int compare(const varying_string_header& str) const { 
 	size_t left_len = length();
 	size_t right_len = str.length();
 	size_t min_len = left_len < right_len ? left_len : right_len;
 	int diff = memcmp(get_body(), str.get_body(), min_len);
-	return diff == 0 ? left_len - right_len : diff; 
+	return diff == 0 ? (int)(left_len - right_len) : diff; 
     }
     int compare(char ch) const { 
 	unsigned len = length();
@@ -495,7 +495,7 @@ class varying_string : public varying_string_header {
 	size_t len = strlen(str);
 	if (len > max_size) len = max_size;
 	memcpy(body, str, len);
-	set_length(len);
+	set_length((integer)len);
     }
     void operator = (char elem) { 
 	body[0] = elem;
@@ -512,7 +512,7 @@ class varying_string : public varying_string_header {
 	size_t len = str.length();
 	if (len > max_size) len = max_size;
 	memcpy(body, str.get_body(), len);
-	set_length(len);
+	set_length((integer)len);
     }
 
     string operator + (const varying_string_header& str) const;
@@ -535,7 +535,7 @@ class varying_string : public varying_string_header {
 	size_t len = strlen(str);
 	if (len > max_size) len = max_size;
 	memcpy(body, str, len);
-	set_length(len);
+	set_length((integer)len);
     }
     varying_string(char ch) {
 	if (max_size >= 1) { 
@@ -689,7 +689,7 @@ inline string copy(varying_string_header const& str, integer p, integer n)
     if (size_t(p-1) < len) { 
 	size_t count = size_t(p-1+n) <= len ? size_t(n) : len - p + 1;
 	memcpy(result.body, str.get_body() + p - 1, count);
-	result.set_length(count);
+	result.set_length((integer)count);
     }
     return result;
 }
@@ -698,11 +698,11 @@ inline string copy(char const* str, integer p, integer n)
 { 
     string result;
     size_t len = strlen(str);
-    result.set_length(len);
+    result.set_length((integer)len);
     if (size_t(p-1) < len) { 
 	size_t count = size_t(p+n) <= len ? size_t(n) : len - p + 1;
 	memcpy(result.body, str + p - 1, count);
-	result.set_length(count);
+	result.set_length((integer)count);
     }
     return result;
 }

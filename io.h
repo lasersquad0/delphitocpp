@@ -21,7 +21,7 @@ typedef struct text_descriptor {
 
 
 #ifdef __cplusplus
-extern "C" { 
+//extern "C" { 
 #endif
 
 extern boolean pio_ignore_error;
@@ -144,7 +144,7 @@ extern new_line_marker NL;
 
 #ifdef __cplusplus
 
-}
+//}
 
 //
 // Some compilers report error when operator-> returns non-stuctural type
@@ -341,7 +341,8 @@ class file {
 
 class text;
 
-extern "C" text input, output;
+//extern "C" 
+extern text input, output;
 
 class text : public file<char> { 
   public:
@@ -735,7 +736,7 @@ inline format_char format(char val, int width) {
 }
 
 
-#else 
+#else //__cplusplus
 
 #define file(type) struct {  \
   file_descriptor desc;      \
@@ -834,19 +835,21 @@ extern text input, output;
 #define eoln(text_variable) \
         pio_check_end_of_line(&text_variable)
 
+#endif //__cplusplus
 
 void tread(text* text_file, char* format_string, ...);
 
 void twrite(text* text_file, char* format_string, ...);
 
-void cread(char* format_string, ...);
+void cread(const char* format_string, ...);
 
-void cwrite(char* format_string, ...);
+void cwrite(const char* format_string, ...);
 
-#endif
+
 
 #ifdef TURBO_PASCAL 
-extern "C" integer ioresult;
+//extern "C" integer ioresult;
+extern integer ioresult; 
 #define ioResult ioresult
 #endif
 
