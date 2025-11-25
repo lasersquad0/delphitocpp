@@ -131,6 +131,12 @@ const double pi = 3.14159265359;
 #define ParamStr(i)      paramstr(i)
 #define GetMem(p, size)  getmem(p, size)
 #define FreeMem(p, size) freemem(p, size)
+#define AllocMem(size) calloc(size, 1)
+#define ReAllocMem(p, size) realloc(p, size)
+#define StrAlloc(size) malloc(size)
+#define StrDispose(str) free(str)
+#define StrLen(str) strlen(str)
+
 
 #define upcase(c)        ((char)toupper(c))
 #define lowcase(c)       ((char)tolower(c))
@@ -155,6 +161,9 @@ inline void halt(int code = EXIT_FAILURE) { exit(code); }
 
 #define getmem(ptr,size)  ptr = malloc(size)
 #define freemem(ptr,size) free(ptr)
+
+//TODO There are many other Delphi string functions that need to be implemented
+// StrNew, StrCopy, StrComp, StrMove, StrLower, StrUpper, StrCat, StrEnd, StrPos, etc.
 
 //extern "C" 
 extern void     Randomize();
