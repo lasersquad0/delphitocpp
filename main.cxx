@@ -42,8 +42,12 @@
 * DONE - destructors declarations and definitions are translated into C++ destructors. 
          This may require manual fixes in code because Delphi destructors can have parameters while C++ - not.
 * DONE - result := nil правильно транслируется в result = nullptr;
-* ВЩТУ - решить вопрос с Index keyword и когда переменная имеет название Index (ценой дополнительного warning в грамматике)
+* DONE - методы, переменные, параметры ф-ций могут иметь следующие зарезервированные названия: read, write, index 
 *
+* implement functions StrLen, StrDispose, StrAlloc
+* реализовать операторы is и as.
+* Если у обьекта есть метод Read и он вызывается в коде то парсер говорит ошибку.
+* Если в секции implementation процедура имеет qualifiers то парсинг выдает ошибку. пример: procedure memcpyfromend(pi, po: Pointer; Count: Cardinal); stdcall;
 * особенности реализации inherited -  In this case, inherited takes no explicit parameters, but passes to the inherited method the same parameters with which the enclosing method was called.
 * плохо работает грамматика если в implementation обьявляешь 2 ф-ции c директивой overload. тогда срабатывает proc_fwd_decl а proc_def НЕ срабатывает 
 * если в конструкторе inherited идет первой строчкой тогда parent можно вызывать так (часто это и единственный компилируемый метод). TTest::TTest(int a): TParent(a, 4);
@@ -57,7 +61,7 @@
 * не понимает определение ф-ции с пустыми скобками (function Fun():Integer;), без скобок совсем - понимает
 * check if var1.var2.funcall() works properly
 * System.exit() - does not recognize System as namespace/unit
-* TArr = array of Integer - is not supported (dynamic arrays)
+* TArr = array of Integer - is not supported (dynamic arrays). Also requires changes in SetLength() and Length()
 * RECORDS cannot contain published and protected sections
 * 
 *////////////////////////////////////
@@ -217,9 +221,7 @@ static void load_configuration(char* name) {
 			{
 				while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(library)") != 0)
 				{
-					b_ring::global_b_ring.add(nm_entry::add(buf, TKN_IDENT),
-						symbol::s_dummy,
-						NULL);
+					b_ring::global_b_ring.add(nm_entry::add(buf, TKN_IDENT), symbol::s_dummy, NULL);
 				}
 			}
 			else if (strcmp(buf, "#begin(rename)") == 0) {
