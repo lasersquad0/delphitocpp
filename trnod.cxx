@@ -108,16 +108,16 @@ void program_node::translate(int)
     }
     end->disable();
     curr_proc = main;
-    global_func_decl_level = block->body->t_begin;
+	global_func_decl_level = block->body_begin_tkn(); //block->body->t_begin;
     block->translate(ctx_program);
-    token* first_stmt = block->body->t_begin->next_relevant();
+	token* first_stmt = block->body_begin_tkn()->next_relevant(); //block->body->t_begin->next_relevant();
 
     if (1/*pio_init*/) {
-	block->body->t_begin->prepend("int main(int argc, const char* argv[])\n");
+	block->body_begin_tkn()->prepend("int main(int argc, const char* argv[])\n");
 	} else {
-		block->body->t_begin->prepend("int main()\n");
+		block->body_begin_tkn()->prepend("int main()\n");
 	}
-    block->body->t_end->prepend("return EXIT_SUCCESS;\n")->set_bind(first_stmt);
+    block->body_end_tkn()->prepend("return EXIT_SUCCESS;\n")->set_bind(first_stmt);
     main->insert_temporaries(first_stmt);
 	if (1/*pio_init*/) {
 		first_stmt->prepend("pio_initialize(argc, argv);\n");
@@ -357,18 +357,44 @@ void module_node::translate(int)
 
 
 
+block_node::block_node(asm_block_node* asm_body)
+{
+	CONS1(asm_body);
+	decls = NULL;
+	body = NULL;
+}
 
 block_node::block_node(decl_node* decls, compound_node* body)
 {
     CONS2(decls, body);
+	asm_body = NULL;
 }
+
+token* block_node::body_begin_tkn()
+{
+	// assumed that attrib() already called and asm_body->f_tkn is initialised 
+	return body? body->t_begin : asm_body->t_asm;
+}
+
+token* block_node::body_end_tkn()
+{
+	// assumed that attrib() already called and asm_body->l_tkn is initialised 
+	return body ? body->t_end : asm_body->t_end;
+}
+
 
 void block_node::attrib(int ctx)
 {
+	// one of two bodies must be NULL, another one must be not null
+	assert((asm_body == NULL && body != NULL) || (asm_body != NULL && body == NULL));
+
     for (decl_node* dcl = decls; dcl != NULL; dcl = dcl->next) {
         dcl->attrib(ctx);
     }
-    body->attrib(ctx);
+	if (body)
+		body->attrib(ctx);
+	else
+		asm_body->attrib(ctx);
 }
 
 
@@ -377,14 +403,19 @@ void block_node::translate(int ctx)
     for( decl_node* dcl = decls; dcl != NULL; dcl = dcl->next ) {
         dcl->translate(ctx);
     }
-    body->translate(ctx);
-    f_tkn = decls ? decls->f_tkn : body->f_tkn;
-    l_tkn = body->l_tkn;
+	if (body)
+	{
+		body->translate(ctx);
+		f_tkn = decls ? decls->f_tkn : body->f_tkn;
+		l_tkn = body->l_tkn;
+	}
+	else
+	{
+		asm_body->translate(ctx);
+		f_tkn = decls ? decls->f_tkn : asm_body->f_tkn;
+		l_tkn = asm_body->l_tkn;
+	}
 }
-
-
-bool stmt_node::is_compound() { return false; }
-
 
 label_node::label_node(token* ident, token* colon, stmt_node* stmt)
 {
@@ -577,9 +608,7 @@ read_node::read_node(token* t_read, expr_group_node* params)
 
 void read_node::attrib(int)
 {
-    if( params ) {
-	params->attrib(ctx_lvalue);
-    }
+    if( params ) params->attrib(ctx_lvalue);
 }
 
 
@@ -869,9 +898,6 @@ void compound_node::translate(int)
     swallow_semicolon();
 }
 
-bool compound_node::is_compound() { return true; }
-
-
 raise_node::raise_node(token* t_raise, expr_node* expr)
 {
 	CONS2(t_raise, expr);
@@ -1023,17 +1049,26 @@ void on_except_node::translate(int ctx)
 }
 
 inherited_node::inherited_node(token* t_inherited, token* t_ident, token* t_lpar, expr_node* params, token* t_rpar)
+	: expr_node(tn_fcall)
 {
 	CONS5(t_inherited, t_ident, t_lpar, params, t_rpar);
 }
-void inherited_node::attrib(int)
+void inherited_node::attrib(int ctx)
 {
 	assert(!(t_ident == NULL && params != NULL));
+	
+	//assert(params != 0);
+	if(params) params->attrib(ctx);
+
+	f_tkn = t_inherited;
+	l_tkn = t_rpar ? t_rpar : (t_ident ? t_ident : t_inherited);
 }
-void inherited_node::translate(int)
+void inherited_node::translate(int ctx)
 {
 	// *** see function proc_def_node::attrib(int ctx) how to find class and work with it.
 	
+	//assert(params != 0);
+
 	auto r = dynamic_cast<object_tp*>(curr_proc->forward->var->ring);
 	assert(r);
 	auto otpd = dynamic_cast<object_tpd_node*>(r->tpd);
@@ -1051,12 +1086,18 @@ void inherited_node::translate(int)
 		t_inherited->set_trans(dprintf("%s::", sc->in_text)); 
 	}
 
-	if (t_ident == NULL) t_ident = t_inherited->append(curr_proc->proc_name); // if ident is missing than use current proc name for it
+	if (t_ident == NULL)
+		l_tkn = t_ident = t_inherited->append(curr_proc->proc_name); // if ident is missing than use current proc name for it
+	else
+		t_ident->prev->disable(); // remove space between 'inherited' and name of calling method, it is not needed any more
 
 	if (params == NULL)
-		t_ident->append("(")->append(")");
+		l_tkn = t_ident->append("()");
+	else
+		params->translate(ctx);
 
-	//t_inherited->next->disable(); // remove space between 'inherited' and name of calling method, it is not needed any more
+//	token::disable(t_inherited->next, t_inherited->next_relevant()->prev); // remove space between 'inherited' and name of calling method, it is not needed any more
+	//token::disable(t_ident->next, t_ident->next_relevant()->prev);
 }
 
 
@@ -1115,12 +1156,10 @@ void assign_node::translate(int)
 			if (lval->is_parameter()) {
 				f_tkn = lval->f_tkn->prepend("memcpy(");
 				if (lval->type->name != NULL) {
-					l_tkn = rval->l_tkn->append(dprintf(", sizeof(%s))",
-						lval->type->name));
+					l_tkn = rval->l_tkn->append(dprintf(", sizeof(%s))", lval->type->name));
 				} else {
 					l_tkn = rval->l_tkn->append(", ")->append("*sizeof(*");
-					((array_tp*)lval->type->get_typedef())->
-						insert_length(l_tkn);
+					((array_tp*)lval->type->get_typedef())->insert_length(l_tkn);
 					l_tkn = l_tkn->append("))");
 					l_tkn->copy(lval->f_tkn, lval->l_tkn);
 				}
@@ -1333,17 +1372,13 @@ void for_node::translate(int ctx)
     till->l_tkn->append(";");
     if (t_to->name->tag == TKN_TO) {
 	if (var && var->type->tag == tp_enum && var->type->name != NULL) {
-	    t_do->set_trans(dprintf("%s = succ(%s,%s))",
-				    t_ident->out_text, var->type->name,
-				    t_ident->out_text));
+	    t_do->set_trans(dprintf("%s = succ(%s,%s))", t_ident->out_text, var->type->name, t_ident->out_text));
 	} else {
 	    t_do->set_trans(dprintf("%s ++)", t_ident->out_text));
 	}
     } else {
 	if (var && var->type->tag == tp_enum && var->type->name != NULL) {
-	    t_do->set_trans(dprintf("%s = pred(%s,%s))",
-				    t_ident->out_text, var->type->name,
-				    t_ident->out_text));
+	    t_do->set_trans(dprintf("%s = pred(%s,%s))", t_ident->out_text, var->type->name, t_ident->out_text));
 	} else {
 	    t_do->set_trans(dprintf("%s --)", t_ident->out_text));
 	}
@@ -1576,10 +1611,6 @@ void atom_expr_node::translate(int ctx)
 		else 
 			tkn->set_trans("(*this)");
 
-		return;
-	}
-	else if (tkn->name->tag == TKN_NIL) {
-		tkn->set_trans("nullptr");
 		return;
 	}
 	else if (turbo_pascal && tkn->name->tag == TKN_EXIT) {
@@ -2094,8 +2125,7 @@ void set_node::translate(int)
     } else {
 	if (((set_tp*)type)->elem_type->tag == tp_enum) {
 	    assert(((set_tp*)type)->elem_type->name != NULL);
-	    t_lbr->set_trans(dprintf("set_of_enum(%s)::of(",
-				     ((set_tp*)type)->elem_type->name));
+	    t_lbr->set_trans(dprintf("set_of_enum(%s)::of(", ((set_tp*)type)->elem_type->name));
 	} else {
 	    t_lbr->set_trans("set::of(");
 	}
@@ -2301,13 +2331,22 @@ void access_expr_node::attrib(int)
     rec->attrib(ctx_access);
 
 	if (rec->type != NULL && (rec->type->tag == tp_record || rec->type->tag == tp_object || rec->type->tag == tp_unit)) {
-		recfld = ((record_tp*)rec->type->get_typedef())->search(field);
-		if (recfld == NULL) {
-			assert(rec->f_tkn);
-			warning(field, "component '%s.%s' not found.", rec->f_tkn->in_text, field->in_text);
+		recfld = ((record_tp*)rec->type->get_typedef())->search(field); // because object_tp and unit_tp are descendants of record_tp
+		if (recfld == NULL) { // recfld may be NULL when method is declared in parent type and this type is unknown for some reason.
+			//assert(rec->f_tkn);
+			if (rec->f_tkn == NULL)
+			{
+				assert(rec->type->name);
+				warning(field, "component '%s' is not found in type '%s'.", field->in_text, rec->type->name);
+			}
+			else
+			{
+				warning(field, "component '%s.%s' is not found.", rec->f_tkn->in_text, field->in_text);
+			}
 		}
 	} else {
-		warning(field, "unknown record/class type '%s'", rec->type->name); //TODO here can be class too (in addition to record)
+		assert(rec->type->name);
+		warning(field, "unknown record/class type '%s'", rec->type->name);
 		recfld = NULL;
 	}
 
@@ -2428,59 +2467,58 @@ op_node::op_node(int tag, expr_node* left, token* op, expr_node* right)
 	parent = NULL;
 }
 
-
 void op_node::attrib(int)
 {
     if (left) {
-	left->parent_tag = tag;
+		left->parent_tag = tag;
         left->attrib(ctx_value);
-	type = left->type;
+		type = left->type;
     }
     if (right) {
-	right->parent_tag = tag;
+		right->parent_tag = tag;
         right->attrib(ctx_value);
-	type = right->type;
+		type = right->type; // right type overrides left type
     }
     if ((unsigned(tag - tn_add) <= tn_div - tn_add) &&
 	((left->type && left->type->get_typedef() == &longint_type)
 	 || (right->type && right->type->get_typedef() == &longint_type)))
     {
-	type = &longint_type;
+		type = &longint_type;
     }
-    if ((left == NULL || (left->flags & tn_is_const)) &&
-	(right == NULL || (right->flags & tn_is_const)))
-    {
-	switch (tag) {
-	  case tn_add:
-	    value = left->value + right->value;
-	    flags |= tn_is_const;
-	    break;
-	  case tn_sub:
-	    value = left->value - right->value;
-	    flags |= tn_is_const;
-	    break;
-	  case tn_plus:
-	    value = + right->value;
-	    flags |= tn_is_const | (right->flags & tn_is_literal);
-	    break;
-	  case tn_minus:
-	    value = - right->value;
-	    flags |= tn_is_const | (right->flags & tn_is_literal);
-	    break;
-	  case tn_mod:
-	    value = left->value % right->value;
-	    flags |= tn_is_const;
-	    break;
-	  case tn_mul:
-	    value = left->value * right->value;
-	    flags |= tn_is_const;
-	    break;
-	  case tn_div:
-	    value = left->value / right->value;
-	    flags |= tn_is_const;
-	    break;
+	if ((left == NULL || (left->flags & tn_is_const)) &&
+		(right == NULL || (right->flags & tn_is_const)))
+	{
+		switch (tag) {
+		case tn_add:
+			value = left->value + right->value;
+			flags |= tn_is_const;
+			break;
+		case tn_sub:
+			value = left->value - right->value;
+			flags |= tn_is_const;
+			break;
+		case tn_plus:
+			value = +right->value;
+			flags |= tn_is_const | (right->flags & tn_is_literal);
+			break;
+		case tn_minus:
+			value = -right->value;
+			flags |= tn_is_const | (right->flags & tn_is_literal);
+			break;
+		case tn_mod:
+			value = left->value % right->value;
+			flags |= tn_is_const;
+			break;
+		case tn_mul:
+			value = left->value * right->value;
+			flags |= tn_is_const;
+			break;
+		case tn_div:
+			value = left->value / right->value;
+			flags |= tn_is_const;
+			break;
+		}
 	}
-    }
 
     if (tag == tn_divr) {
         type = &real_type;
@@ -2489,9 +2527,9 @@ void op_node::attrib(int)
     } else if (left && right && right->type && right->type->tag == tp_set
 	       && left->type && left->type->tag == tp_set)
     {
-	set_tp* ltype = (set_tp*)left->type->get_typedef();
-	set_tp* rtype = (set_tp*)right->type->get_typedef();
-	type = (ltype->card() < rtype->card()) ? ltype : rtype;
+		set_tp* ltype = (set_tp*)left->type->get_typedef();
+		set_tp* rtype = (set_tp*)right->type->get_typedef();
+		type = (ltype->card() < rtype->card()) ? ltype : rtype;
     } else if (left && right && left->type && right->type &&
 	       (left->type->tag == tp_real || right->type->tag == tp_real))
     {
@@ -2500,7 +2538,13 @@ void op_node::attrib(int)
 	       (right->type->tag == tp_string || right->type->tag == tp_char))
     {
         type = &varying_string_type;
-    }
+	} else if (tag == tn_is) {
+		type = &bool_type;
+		assert(dynamic_cast<atom_expr_node*>(right->type)); //TODO here is a check that tn_is has right part is a type (atom type)
+	} else if (tag == tn_as) {
+		// type is already assigned above
+		//assert(dynamic_cast<atom_expr_node*>(right->type)); //TODO here is a check that tn_is has right part is a type (atom type)
+	}
 }
 
 static char* cmp_op[] = { "==", "!=", ">", ">=", "<", "<=" };
@@ -2532,314 +2576,453 @@ void op_node::translate(int)
         right->translate(ctx_value);
         l_tkn = right->l_tkn;
     }
-    switch(tag) {
-      case tn_mod:
-        op->set_trans("%");
-        break;
-      case tn_div:
-        op->set_trans("/");
-        break;
-      case tn_divr:
-        op->set_trans("/");
-	if (left->type && left->type->tag != tp_real &&
-	    right->type && right->type->tag != tp_real)
-        {
-	    f_tkn = left->f_tkn->prepend("(real)(");
-	    left->l_tkn->append(")");
-	}
-        break;
-      case tn_and:
-        op->set_trans((!force_logical && ((left->type && left->type->tag != tp_bool) ||
-										  (right->type && right->type->tag != tp_bool) || nological))
-					  ? "&" : "&&");
+
+	switch (tag) {
+	case tn_mod:
+		op->set_trans("%");
+		break;
+	case tn_div:
+		op->set_trans("/");
+		break;
+	case tn_divr:
+		op->set_trans("/");
+		if (left->type && left->type->tag != tp_real &&
+			right->type && right->type->tag != tp_real)
+		{
+			f_tkn = left->f_tkn->prepend("(real)(");
+			left->l_tkn->append(")");
+		}
+		break;
+	case tn_and:
+		op->set_trans((!force_logical && ((left->type && left->type->tag != tp_bool) ||
+			(right->type && right->type->tag != tp_bool) || nological)) ? "&" : "&&");
 		// no break
-      case tn_binand:
+	case tn_binand:
 		if (parent_tag != tn_group && parent_tag != tn_and) {
 			f_tkn = left->f_tkn->prepend("(");
 			l_tkn = right->l_tkn->append(")");
 		}
-	break;
-      case tn_xor:
-        op->set_trans("^");
-	if (parent_tag != tn_group && parent_tag != tn_xor) {
-	    f_tkn = left->f_tkn->prepend("(");
-	    l_tkn = right->l_tkn->append(")");
-	}
-	break;
-      case tn_let:
-	op->set_trans("=");
-	break;
-      case tn_shr:
-	if (parent_tag != tn_group) {
-		assert(left->type->get_typedef() != &integer_type);//TODO this is to check whether integer_type comes here at all
-	    f_tkn = left->f_tkn->prepend(left->type &&
-			left->type->get_typedef() == &longint_type ? "((unsigned long)" : 
-			left->type->get_typedef() == &uint64_type ? "((uint64_t)" :
-			left->type->get_typedef() == &int64_type ? "((int64_t)" : "((cardinal)");
-	    l_tkn = right->l_tkn->append(")");
-	} else {
-		f_tkn = left->f_tkn->prepend(left->type &&
-			left->type->get_typedef() == &longint_type ? "(unsigned long)" :
-			left->type->get_typedef() == &uint64_type ? "(uint64_t)" :
-			left->type->get_typedef() == &int64_type ? "(int64_t)" : "(cardinal)");
-	}
-	op->set_trans(">>");
-	break;
-      case tn_shl:
-	if (parent_tag != tn_group) {
-	    f_tkn = left->f_tkn->prepend("(");
-	    l_tkn = right->l_tkn->append(")");
-	}
-	op->set_trans("<<");
-	break;
-      case tn_or:
-	if (parent_tag != tn_group && parent_tag != tn_or) {
-	    f_tkn = left->f_tkn->prepend("(");
-	    l_tkn = right->l_tkn->append(")");
-	}
+		break;
+	case tn_xor:
+		op->set_trans("^");
+		if (parent_tag != tn_group && parent_tag != tn_xor) {
+			f_tkn = left->f_tkn->prepend("(");
+			l_tkn = right->l_tkn->append(")");
+		}
+		break;
+	case tn_let:
+		op->set_trans("=");
+		break;
+	case tn_shr:
+		if (parent_tag != tn_group) {
+			assert(left->type->get_typedef() != &integer_type);//TODO this is to check whether integer_type comes here at all
+			f_tkn = left->f_tkn->prepend(left->type &&
+				left->type->get_typedef() == &longint_type ? "((unsigned long)" :
+				left->type->get_typedef() == &uint64_type ? "((uint64_t)" :
+				left->type->get_typedef() == &int64_type ? "((int64_t)" : "((cardinal)");
+			l_tkn = right->l_tkn->append(")");
+		} else {
+			f_tkn = left->f_tkn->prepend(left->type &&
+				left->type->get_typedef() == &longint_type ? "(unsigned long)" :
+				left->type->get_typedef() == &uint64_type ? "(uint64_t)" :
+				left->type->get_typedef() == &int64_type ? "(int64_t)" : "(cardinal)");
+		}
+		op->set_trans(">>");
+		break;
+	case tn_shl:
+		if (parent_tag != tn_group) {
+			f_tkn = left->f_tkn->prepend("(");
+			l_tkn = right->l_tkn->append(")");
+		}
+		op->set_trans("<<");
+		break;
+	case tn_or:
+		if (parent_tag != tn_group && parent_tag != tn_or) {
+			f_tkn = left->f_tkn->prepend("(");
+			l_tkn = right->l_tkn->append(")");
+		}
 		// no break
-	  case tn_binor:
-	op->set_trans((!force_logical && ((left->type && left->type->tag != tp_bool) ||
-									  (right->type && right->type->tag != tp_bool) ||
-									  nological)) ? "|" : "||");
-        break;
-      case tn_in:
-        token::disable(left->l_tkn->next, right->f_tkn->prev);
-	if (language_c) {
-            f_tkn = left->f_tkn->prepend(
-		        short_set && ((set_tp*)right->type)->is_short_set()
-                        ? "INSET(" : "inset(");
-	    left->l_tkn->append(", ");
-	    l_tkn = right->l_tkn->append(")");
-	} else {
-	    left->f_tkn->move(right->f_tkn, right->l_tkn);
-	    if (right->tag==tn_add || right->tag==tn_sub || right->tag==tn_mul){
-		f_tkn = right->f_tkn->prepend("(");
-		right->l_tkn->append(")");
-	    } else {
-		f_tkn = right->f_tkn;
-	    }
-	    left->f_tkn->prepend(".has(");
-	    l_tkn = left->l_tkn->append(")");
-	}
-        break;
-      case tn_add:
-      case tn_sub:
-      case tn_mul:
-        if (left->type && left->type->tag == tp_set) {
-	    if (language_c) {
-		if (short_set && ((set_tp*)type)->is_short_set()) {
-		    f_tkn = left->f_tkn->prepend(tag == tn_add
-						 ? "JOIN(" : tag == tn_sub
-						 ? "DIFFERENCE("
-						 : "INTERSECT(");
-		} else {
-		    f_tkn = left->f_tkn->prepend(tag == tn_add
-						 ? "join(" : tag == tn_sub
-						 ? "difference("
-						 : "intersect(");
-		}
-		l_tkn = right->l_tkn->append(")");
+	case tn_binor:
+		op->set_trans((!force_logical && ((left->type && left->type->tag != tp_bool) ||
+			(right->type && right->type->tag != tp_bool) ||
+			nological)) ? "|" : "||");
+		break;
+	case tn_in:
 		token::disable(left->l_tkn->next, right->f_tkn->prev);
-		left->l_tkn->append(", ");
-	    }
-	} else if (!language_c) {
-	    if (left->type
-		&& (left->type->tag == tp_string || left->type->tag == tp_char))
-	    {
-		f_tkn = left->f_tkn->prepend("string(");
+		if (language_c) {
+			f_tkn = left->f_tkn->prepend(
+				short_set && ((set_tp*)right->type)->is_short_set()
+				? "INSET(" : "inset(");
+			left->l_tkn->append(", ");
+			l_tkn = right->l_tkn->append(")");
+		} else {
+			left->f_tkn->move(right->f_tkn, right->l_tkn);
+			if (right->tag == tn_add || right->tag == tn_sub || right->tag == tn_mul) {
+				f_tkn = right->f_tkn->prepend("(");
+				right->l_tkn->append(")");
+			} else {
+				f_tkn = right->f_tkn;
+			}
+			left->f_tkn->prepend(".has(");
+			l_tkn = left->l_tkn->append(")");
+		}
+		break;
+	case tn_add:
+	case tn_sub:
+	case tn_mul:
+		if (left->type && left->type->tag == tp_set) {
+			if (language_c) {
+				if (short_set && ((set_tp*)type)->is_short_set()) {
+					f_tkn = left->f_tkn->prepend(tag == tn_add ? "JOIN(" : tag == tn_sub ? "DIFFERENCE(" : "INTERSECT(");
+				} else {
+					f_tkn = left->f_tkn->prepend(tag == tn_add ? "join(" : tag == tn_sub ? "difference(" : "intersect(");
+				}
+				l_tkn = right->l_tkn->append(")");
+				token::disable(left->l_tkn->next, right->f_tkn->prev);
+				left->l_tkn->append(", ");
+			}
+		} else if (!language_c) {
+			if (left->type
+				&& (left->type->tag == tp_string || left->type->tag == tp_char))
+			{
+				f_tkn = left->f_tkn->prepend("string(");
+				left->l_tkn->append(")");
+			}
+		}
+		break;
+	case tn_eq:
+	case tn_ne:
+	case tn_gt:
+	case tn_ge:
+	case tn_lt:
+	case tn_le:
+		if (unsigned_comparison && left->type && right->type &&
+			(left->type->tag == tp_range || right->type->tag == tp_range ||
+				left->type->tag == tp_enum || right->type->tag == tp_enum))
+		{
+			range_tp* ltype = (range_tp*)left->type->get_typedef();
+			range_tp* rtype = (range_tp*)right->type->get_typedef();
+
+			if (((ltype->tag == tp_range && ltype->min_value >= 0) ||
+				ltype->tag == tp_enum) &&
+				((rtype->tag == tp_range && rtype->min_value < 0) ||
+					(rtype->tag == tp_integer && !(right->flags & tn_is_const))))
+			{
+				if (rtype->tag == tp_integer) {
+					right->f_tkn->prepend("(cardinal)");
+				}
+				else if (ltype->tag == tp_enum || rtype->size <= ltype->size)
+				{
+					right->f_tkn->prepend(rtype->size == 1 ? "(unsigned char)" : rtype->size == 2 ? "(unsigned short)" : "(unsigned)");
+				}
+			} else if (((rtype->tag == tp_range && rtype->min_value >= 0) ||
+				rtype->tag == tp_enum) &&
+				((ltype->tag == tp_range && ltype->min_value < 0) ||
+					(ltype->tag == tp_integer && !(left->flags & tn_is_const))))
+			{
+				if (ltype->tag == tp_integer) {
+					f_tkn = left->f_tkn->prepend("(cardinal)");
+				}
+				else if (rtype->tag == tp_enum || ltype->size <= rtype->size)
+				{
+					f_tkn = left->f_tkn->prepend(ltype->size == 1 ? "(unsigned char)" :	ltype->size == 2 ? "(unsigned short)" : "(unsigned)");
+				}
+			}
+		}
+
+		if (language_c && left->type && right->type) {
+			switch (left->type->tag) {
+			case tp_string:
+			case tp_record:
+			case tp_array:
+			case tp_dynarray:
+				if (right->type->tag == tp_char) {
+					f_tkn = left->f_tkn->prepend("*");
+				} else {
+					token::disable(left->l_tkn->next, right->f_tkn->prev);
+					left->l_tkn->append(", ");
+					if (left->is_parameter()) {
+						f_tkn = left->f_tkn->prepend("memcmp(");
+						if (left->type->tag == tp_record) {
+							left->f_tkn->prepend("&");
+							right->f_tkn->prepend("&");
+						}
+						if (left->type->name != NULL) {
+							l_tkn = right->l_tkn->append(dprintf(", sizeof(%s)) %s 0", left->type->name, CMP_OP(tag)));
+						} else {
+							l_tkn = right->l_tkn->append(", ")->append("*sizeof(*");
+							((array_tp*)left->type->get_typedef())->insert_length(l_tkn);
+							l_tkn = l_tkn->append(dprintf(")) %s 0", CMP_OP(tag)));
+							l_tkn->copy(left->f_tkn, left->l_tkn);
+						}
+					} else if (left->type->tag == tp_string) {
+						token::swap(left->f_tkn, left->l_tkn,
+							right->f_tkn, right->l_tkn);
+						f_tkn = right->f_tkn->prepend("arrcmp(");
+						l_tkn = left->l_tkn->append(dprintf(") %s 0", RCMP_OP(tag)));
+					} else {
+						if (left->type->tag == tp_record) {
+							f_tkn = left->f_tkn->prepend("reccmp(");
+						} else {
+							f_tkn = left->f_tkn->prepend("arrcmp(");
+						}
+						l_tkn = right->l_tkn->append(dprintf(") %s 0", CMP_OP(tag)));
+					}
+					return;
+				}
+			case tp_char:
+				if (right->type && right->type->is_array()) {
+					right->f_tkn->prepend("*");
+				}
+				break;
+			case tp_set:
+				token::disable(left->l_tkn->next, right->f_tkn->prev);
+				left->l_tkn->append(", ");
+
+				if (short_set && left->type && ((set_tp*)left->type)->is_short_set()) {
+					switch (tag) {
+					case tn_eq:
+						f_tkn = left->f_tkn->prepend("EQUIVALENT(");
+						l_tkn = right->l_tkn->append(")");
+						break;
+					case tn_ne:
+						f_tkn = left->f_tkn->prepend("!EQUIVALENT(");
+						l_tkn = right->l_tkn->append(")");
+						break;
+					case tn_le:
+						f_tkn = left->f_tkn->prepend("SUBSET(");
+						l_tkn = right->l_tkn->append(")");
+						break;
+					case tn_ge:
+						token::swap(left->f_tkn, left->l_tkn,
+							right->f_tkn, right->l_tkn);
+						f_tkn = right->f_tkn->prepend("SUBSET(");
+						l_tkn = left->l_tkn->append(")");
+						break;
+					}
+				} else {
+					switch (tag) {
+					case tn_eq:
+						f_tkn = left->f_tkn->prepend("equivalent(");
+						l_tkn = right->l_tkn->append(")");
+						break;
+					case tn_ne:
+						f_tkn = left->f_tkn->prepend("!equivalent(");
+						l_tkn = right->l_tkn->append(")");
+						break;
+					case tn_le:
+						f_tkn = left->f_tkn->prepend("subset(");
+						l_tkn = right->l_tkn->append(")");
+						break;
+					case tn_ge:
+						token::swap(left->f_tkn, left->l_tkn, right->f_tkn, right->l_tkn);
+						f_tkn = right->f_tkn->prepend("subset(");
+						l_tkn = left->l_tkn->append(")");
+						break;
+					}
+				}
+				return;
+			}
+		} else { // language C++
+			if (left->type && right->type
+				&& (right->type->tag == tp_array
+					|| right->type->tag == tp_varying_string
+					|| right->type->tag == tp_dynarray)
+				&& (left->type->tag == tp_string
+					|| left->type->tag == tp_char))
+			{
+				token::swap(left->f_tkn, left->l_tkn, right->f_tkn, right->l_tkn);
+				f_tkn = right->f_tkn;
+				l_tkn = left->l_tkn;
+				op->set_trans(RCMP_OP(tag));
+				return;
+			}
+		}
+		op->set_trans(CMP_OP(tag));
+		break;
+	case tn_not:
+		op->set_trans(force_logical || (right->type && right->type->tag == tp_bool) ? "!" : "~");
+		break;
+	case tn_binnot:
+		break;
+	case tn_is: 
+		token::swap(left->f_tkn, left->l_tkn, right->f_tkn, right->l_tkn);
+		token::disable(right->f_tkn->next, left->l_tkn->prev);
+		right->f_tkn->prepend("dynamic_cast<");
+		right->l_tkn->append(">(");
+		left->l_tkn->append(") != nullptr");
+		break;
+	case tn_as:
+		token::swap(left->f_tkn, left->l_tkn, right->f_tkn, right->l_tkn);
+		token::disable(right->f_tkn->next, left->l_tkn->prev);
+		right->f_tkn->prepend("dynamic_cast<");
+		right->l_tkn->append(">(");
 		left->l_tkn->append(")");
-	    }
-	}
-	break;
-      case tn_eq:
-      case tn_ne:
-      case tn_gt:
-      case tn_ge:
-      case tn_lt:
-      case tn_le:
-	if (unsigned_comparison && left->type && right->type &&
-	    (left->type->tag == tp_range || right->type->tag == tp_range ||
-	     left->type->tag == tp_enum || right->type->tag == tp_enum))
-        {
-	    range_tp* ltype = (range_tp*)left->type->get_typedef();
-	    range_tp* rtype = (range_tp*)right->type->get_typedef();
-
-	    if (((ltype->tag == tp_range && ltype->min_value >= 0) ||
-		 ltype->tag == tp_enum) &&
-		((rtype->tag == tp_range && rtype->min_value < 0) ||
-		 (rtype->tag == tp_integer && !(right->flags & tn_is_const))))
-	    {
-		if (rtype->tag == tp_integer) {
-		    right->f_tkn->prepend("(cardinal)");
-		}
-		else if (ltype->tag == tp_enum || rtype->size <= ltype->size)
-		{
-		    right->f_tkn->prepend(rtype->size == 1 ? "(unsigned char)":
-					  rtype->size == 2 ? "(unsigned short)"
-					  : "(unsigned)");
-		}
-	    } else if (((rtype->tag == tp_range && rtype->min_value >= 0) ||
-			rtype->tag == tp_enum) &&
-		       ((ltype->tag == tp_range && ltype->min_value < 0) ||
-			(ltype->tag == tp_integer && !(left->flags & tn_is_const))))
-	    {
-		if (ltype->tag == tp_integer) {
-		    f_tkn = left->f_tkn->prepend("(cardinal)");
-		}
-                else if (rtype->tag == tp_enum || ltype->size <= rtype->size)
-		{
-		    f_tkn = left->f_tkn->prepend(
-					  ltype->size == 1 ? "(unsigned char)":
-					  ltype->size == 2 ? "(unsigned short)"
-					  : "(unsigned)");
-		}
-	    }
-	}
-	if (language_c && left->type && right->type) {
-	    switch(left->type->tag) {
-	      case tp_string:
-	      case tp_record:
-	      case tp_array:
-	      case tp_dynarray:
-		if (right->type->tag == tp_char) {
-		    f_tkn = left->f_tkn->prepend("*");
-		} else {
-		    token::disable(left->l_tkn->next, right->f_tkn->prev);
-		    left->l_tkn->append(", ");
-		    if (left->is_parameter()) {
-			f_tkn = left->f_tkn->prepend("memcmp(");
-			if (left->type->tag == tp_record) {
-			    left->f_tkn->prepend("&");
-			    right->f_tkn->prepend("&");
-			}
-			if (left->type->name != NULL) {
-			    l_tkn = right->l_tkn->append(
-					   dprintf(", sizeof(%s)) %s 0",
-					       left->type->name, CMP_OP(tag)));
-			} else {
-			    l_tkn = right->l_tkn->append(", ")
-				                ->append("*sizeof(*");
-			    ((array_tp*)left->type->get_typedef())->
-				insert_length(l_tkn);
-			    l_tkn = l_tkn->append(dprintf(")) %s 0",
-							  CMP_OP(tag)));
-			    l_tkn->copy(left->f_tkn, left->l_tkn);
-			}
-		    } else if (left->type->tag == tp_string) {
-			token::swap(left->f_tkn, left->l_tkn,
-				    right->f_tkn, right->l_tkn);
-			f_tkn = right->f_tkn->prepend("arrcmp(");
-			l_tkn = left->l_tkn->append(dprintf(") %s 0",
-							    RCMP_OP(tag)));
-		    } else {
-			if (left->type->tag == tp_record) {
-			    f_tkn = left->f_tkn->prepend("reccmp(");
-			} else {
-			    f_tkn = left->f_tkn->prepend("arrcmp(");
-			}
-			l_tkn = right->l_tkn->append(dprintf(") %s 0",
-							     CMP_OP(tag)));
-		    }
-		    return;
-		}
-	      case tp_char:
-		if (right->type && right->type->is_array()) {
-		    right->f_tkn->prepend("*");
-		}
 		break;
-	      case tp_set:
-		token::disable(left->l_tkn->next, right->f_tkn->prev);
-		left->l_tkn->append(", ");
+	} // switch (tag)
 
-		if (short_set && left->type && ((set_tp*)left->type)->is_short_set()) {
-		    switch (tag) {
-		      case tn_eq:
-			f_tkn = left->f_tkn->prepend("EQUIVALENT(");
-			l_tkn = right->l_tkn->append(")");
-			break;
-		      case tn_ne:
-			f_tkn = left->f_tkn->prepend("!EQUIVALENT(");
-			l_tkn = right->l_tkn->append(")");
-			break;
-		      case tn_le:
-			f_tkn = left->f_tkn->prepend("SUBSET(");
-			l_tkn = right->l_tkn->append(")");
-			break;
-		      case tn_ge:
-			token::swap(left->f_tkn, left->l_tkn,
-				    right->f_tkn, right->l_tkn);
-			f_tkn = right->f_tkn->prepend("SUBSET(");
-			l_tkn = left->l_tkn->append(")");
-			break;
-		    }
-		} else {
-		    switch (tag) {
-		      case tn_eq:
-			f_tkn = left->f_tkn->prepend("equivalent(");
-			l_tkn = right->l_tkn->append(")");
-			break;
-		      case tn_ne:
-			f_tkn = left->f_tkn->prepend("!equivalent(");
-			l_tkn = right->l_tkn->append(")");
-			break;
-		      case tn_le:
-			f_tkn = left->f_tkn->prepend("subset(");
-			l_tkn = right->l_tkn->append(")");
-			break;
-		      case tn_ge:
-			token::swap(left->f_tkn, left->l_tkn,
-				    right->f_tkn, right->l_tkn);
-			f_tkn = right->f_tkn->prepend("subset(");
-			l_tkn = left->l_tkn->append(")");
-			break;
-		    }
+	if ((unsigned(tag - tn_add) <= tn_div - tn_add) && type && type->tag == tp_longint)
+	{
+		if (left->type && left->type->tag != tp_longint) {
+			f_tkn = f_tkn->prepend("longint(");
+			left->l_tkn->append(")");
 		}
-		return;
-	    }
-	} else { // language C++
-	    if (left->type && right->type
-		&& (right->type->tag == tp_array
-		 || right->type->tag == tp_varying_string
-		 || right->type->tag == tp_dynarray)
-		&& (left->type->tag == tp_string
-		    || left->type->tag == tp_char))
-	    {
-		token::swap(left->f_tkn, left->l_tkn,
-			    right->f_tkn, right->l_tkn);
-		f_tkn = right->f_tkn;
-		l_tkn = left->l_tkn;
-		op->set_trans(RCMP_OP(tag));
-		return;
-	    }
+		else if (right->type && right->type->tag != tp_longint) {
+			right->f_tkn->prepend("longint(");
+			l_tkn = l_tkn->append(")");
+		}
 	}
-	op->set_trans(CMP_OP(tag));
-        break;
-      case tn_not:
-        op->set_trans(force_logical || (right->type && right->type->tag == tp_bool) ? "!" : "~");
-        break;
-	  case tn_binnot:
-		break;
-    }
-    if ((unsigned(tag - tn_add) <= tn_div - tn_add) && type && type->tag == tp_longint)
-    {
-	if (left->type && left->type->tag != tp_longint) {
-	    f_tkn = f_tkn->prepend("longint(");
-	    left->l_tkn->append(")");
-	} else if (right->type && right->type->tag != tp_longint) {
-	    right->f_tkn->prepend("longint(");
-	    l_tkn = l_tkn->append(")");
-	}
-    }
 }
 
-fcall_node::fcall_node(expr_node* fptr, token* lpar, expr_node* args,
-		       token* rpar)
-: expr_node(tn_fcall)
+fcall_node::fcall_node(expr_node* fptr, token* lpar, expr_node* args, token* rpar) : expr_node(tn_fcall)
 {
     CONS4(fptr, lpar, args, rpar);
 	temp = NULL;
 }
+
+/*
+void fcall_node::translate_read(int ctx, bool newl)
+{
+	if (language_c) {
+		if (args) {
+			char const* format = "";
+			char const* newln = newl ? "\\n" : "";
+			expr_node* prm = args;
+
+			l_tkn = args->l_tkn;
+
+			if (prm->type->tag == tp_file) {
+				prm->translate(ctx_value);
+				expr_node* file = prm;
+				while ((prm = prm->next) != NULL) {
+					prm->translate(ctx_lvalue);
+					if (prm->tag == tn_filevar && language_c) {
+						prm->f_tkn->prepend("scopy(")->set_pos(fptr->f_tkn);
+					}
+					else {
+						prm->f_tkn->prepend("sread(")->set_pos(fptr->f_tkn);
+					}
+					prm->f_tkn->copy(file->f_tkn, file->l_tkn);
+					prm->f_tkn->prepend(", ");
+					prm->l_tkn->append(")");
+				}
+				token::disable(fptr->f_tkn, file->l_tkn->next_relevant());
+				//params->rpar->disable();
+				force_semicolon();
+				return;
+			}
+			if (prm->type->tag == tp_text) {
+				prm->translate(ctx_access);
+				if (prm->tag != tn_address) {
+					prm->f_tkn->prepend("&");
+				}
+				prm = prm->next;
+				fptr->f_tkn->set_trans("tread");
+			}
+			else {
+				fptr->f_tkn->set_trans("cread");
+			}
+			int n_params = 0;
+			while (prm != NULL) {
+				char fmt = '?';
+				prm->translate(ctx_access);
+				n_params += 1;
+				switch (prm->type->tag) {
+				case tp_dynarray:
+				case tp_array:
+					fmt = 's';
+					((array_tp*)prm->type->get_typedef())
+						->insert_dimensions(prm);
+					break;
+				case tp_real:
+					fmt = 'f';
+					break;
+				case tp_integer:
+					fmt = 'i';
+					break;
+				case tp_char:
+					fmt = 'c';
+					break;
+				case tp_bool:
+					fmt = 'b';
+					break;
+				case tp_range:
+					switch (((range_tp*)prm->type->get_typedef())->size) {
+					case 1: fmt = 'B'; break;
+					case 2: fmt = 'W'; break;
+					case 4: fmt = 'i'; break;
+					default:
+						warning(prm->f_tkn, "sizeof range type is %d", ((range_tp*)prm->type->get_typedef())->size);
+					}
+					break;
+				default:
+					warning(prm->f_tkn, "invalid parameter for read operator");
+				}
+				format = dprintf("%s%%%c", format, fmt);
+				if (fmt != 's' && prm->tag != tn_address) {
+					prm->f_tkn = prm->f_tkn->prepend("&");
+				}
+				prm = prm->next;
+			}
+			if (args->type->tag == tp_text) {
+				args->l_tkn->append(dprintf(", \"%s%s\"", format, newln));
+			}
+			else {
+				args->f_tkn->append(dprintf(n_params ? "\"%s%s\", " : "\"%s%s\"", format, newln));
+			}
+		}
+		else if (newl) {
+			fptr->f_tkn->set_trans("cread(\"\\n\")");
+		}
+		else {
+			warning(fptr->f_tkn, "read statement with no effect");
+			fptr->f_tkn->disable();
+		}
+
+	}
+	else { // C++
+		if (args) {
+			l_tkn = args->l_tkn; // params->rpar;
+			args->l_tkn->disable();
+			args->f_tkn->disable();
+
+			expr_node* prm = args;
+			bool newln = newl;
+
+			if (prm->type->tag == tp_text || prm->type->tag == tp_file) {
+				prm->translate(ctx_value);
+				if (prm->next) {
+					prm->l_tkn->next_relevant()->set_trans(" >> ");
+				}
+				prm->f_tkn->set_pos(fptr->f_tkn);
+				fptr->f_tkn->disable();
+				prm = prm->next;
+			}
+			else {
+				fptr->f_tkn->set_trans("input >> ");
+			}
+			while (prm != NULL) {
+				prm->translate(ctx_lvalue);
+				if (prm->next != NULL) {
+					prm->l_tkn->next_relevant()->set_trans(" >> ");
+				}
+				prm = prm->next;
+			}
+			if (newln) {
+				l_tkn = l_tkn->append(" >> NL");
+			}
+		}
+		else if (newl) {
+			fptr->f_tkn->set_trans("input >> NL");
+		}
+		else {
+			warning(fptr->f_tkn, "read statement with no effect");
+			fptr->f_tkn->disable();
+		}
+	}
+	force_semicolon();
+}
+*/
 
 void fcall_node::attrib(int ctx)
 {
@@ -2903,9 +3086,16 @@ void fcall_node::attrib(int ctx)
 				value = args->value + 1;
 			}
 			break;
-			//case TKN_EXIT: //TODO заглушка, may be later add some code 
-			  //args->attrib(ctx_value);
-			  //goto normal_call;
+
+		case TKN_READ:
+		case TKN_READLN:
+			if (args) args->attrib(ctx_lvalue);
+			break;
+
+		//case TKN_EXIT: //TODO заглушка, may be later add some code 
+		   //args->attrib(ctx_value);
+		   //goto normal_call;
+		
 		case TKN_HALT:
 			if (turbo_pascal) {
 				tok->set_trans("exit");
@@ -2987,6 +3177,9 @@ void fcall_node::translate(int ctx)
 
     if (fptr->tag == tn_atom && ((atom_expr_node*)fptr)->tkn->tag != TKN_IDENT)
     {
+		// We come here for special Delphi calls only. Which are defined in token.dpp and which have unique TKN_* ID.
+		// Like: New, Dispose, Pred, Succ, Inc, Dec, SetLength, Length, Move, etc. 
+
 		f_tkn = ((atom_expr_node*)fptr)->tkn;
 
       switch(/*((atom_expr_node*)fptr)->tkn*/f_tkn->tag) { //TODO replace by f_tkn->tag?
@@ -3161,7 +3354,8 @@ void fcall_node::translate(int ctx)
 		  assert(args->next != NULL && args->next->next == NULL); // SetLength must have two arguments
 		  args->f_tkn->set_pos(f_tkn);
 		  token::disable(f_tkn, lpar);
-		  assert(args->type->tag == tp_varying_string);
+		  //TODO improve this function to work with dynamic arrays
+		 // assert(args->type->tag == tp_varying_string);
 		  token* t_len = args->l_tkn->next_relevant()->next_relevant(); // look for second argument token
 		  token::disable(args->l_tkn->next, t_len->prev); // disable spaces and comma between first and second SetLength arguments
 		  args->l_tkn->append(".set_length(");
@@ -3187,9 +3381,11 @@ void fcall_node::translate(int ctx)
 		  }
 		  break;
 	  }
+
 	  case TKN_MOVE:
 		  args->translate(ctx_lvalue);
 		  assert(args->next != NULL && args->next->next != NULL && args->next->next->next == NULL); // Move must have 3 arguments
+		  //TODO add check here for args->next, son on like assert above
 		  args->f_tkn->set_pos(f_tkn);
 		  f_tkn->set_trans("memmove");
 
@@ -3201,6 +3397,7 @@ void fcall_node::translate(int ctx)
 		  args->next->translate(ctx_rvalue);
 		  args->next->next->translate(ctx_rvalue);
 		  break;
+
 	  case TKN_ASSERT:
 		  args->translate(ctx_lvalue);
 		  args->f_tkn->set_pos(f_tkn);
@@ -3208,8 +3405,19 @@ void fcall_node::translate(int ctx)
 
 		  if(args->next) args->next->translate(ctx_rvalue);
 		  break;
+
+/*	  case TKN_READ:
+		  translate_read(ctx, false);
+		  break;
+
+	  case TKN_READLN:
+		  translate_read(ctx, true);
+		  break;
+		  */
 	  } // switch
+
 	return;
+
     }
 
 normal_call:
@@ -3397,7 +3605,8 @@ normal_call:
 
 skipped_node::skipped_node(token* comma) : expr_node(tn_skip)
 {
-    this->comma = comma;
+	CONS1(comma);
+   // this->comma = comma;
 }
 
 void skipped_node::attrib(int)
@@ -3463,9 +3672,7 @@ void field_init_node::attrib(tpexpr* record_type)
     if (record_type != NULL && record_type->tag != tp_void) {
 	symbol* s = ((record_tp*)record_type)->shallow_search(t_field);
 	if (s == NULL) {
-	    warning(t_field, "Field '%s' is not found in record %s\n",
-		    t_field->in_text,
-		    record_type->name ? record_type->name : "");
+	    warning(t_field, "Field '%s' is not found in record %s\n", t_field->in_text, record_type->name ? record_type->name : "");
 	} else {
 	    value->type = s->type;
 	    ctx = s->type->tag == tp_record || s->type->tag == tp_object ? ctx_record
@@ -3547,30 +3754,32 @@ static expr_node* aggregate_constant(expr_node* expr, symbol* component)
 void expr_group_node::attrib(int ctx)
 {
     this->ctx = ctx;
-    if (type != NULL) {
-	if (type->tag == tp_record || type->tag == tp_object) {
-	    for (expr_node* e = aggregate_constant(expr,
-				    ((record_tp*)type->get_typedef())->syms);
-		 e != NULL;
-		 e = e->next)
-	    {
-		e->attrib(ctx_constant);
-	    }
-	    return;
-	} else if (type->is_array()) {
-	    tpexpr* elem_type = ((array_tp*)type->get_typedef())->elem_type;
-	    ctx = (elem_type->tag == tp_record || elem_type->tag == tp_object) ? ctx_record
-		: (elem_type->is_array()) ? ctx_array : ctx_constant;
-	    for(expr_node* e = expr; e != NULL; e = e->next) {
-		e->type = elem_type;
-		e->attrib(ctx);
-	    }
-	    return;
+	if (type != NULL) {
+		if (type->tag == tp_record || type->tag == tp_object) {
+			for (expr_node* e = aggregate_constant(expr,
+				((record_tp*)type->get_typedef())->syms);
+				e != NULL;
+				e = e->next)
+			{
+				e->attrib(ctx_constant);
+			}
+			return;
+		} else if (type->is_array()) {
+			tpexpr* elem_type = ((array_tp*)type->get_typedef())->elem_type;
+			ctx = (elem_type->tag == tp_record || elem_type->tag == tp_object) ? ctx_record //TODO are we updating class field or parameter here???
+				: (elem_type->is_array()) ? ctx_array : ctx_constant;
+			for (expr_node* e = expr; e != NULL; e = e->next) {
+				e->type = elem_type;
+				e->attrib(ctx);
+			}
+			return;
+		}
 	}
-    }
+
     for(expr_node* e = expr; e != NULL; e = e->next) {
-	e->attrib(ctx);
+		e->attrib(ctx);
     }
+
     type = expr->type;
 }
 
@@ -3919,9 +4128,8 @@ void const_def_node::translate(int)
 }
 
 typed_const_def_node::typed_const_def_node(token* ident, token* coln,
-					   tpd_node* tpd,
-					   token* equal, expr_node* constant)
-: const_def_node(ident, equal, constant)
+					   tpd_node* tpd, token* equal, expr_node* constant)
+				: const_def_node(ident, equal, constant)
 {
     CONS2(coln, tpd);
 }
@@ -4176,10 +4384,11 @@ void var_decl_node::attrib(int ctx)
 		tp = tpd->type;
 		if (tp == NULL)
 		{
-			if (tpd && tpd->f_tkn)
+			if (/*tpd &&*/ tpd->f_tkn)
 				warning(coln, "type is unknown '%s'", tpd->f_tkn->in_text);
-			else
-				warning(coln, "type is unknown");
+			else 
+				warning(coln, "type is unknown for variable '%s'", vars->ident->in_text);
+
 			tpd->type = tp = &any_type;
 		}
 	}
@@ -4245,8 +4454,9 @@ void  var_decl_node::translate(int ctx)
     l_tkn = coln ? coln : f_tkn;
 
     if (coln != NULL) {
-		token::disable(coln->prev_relevant()->next, tpd->f_tkn->prev); // disables two tokens ":" and "PascalType" in variable decl
+		token::disable(coln->prev_relevant()->next, tpd->f_tkn->prev); // disables two tokens: ":" and "PascalType" in variable decl
     }
+
 	if (ctx == ctx_valpar || ctx == ctx_varpar || ctx == ctx_constpar) {  // working with fun/method parameters here
 		if (language_c && tp->tag == tp_dynarray) {
 			token* t = vars->ident->prev;
@@ -4635,6 +4845,8 @@ void proc_decl_node::attrib(int ctx)
 void proc_decl_node::insert_return_type() {
     if (ret_type) {
         ret_type->translate(ctx_block);
+		if (ret_type->type->tag == tp_object) ret_type->l_tkn = ret_type->l_tkn->append("*");
+
 		assert(ret_type->type->name != NULL);
 		if (language_c && ret_type->type->tag == tp_array) {
 			t_proc->set_trans(dprintf("%s*", ret_type->type->name));
@@ -4714,59 +4926,51 @@ void proc_decl_node::insert_params()
 	}
 	first = false;
     }
-    for (param_spec* p = type->extra_params; p != NULL; p = p->next) {
+	for (param_spec* p = type->extra_params; p != NULL; p = p->next) {
 
-	if (p->var->flags & symbol::f_static) continue;
+		if (p->var->flags & symbol::f_static) continue;
 
-	if (!first) {
-     	    rest->prepend(", ");
-	}
-	first = false;
-	if (language_c) {
-	    if (p->var->type->tag == tp_array) {
-		array_tpd_node* atp = (array_tpd_node*)p->var->type->tpd;
-		rest->copy(atp->eltd->f_tkn, atp->eltd->l_tkn);
-		rest->prepend(dprintf(p->var->tag == symbol::s_const
-				      ? " const %s" : " %s",
-				      p->var->out_name->text));
-		rest->copy(atp->f_tkn, atp->l_tkn);
-	    } else if (p->var->type->tag == tp_dynarray) {
-		array_tpd_node* atp = (array_tpd_node*)p->var->type->tpd;
-		rest->copy(atp->eltd->f_tkn, atp->eltd->l_tkn);
-		rest->prepend(dprintf(p->var->tag == symbol::s_const
-				      ? " const* %s" : "* %s",
-				      p->var->out_name->text));
-	    } else {
-		p->var->type->insert_before(rest);
-		if (p->var->tag == symbol::s_const) {
-		    if (p->var->type->is_scalar()
-			|| p->var->type->tag == tp_string)
-		    {
-			rest->prepend(dprintf(" const %s",
-					      p->var->out_name->text));
-		    } else {
-			rest->prepend(dprintf(" const* %s",
-					      p->var->out_name->text));
-		    }
-		} else {
-		    rest->prepend(dprintf("* %s", p->var->out_name->text));
+		if (!first) {
+			rest->prepend(", ");
 		}
-	    }
-	} else {
-	    p->var->type->insert_before(rest);
-	    if (p->var->tag == symbol::s_const) {
-		if (p->var->type->is_scalar()) {
-		    rest->prepend(dprintf(" const %s",
-					  p->var->out_name->text));
-		} else {
-		    rest->prepend(dprintf(" const& %s",
-					  p->var->out_name->text));
+		first = false;
+		if (language_c) {
+			if (p->var->type->tag == tp_array) {
+				array_tpd_node* atp = (array_tpd_node*)p->var->type->tpd;
+				rest->copy(atp->eltd->f_tkn, atp->eltd->l_tkn);
+				rest->prepend(dprintf(p->var->tag == symbol::s_const ? " const %s" : " %s", p->var->out_name->text));
+				rest->copy(atp->f_tkn, atp->l_tkn);
+			} else if (p->var->type->tag == tp_dynarray) {
+				array_tpd_node* atp = (array_tpd_node*)p->var->type->tpd;
+				rest->copy(atp->eltd->f_tkn, atp->eltd->l_tkn);
+				rest->prepend(dprintf(p->var->tag == symbol::s_const ? " const* %s" : "* %s", p->var->out_name->text));
+			} else {
+				p->var->type->insert_before(rest);
+				if (p->var->tag == symbol::s_const) {
+					if (p->var->type->is_scalar()
+						|| p->var->type->tag == tp_string)
+					{
+						rest->prepend(dprintf(" const %s", p->var->out_name->text));
+					} else {
+						rest->prepend(dprintf(" const* %s", p->var->out_name->text));
+					}
+				} else {
+					rest->prepend(dprintf("* %s", p->var->out_name->text));
+				}
+			}
+		} else { // C++
+			p->var->type->insert_before(rest);
+			if (p->var->tag == symbol::s_const) {
+				if (p->var->type->is_scalar()) {
+					rest->prepend(dprintf(" const %s", p->var->out_name->text));
+				} else {
+					rest->prepend(dprintf(" const& %s", p->var->out_name->text));
+				}
+			} else {
+				rest->prepend(dprintf("& %s", p->var->out_name->text));
+			}
 		}
-	    } else {
-		rest->prepend(dprintf("& %s", p->var->out_name->text));
-	    }
 	}
-    }
 }
 
 
@@ -4844,15 +5048,15 @@ void proc_fwd_decl_node::attrib(int ctx)
 			is_static = true;
 		}
 		else if (t->ident->tag == TKN_VIRTUAL) { 
-			is_virtual = true;
+			is_virtual = type->is_constructor ? false : true; // in C++ constructors cannot be virtual unlike to Delphi
 			if (ctx != ctx_object) warning(t->ident, "method %s: virtual directive cannot be used here, only class methods can be marked virtual", t_ident->in_text);
 		}
-		else if (t->ident->tag == TKN_DYNAMIC) { // dynamic functions are marked virtual in C++
-			is_virtual = true;
+		else if (t->ident->tag == TKN_DYNAMIC) { // dynamic functions are marked virtual in C++ (constructors is an exception)
+			is_virtual = type->is_constructor ? false : true;
 			if (ctx != ctx_object) warning(t->ident, "method %s: dynamic directive cannot be used here, only class methods can be marked dynamic", t_ident->in_text);
 		}
 		else if (t->ident->tag == TKN_OVERRIDE) {
-			is_override = true;
+			is_override = type->is_constructor ? false : true; // in C++ constructors cannot be marked override since they are NOT virtual
 			if (ctx != ctx_object) warning(t->ident, "method %s: override directive cannot be used here, only class methods can be marked override", t_ident->in_text);
 		}
 		else if (t->ident->tag == TKN_OVERLOAD) {
@@ -5148,19 +5352,19 @@ void proc_def_node::translate(int ctx)
 
     t_semi1->disable();
     token* first_stmt = t_semi1->next_relevant();
-    token* lbr = block->body->t_begin;
-    if (first_stmt != block->body->t_begin) { //put variable declarations into block code
+    token* lbr = block->body_begin_tkn();
+    if (first_stmt != block->body_begin_tkn()) { //put variable declarations into block code
 		lbr = first_stmt->prepend("{\n");
-		lbr->set_pos(block->body->t_begin);
-		block->body->t_begin->disable();
+		lbr->set_pos(block->body_begin_tkn());
+		block->body_begin_tkn()->disable();
     }
-    block->body->t_end->set_bind(lbr);
+    block->body_end_tkn()->set_bind(lbr);
 
 
     if (language_c) {
-		type->undefine(block->body->t_end->prev_relevant());
+		type->undefine(block->body_end_tkn()->prev_relevant());
     }
-    first_stmt = block->body->t_begin->next_relevant();
+    first_stmt = block->body_begin_tkn()->next_relevant();
 
     type->insert_temporaries(first_stmt);
 
@@ -5171,7 +5375,7 @@ void proc_def_node::translate(int ctx)
 	if (type->res_type != NULL)
 	{
 		if (language_c && type->res_type->tag == tp_array) {
-			block->body->t_end->prepend(dprintf("return (%s*)%s_result;\n", type->res_type->name, type->proc_name))->set_bind(first_stmt);
+			block->body_end_tkn()->prepend(dprintf("return (%s*)%s_result;\n", type->res_type->name, type->proc_name))->set_bind(first_stmt);
 		} else {
 			// define two variables that share the same memory.
 			// one is Delphi built-in 'Result' variable (works for functions only)
@@ -5181,7 +5385,7 @@ void proc_def_node::translate(int ctx)
 			tmp->set_pos(first_stmt);
 			tmp = tmp->append(dprintf("%s& result = %s_result;\n", type->res_type->name, type->proc_name));
 			tmp->set_pos(first_stmt);
-			block->body->t_end->prepend(dprintf("return %s_result;\n", type->proc_name))->set_bind(first_stmt);
+			block->body_end_tkn()->prepend(dprintf("return %s_result;\n", type->proc_name))->set_bind(first_stmt);
 		}
 	} 
 	/*else if (type->is_constructor || type->is_destructor) { we do not need 'return this' any more
@@ -5215,11 +5419,17 @@ void simple_tpd_node::attrib(int ctx)
 	if (t_ident1) {   // 't_ident1.t_ident2' 
 		sym1 = b_ring::search_cur(t_ident1);
 		assert(sym1); 
-		sym2 = ((object_tp*)(sym1->type->get_typedef()))->shallow_search(t_ident2);
-		if (sym2 == NULL) {
+		auto otp = dynamic_cast<object_tp*>(sym1->type->get_typedef()); //TODO may be it is enough to cast to record_tp* here ?
+		assert(otp);
+		sym2 = otp->shallow_search(t_ident2);
+		if (sym2 == NULL) 
+		{
 			if (ctx == ctx_reftyp)
+			{
 				type = new fwd_ref_tp(t_ident2);
-			else {
+			} 
+			else 
+			{
 				char* full_name = dprintf("%s::%s", t_ident1->in_text, t_ident2->in_text);
 				warning(t_ident2, "unknown type '%s'", full_name);
 				// tp_last because we do not know its type yet
@@ -5231,8 +5441,11 @@ void simple_tpd_node::attrib(int ctx)
 		sym2 = b_ring::search_cur(t_ident2);
 		if (sym2 == NULL) {
 			if (ctx == ctx_reftyp)
+			{
 				type = new fwd_ref_tp(t_ident2);
-			else {
+			} 
+			else 
+			{
 				warning(t_ident2, "unknown type '%s'", t_ident2->in_text);
 				// tp_last because we do not know its type yet
 				//TODO understand better whether it is good solution. it creates new tpexpr node for each TBytes unknown type
@@ -5990,7 +6203,6 @@ void guid_node::translate(int)
 {
 }
 
-
 interface_tpd_node::interface_tpd_node(token* t_interface, token* t_lbr, token* t_superinterface, token* t_rbr,
 decl_node* guid, decl_node* components, token* t_end) : tpd_node(tpd_object) //TODO shall we introduce tpd_interface tag here?
 {
@@ -6074,7 +6286,8 @@ void object_tpd_node::attrib(int)
 	} else {
 		type = new object_tp(this);
     }
-    b_ring::push((object_tp*)type);
+    
+	b_ring::push((object_tp*)type);
     for (decl_node* dcl = parts; dcl != NULL; dcl = dcl->next) {
 		dcl->attrib(ctx_object);
     }
@@ -6329,11 +6542,15 @@ void prop_type_def_node::translate(int ctx)
 {
 	tpd->translate(ctx);
 
-	//TODO check this because for example string is not considered as simple type
+	//TODO check this because string may be not considered as simple type
 	if (tpd->tag == tpd_node::tpd_simple) // need to be BEFORE any ->disable() call
 	{
-		auto stpd = (simple_tpd_node*)tpd;
-		val_type = dprintf("%s%s%s", stpd->t_ident1 ? stpd->t_ident1->out_text : "", stpd->t_dot ? stpd->t_dot->out_text : "", stpd->t_ident2->out_text);
+		auto stpd = dynamic_cast<simple_tpd_node*>(tpd);
+		assert(stpd);
+		if(tpd->type->tag == tp_object) // Object types need to be passed by pointers
+			val_type = dprintf("%s%s%s*", stpd->t_ident1 ? stpd->t_ident1->out_text : "", stpd->t_dot ? stpd->t_dot->out_text : "", stpd->t_ident2->out_text);
+		else
+			val_type = dprintf("%s%s%s", stpd->t_ident1 ? stpd->t_ident1->out_text : "", stpd->t_dot ? stpd->t_dot->out_text : "", stpd->t_ident2->out_text);
 	}
 	else
 	{
@@ -6617,4 +6834,41 @@ void property_decl_part_node::translate(int ctx)
 {
 	for (decl_node* p = props; p != NULL; p = p->next)
 		p->translate(ctx);
+}
+
+asm_line_node::asm_line_node(token_list* t_list, token* comma) 
+{ 
+	CONS2(t_list, comma); 
+}
+
+void asm_line_node::attrib(int)
+{
+}
+void asm_line_node::translate(int)
+{
+}
+
+asm_block_node::asm_block_node(token* t_asm, asm_line_node* lines, token* t_end)
+{
+	CONS3(t_asm, lines, t_end);
+}
+
+void asm_block_node::attrib(int ctx)
+{
+	f_tkn = t_asm;
+	l_tkn = t_end;
+
+	for (decl_node* l = lines; l != NULL; l = l->next)
+		l->attrib(ctx);
+
+}
+void asm_block_node::translate(int ctx)
+{
+	t_asm->set_trans("{");
+	t_end->set_trans("}");
+	t_asm->append("__asm {\n")->set_pos(t_asm);
+	t_end->prepend("}\n")->set_pos(t_end);
+
+	for (decl_node* l = lines; l != NULL; l = l->next)
+		l->translate(ctx);
 }
