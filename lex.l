@@ -65,7 +65,7 @@ void scanner_input(char *file)
 
 // Hints for macro functionality (inherited from rtl2c)
 static nm_entry *nm = NULL;	       // Token name
-static char *text   = NULL;            // Token text if != NULL
+static char *text   = NULL;        // Token text if != NULL
 
 static int include_level;
 
@@ -87,9 +87,8 @@ static use_ctx* use_chain;
 
 // Token generator function
 
-int tkn (int tag) {
-   curr_token = new token(text ? text : mystrdup(yytext),
-			  tag, line, pos, nm);
+static int tkn (int tag) {
+   curr_token = new token(text ? text : mystrdup(yytext), tag, line, pos, nm);
    nm = NULL; text = NULL;
    for (char *c = yytext; *c != 0; c++) {
        if (*c == '\n') { line++; pos = 0; }
