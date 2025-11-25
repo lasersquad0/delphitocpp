@@ -12,11 +12,12 @@ class tpexpr;
 // Element of binding contour: variable, type or label
 class symbol : public heap_object {
   public:
-    symbol	*next;
+    symbol	    *next;
     nm_entry 	*in_name;
     nm_entry    *out_name;        
     char        *path;     // path to component in structure    
-    b_ring	*ring;
+    b_ring	    *ring;
+
     enum {
       s_var,    // variable
       s_ref,    // reference 
@@ -41,9 +42,9 @@ class symbol : public heap_object {
     };
     int	        flags;
     int         value;  
-    tpexpr	*type;
+    tpexpr	    *type;
 
-    void translate(token* t);
+    void translate(token* t) const;
 };
 
 // Binding contour

@@ -18,7 +18,7 @@ b_ring *b_ring::top_b_ring = &b_ring::global_b_ring;
 
 rename_item* rename_item::list;
 
-void symbol::translate(token* t)
+void symbol::translate(token* t) const
 {
     if( path != NULL)
 	    t->set_trans(dprintf("%s%s", path, out_name->text)); 
