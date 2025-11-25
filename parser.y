@@ -61,7 +61,9 @@ void zzerror(const char* text)
     selector_node        *n_sel; 
     variant_node         *n_vari;
     compound_node        *n_comp;
-   
+
+    asm_line_node        *n_asm;       
+    asm_block_node       *n_basm;       
     import_list_node     *n_imp; 
 }
 
@@ -70,6 +72,7 @@ void zzerror(const char* text)
 
 %token <tok> ABSTRACT
              ARRAY
+             ASM
              BEGIN
              CASE
              CDECL
@@ -87,7 +90,6 @@ void zzerror(const char* text)
              FINAL
 	     FINALIZATION
              FINALLY
- //            FFALSE
              FAR
              FOR
              FORWARD
@@ -128,7 +130,7 @@ void zzerror(const char* text)
              REINTRODUCE
              REPEAT
 	     RESOURCESTRING
-             RETURN
+    //         RETURN
              SAFECALL
              SET
              SCONST
@@ -139,7 +141,6 @@ void zzerror(const char* text)
              STRING
              THEN
              TO
-//             TTRUE
              TRY
              TYPE
              UNTIL
@@ -165,11 +166,11 @@ void zzerror(const char* text)
              SCOPE
 
 
-%right <tok>  LET LETADD LETSUB LETDIV LETMUL LETAND LETOR LETSHL LETSHR
-%left  <tok>  EQ NE LT LE GT GE IN
-%left  <tok>  PLUS MINUS OR XOR BINOR
-%left  <tok>  MOD DIV DIVR MUL AND SHR SHL BINAND
-%right <tok>  UPLUS UMINUS NOT ADDRESS BINNOT
+%right <tok>    LET LETADD LETSUB LETDIV LETMUL LETAND LETOR LETSHL LETSHR
+%left  <tok>    EQ NE LT LE GT GE IN IS
+%left  <tok>    PLUS MINUS OR XOR BINOR
+%left  <tok>    MOD DIV DIVR MUL AND SHR SHL BINAND AS
+%right <tok>    UPLUS UMINUS NOT ADDRESS BINNOT
 
 %type <toks>    ident_list
 %type <toks>    label_list
@@ -184,6 +185,8 @@ void zzerror(const char* text)
 %type <tok>     class_access_spec_tok
 %type <tok>     record_access_spec_tok
 %type <tok>     const
+%type <tok>     ident_ext
+
 
 %type <n_imp>   prog_param_list
 
@@ -197,7 +200,6 @@ void zzerror(const char* text)
 %type <n_block> block
 %type <n_stmt>  statement
 %type <n_stmt>  sequence
-%type <n_stmt>  inherited
 %type <n_stmt>  try_finally
 %type <n_stmt>  try_except
 %type <n_stmt>  except
@@ -205,7 +207,6 @@ void zzerror(const char* text)
 %type <n_grp>   actual_params
 
 %type <n_comp>  compoundst
-
 %type <n_wrls>  write_params
 %type <n_wrtp>  write_list
 %type <n_wrtp>  write_param
@@ -220,6 +221,8 @@ void zzerror(const char* text)
 %type <n_expr>  act_param
 %type <n_expr>  case_elem
 %type <n_expr>  case_elem_list
+%type <n_expr>  inherited
+
 %type <n_grp>   expr_group
 
 %type <n_field> field_init_list
@@ -328,6 +331,12 @@ void zzerror(const char* text)
 %type <n_sel>   selector
 %type <n_vari>  variant_list
 %type <n_vari>  variant
+
+%type <tok>    asm_kwd
+%type <toks>   asm_ident_list
+%type <n_asm>  asm_line
+%type <n_asm>  asm_text
+%type <n_basm> assemblerst
 
 %precedence THEN
 %precedence ELSE
@@ -454,11 +463,17 @@ unit_def_list: decl_part_list
 prog_param_list: { $$ = NULL; } 
     | '(' ident_list ')' { $$ = new import_list_node($1, $2, $3); }
 
-ident_list: IDENT ',' ident_list { $$ = new token_list($1, $3); }
-    | IDENT { $$ = new token_list($1); }
+// read, write, index are reserved keywords in Delphi. However they can be used as variable and function names in source code.
+// ident_ext non-terminal is an implementation for that.
+ident_ext: IDENT | READ | WRITE | INDEX
+
+ident_list: ident_ext ',' ident_list { $$ = new token_list($1, $3); }
+    | ident_ext { $$ = new token_list($1); }
 
 block: decl_part_list compoundst 
         { $$ = new block_node($1, $2); }
+    | assemblerst 
+        { $$ = new block_node($1); }
 
 decl_part_list: { $$ = NULL; } 
     | decl_part decl_part_list { $1->next = $2; $$ = $1; }
@@ -543,7 +558,7 @@ statement: { $$ = new empty_node(curr_token->prev_relevant()); }
     | IF expr THEN statement { $$ = new if_node($1, $2, $3, $4); } 
     | IF expr THEN statement ELSE statement 
         { $$ = new if_node($1, $2, $3, $4, $5, $6); }
-    | FOR IDENT LET expr TO expr DO statement 
+    | FOR ident_ext LET expr TO expr DO statement 
         { $$ = new for_node($1, $2, $3, $4, $5, $6, $7, $8); }
     | WHILE expr DO statement { $$ = new while_node($1, $2, $3, $4); }
     | REPEAT sequence UNTIL expr { $$ = new repeat_node($1, $2, $3, $4); }
@@ -551,16 +566,30 @@ statement: { $$ = new empty_node(curr_token->prev_relevant()); }
     | READ actual_params { $$ = new read_node($1, $2); }
     | RAISE expr { $$ = new raise_node($1, $2); }
     | primary { $$ = new pcall_node($1); } 
-    | RETURN { $$ = new return_node($1); }
+ //   | RETURN { $$ = new return_node($1); }
     | WITH expr_list DO statement { $$ = new with_node($1, $2, $3, $4); }
     | ICONST ':' statement { $$ = new label_node($1, $2, $3); }
     | IDENT ':' statement { $$ = new label_node($1, $2, $3); }
     | compoundst { $$ = $1; }
     | try_finally
     | try_except
-    | inherited
 
 compoundst: BEGIN sequence END { $$ = new compound_node($1, $2, $3); }
+
+assemblerst: ASM asm_text END { $$ = new asm_block_node($1, $2, $3); }
+
+// this "stub" for pascal assembler functions, no real assembler parsing yet.
+asm_kwd: IDENT | XOR | ICONST | '@' | ':' | '[' | ']' | '(' | ')' | PLUS | MINUS
+
+asm_ident_list: asm_kwd { $$ = new token_list($1); }
+    | asm_kwd asm_ident_list { $$ = new token_list($1, $2); }
+
+asm_line: asm_ident_list   { $$ = new asm_line_node($1, NULL); }
+    | asm_ident_list ',' { $$ = new asm_line_node($1, $2); }
+    //| IDENT IDENT ',' IDENT { $$ = new asm_line_node($1, $2, $3, $4); }
+
+asm_text: asm_line
+    | asm_text asm_line
 
 sequence: statement | statement ';' sequence { $1->next = $3; $$ = $1; }
 
@@ -652,6 +681,8 @@ expr: simple_expr
    | expr EQ expr { $$ = new op_node(tn_eq, $1, $2, $3); } 
    | expr NE expr { $$ = new op_node(tn_ne, $1, $2, $3); } 
    | expr IN expr { $$ = new op_node(tn_in, $1, $2, $3); } 
+   | expr IS expr { $$ = new op_node(tn_is, $1, $2, $3); } 
+   | expr AS expr { $$ = new op_node(tn_as, $1, $2, $3); } 
 
 simple_expr: primary
    | PLUS simple_expr %prec UPLUS {
@@ -668,9 +699,10 @@ simple_expr: primary
 primary: constant 
    | '(' expr_list ')' { $$ = new expr_group_node($1, $2, $3); }
    | primary '(' act_param_list ')' { $$ = new fcall_node($1, $2, $3, $4); }
-   | primary '.' IDENT { $$ = new access_expr_node($1, $2, $3); }
+   | primary '.' ident_ext { $$ = new access_expr_node($1, $2, $3); }
    | primary '^' { $$ = new deref_expr_node($1, $2); }
    | primary '[' expr_list ']' { $$ = new idx_expr_node($1, $2, $3, $4); }
+   | inherited
 //   | LOOPHOLE '(' type ',' expr ')' { $$ = new loophole_node($1, $2, $3, $4, $5, $6); }
 
 constant: record_constant
@@ -679,6 +711,7 @@ constant: record_constant
         | SCONST { $$ = new string_node($1); }
         | '[' set_elem_list ']' { $$ = new set_node($1, $2, $3); }
         | IDENT { $$ = new atom_expr_node($1); }
+        | INDEX { $$ = new atom_expr_node($1); }
 
 set_elem_list: { $$ = NULL; } 
              | set_elem 
@@ -695,9 +728,7 @@ act_param_list: act_param
 act_param: expr | { $$ = new skipped_node(curr_token->prev_relevant()); }
 
 
-record_constant: '(' field_init_list ')' { 
-    $$ = new record_constant_node($1, $2, $3); 
-}
+record_constant: '(' field_init_list ')' { $$ = new record_constant_node($1, $2, $3); }
 
 field_init_list: field_init_item { $$ = $1; }
     | field_init_item ';' field_init_list { $1->next = $3; $$ = $1; }
@@ -819,6 +850,28 @@ proc_fwd_decl:
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION IDENT formal_params ':' type ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
+    | PROCEDURE READ formal_params ';' qualifiers ';' 
+        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
+    | FUNCTION READ formal_params ':' type ';' qualifiers ';' 
+        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
+    | PROCEDURE INDEX formal_params ';' qualifiers ';' 
+        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
+    | FUNCTION INDEX formal_params ':' type ';' qualifiers ';' 
+        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
+
+proc_spec: 
+      PROCEDURE IDENT formal_params ';'
+        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
+    | FUNCTION IDENT formal_params ':' type ';'
+        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
+    | PROCEDURE READ formal_params ';'
+        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
+    | FUNCTION READ formal_params ':' type ';'
+        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
+    | PROCEDURE INDEX formal_params ';'
+        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
+    | FUNCTION INDEX formal_params ':' type ';'
+        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
 
 
 property_decl: PROPERTY IDENT prop_array prop_type_def prop_index prop_read prop_write prop_stored prop_default ';' prop_default_directive
@@ -831,7 +884,7 @@ prop_array: { $$ = NULL; }
     | '[' prop_param_list ']'
        { $$ = new prop_array_node($1, $2, $3); }
 prop_index: { $$ = NULL; } 
-    | IDENT constant     //TODO we may need expr type here instead of 'constant' to be able to handle 'property ... index IND+3 ...' statements 
+    | INDEX constant     //TODO we may need expr type here instead of 'constant' to be able to handle 'property ... index IND+3 ...' statements 
        { $$ = new prop_index_node($1, $2); }
 prop_type_def: { $$ = NULL; }
     | ':' type 
@@ -858,24 +911,18 @@ prop_param_list: prop_param_decl
 prop_param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3); }
 
 
-proc_spec: 
-      PROCEDURE IDENT formal_params ';'
-        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
-    | FUNCTION IDENT formal_params ':' type ';'
-        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
-
 proc_def: 
       PROCEDURE IDENT formal_params ';' block ';' 
                { $$ = new proc_def_node(NULL, $1, NULL, NULL, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION IDENT formal_params ':' type ';' block ';' 
                { $$ = new proc_def_node(NULL, $1, NULL, NULL, $2, $3, $4, $5, $6, $7, $8); } 
-    | PROCEDURE IDENT '.' IDENT formal_params ';' block ';' 
+    | PROCEDURE IDENT '.' ident_ext formal_params ';' block ';' 
                { $$ = new proc_def_node(NULL, $1, $2, $3, $4, $5, NULL, NULL, $6, $7, $8); } 
-    | FUNCTION IDENT '.' IDENT formal_params ':' type ';' block ';' 
+    | FUNCTION IDENT '.' ident_ext formal_params ':' type ';' block ';' 
                { $$ = new proc_def_node(NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10); } 
-    | CLASS PROCEDURE IDENT '.' IDENT formal_params ';' block ';' 
+    | CLASS PROCEDURE IDENT '.' ident_ext formal_params ';' block ';' 
                { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, NULL, NULL, $7, $8, $9); } 
-    | CLASS FUNCTION IDENT '.' IDENT formal_params ':' type ';' block ';' 
+    | CLASS FUNCTION IDENT '.' ident_ext formal_params ':' type ';' block ';' 
                { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); } 
  
   //  | FUNCTION IDENT ';' block ';' 
@@ -937,7 +984,7 @@ fptr_type: FUNCTION formal_params ':' type
 string_type: STRING '[' expr ']' { $$ = new varying_tpd_node($1, $2, $3, $4); }
 
 simple_type: IDENT { $$ = new simple_tpd_node(NULL, NULL, $1); }
-    | IDENT '.' IDENT { $$ = new simple_tpd_node($1, $2, $3); }  
+    | IDENT '.' ident_ext { $$ = new simple_tpd_node($1, $2, $3); }  
     | STRING { $$ = new string_tpd_node($1); }
 
 array_type: packed ARRAY '[' indices ']' OF type 
@@ -1165,8 +1212,8 @@ variant: expr_list ':' '(' field_list ')'
 %%
 
 int zzlex() { 
-    curr_token = curr_token ? curr_token->next_relevant() 
-	                    : token::first_relevant(); 
+    curr_token = curr_token ? curr_token->next_relevant() : token::first_relevant(); 
+    
     if (curr_token->tag == TKN_SCONST) { 
         while (curr_token->next != NULL && curr_token->next->tag == TKN_SCONST)
         {
@@ -1181,6 +1228,7 @@ int zzlex() {
 	curr_token->in_text = curr_token->out_text = "untyped_file";
 	curr_token->name = nm_entry::find("untyped_file");
     }
+
     zzlval.tok = curr_token;
     return zzcnv_table[curr_token->tag];
 }
