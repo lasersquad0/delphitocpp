@@ -163,13 +163,20 @@ class unit_node : public node {
     virtual void translate(int ctx);
 };
 
+class asm_block_node;
 
-class block_node : public node { 
+class block_node : public node {
+  protected:
+    compound_node* body;
+    asm_block_node* asm_body;
   public:
-    decl_node*             decls;         
-    compound_node*         body;
-
+    decl_node*        decls;         
+ 
+    block_node(asm_block_node* asm_body);
     block_node(decl_node* decls, compound_node* body);
+
+    token* body_begin_tkn();
+    token* body_end_tkn();
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -206,7 +213,8 @@ class stmt_node : public node {
     stmt_node*   next;
     stmt_node() : next(NULL) {}
 
-    virtual bool is_compound();
+    virtual bool is_compound() { return false; }
+
     virtual stmt_node* find_last() { 
         stmt_node* last; 
         for (last = this; last->next != NULL; last = last->next); 
@@ -253,6 +261,7 @@ class pcall_node : public stmt_node {
     virtual void translate(int ctx);
 };
 
+
 class read_node : public stmt_node { 
   public:
     token*           t_read; 
@@ -263,6 +272,7 @@ class read_node : public stmt_node {
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
+
 
 class write_list_node;
 
@@ -288,7 +298,7 @@ class compound_node : public stmt_node {
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
-    virtual bool is_compound(); 
+    virtual bool is_compound() { return true; }
     void print_debug() override { fprintf(stderr, "compound:"); body->print_debug(); };
 };
 
@@ -347,21 +357,6 @@ public:
     void attrib(int ctx) override;
     void translate(int ctx) override;
     void print_debug() override { fprintf(stderr, "on-except:"); body->print_debug(); };
-};
-
-class inherited_node : public stmt_node {
-public:
-    token*     t_inherited;
-    token*     t_ident;
-    token*     t_lpar;
-    token*     t_rpar;
-    expr_node* params;
-
-    inherited_node(token* t_inherited, token* t_ident, token* t_lpar, expr_node* params, token* t_rpar);
-
-    void attrib(int ctx) override;
-    void translate(int ctx) override;
-    void print_debug() override { fprintf(stderr, "inherited:%s", t_ident? t_ident->in_text: "<no name>"); };
 };
 
 
@@ -575,7 +570,9 @@ enum expr_tag {
     tn_wrp,         // 50 write parameter
     tn_retarr,      // result of function is assigned to array
     tn_case_range,  // case items range
-    tn_record_const // record constant
+    tn_record_const,// record constant
+    tn_is,          // is operator 
+    tn_as           // as operator
 };
 
 class expr_node : public node {
@@ -787,6 +784,8 @@ class fcall_node : public expr_node {
 
     fcall_node(expr_node* fptr, token* lpar, expr_node* args, token* rpar);
 
+    //void translate_read(int ctx, bool newl);
+
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
@@ -887,6 +886,22 @@ class write_list_node : public node {
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
+
+class inherited_node : public expr_node {
+public:
+    token* t_inherited;
+    token* t_ident;
+    token* t_lpar;
+    token* t_rpar;
+    expr_node* params;
+
+    inherited_node(token* t_inherited, token* t_ident, token* t_lpar, expr_node* params, token* t_rpar);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+    void print_debug() override { fprintf(stderr, "inherited:%s", t_ident ? t_ident->in_text : "<no name>"); };
+};
+
 
 
 //=============================================================================
@@ -1281,6 +1296,7 @@ class simple_tpd_node: public tpd_node {
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
+
     void print_debug() override 
     { 
         if(t_ident1) 
@@ -1423,9 +1439,9 @@ class array_tpd_node: public tpd_node {
 class varying_tpd_node: public tpd_node {
   public:
     token*      t_string;	   // 'String'
-    token*      t_lbr;             // '['
-    expr_node*  size; 	           // size of string
-    token*      t_rbr;             // ']'
+    token*      t_lbr;         // '['
+    expr_node*  size; 	       // size of string
+    token*      t_rbr;         // ']'
 
     varying_tpd_node(token *t_string, token* t_lbr, expr_node *size, 
 		     token* t_rbr);
@@ -1793,6 +1809,29 @@ public:
     decl_node* props; // actually this is property_node
 
     property_decl_part_node(decl_node* props) { this->props = props; };
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class asm_line_node : public decl_node {
+public:
+    token_list* t_list;
+    token* comma;
+ 
+    asm_line_node(token_list* t_list, token* comma);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class asm_block_node : public decl_node {
+public:
+    token* t_asm;
+    asm_line_node* lines;
+    token* t_end;
+
+    asm_block_node(token* t_asm, asm_line_node* lines, token* t_end);
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
