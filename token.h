@@ -28,9 +28,9 @@ enum category {
     CAT_STR,
     CAT_NUM,
     CAT_KWD,
-    CAT_WSPC, // white space?
+    CAT_WSPC, // white space and \n
     CAT_PUT,
-    CAT_SPEC,  
+    CAT_SPEC, // special?
     CAT_GEN
 };
 
@@ -42,41 +42,7 @@ class token : public heap_object {
     static token  dummy;	// Begin of MAIN token list
 
     static int   const token_cat[];
-    static char* const token_name[]; 
-
-    static char* resolve_name_conflict(char* str);
-
-    token(int v_cat, int v_tag) 
-    { 
-	    next = prev = this;
-	    cat = (unsigned char)v_cat;
-	    tag = (unsigned short)v_tag;
-	    fname = NULL;
-	    clone = bind = NULL;
-        
-        line = 0;
-        attr = 0;
-        pos = 0;
-        name = NULL;
-        out_text = in_text = NULL;
-    }
-
-    token(char const* v_text, int v_tag = TKN_GEN, int v_line = 0, int v_pos = 0, nm_entry *nm = NULL) 
-    { 
-        line = v_line;
-	    attr = 0;
-        pos = (unsigned short)v_pos;
-        tag = (unsigned short)v_tag;
-	    cat = (unsigned char)token_cat[v_tag]; //TODO shall we change stored type in token_cat?
-        out_text = in_text = (char*)v_text; 
-        fname = NULL;
-        name = nm;
-	    clone = bind = NULL;
-
-        next = prev = NULL;
-    }	    
-
-    token(token& t); 	    
+    static char* const token_name[];     
 
     enum token_attributes { 
 	    fix_pos = 1, 
@@ -90,23 +56,29 @@ class token : public heap_object {
     unsigned int   line;    // short line;	// Line number where token was found 
 
     nm_entry*   name;       // Corresponded name entry (!=NULL for ID)
-
     char*       in_text;    // Input text representation of token
     char*       out_text;	// Output text representation of token
-
     char*       fname;      // Token file name
  
     token*      bind;       // token position of which is taken 	    
     token*      clone;      // cloned token 
     
+    static char* resolve_name_conflict(char* str);
+
+    token(int v_cat, int v_tag);
+    token(char const* v_text, int v_tag = TKN_GEN, int v_line = 0, int v_pos = 0, nm_entry* nm = NULL);
+    token(token& t);
+
     token* insert_b(token* t) { // insert token this before t (returns this)
         next = t; prev = t->prev;   
         return t->prev = t->prev->next = this;
     }
+
     token* insert_a(token* t) { // insert token this after t (returns this)
         prev = t; next = t->next;
         return t->next = t->next->prev = this;
     }
+
     void   remove();            // remove token from DL-ring
     static void remove(token* head, token* tail); 
     static void disable(token* head, token* tail); 
@@ -137,8 +109,8 @@ class token : public heap_object {
     token* move_region(token* head, token* tail); // move region (together with comments and white spaces)
     static void swap(token* left_head, token* left_tail, token* right_head, token* right_tail); 
 
-    token* next_relevant();
-    token* prev_relevant();
+    token* next_relevant() const;
+    token* prev_relevant() const;
     static token* first_relevant();
     static token* last_relevant();
 

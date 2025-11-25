@@ -18,6 +18,36 @@ int const token::token_cat[] = {
 #include "token.dpp"
 };
 
+token::token(int v_cat, int v_tag)
+{
+    next = prev = this;
+    cat = (unsigned char)v_cat;
+    tag = (unsigned short)v_tag;
+    fname = NULL;
+    clone = bind = NULL;
+
+    line = 0;
+    attr = 0;
+    pos = 0;
+    name = NULL;
+    out_text = in_text = NULL;
+}
+
+token::token(char const* v_text, int v_tag, int v_line, int v_pos, nm_entry* nm)
+{
+    line = v_line;
+    attr = 0;
+    pos = (unsigned short)v_pos;
+    tag = (unsigned short)v_tag;
+    cat = (unsigned char)token_cat[v_tag]; //TODO shall we change stored type in token_cat?
+    out_text = in_text = (char*)v_text;
+    fname = NULL;
+    name = nm;
+    clone = bind = NULL;
+
+    next = prev = NULL;
+}
+
 token::token(token& t) 
 { 
     *this = t;
@@ -28,19 +58,19 @@ token::token(token& t)
 
 void token::remove() 
 {
-    prev ->next = next;  
+    prev->next = next;  
     next->prev = prev;
 }
 
 // looks for next non-space token (token where cat != CAT_WSPC) 
-token* token::next_relevant() 
+token* token::next_relevant() const 
 {
     token* t; 
     for (t = next; t->cat == CAT_WSPC; t = t->next); 
     return t;
 }
 
-token* token::prev_relevant() 
+token* token::prev_relevant() const
 {
     token* t; 
     for (t = prev; t->cat == CAT_WSPC; t = t->prev); 
@@ -133,10 +163,11 @@ token* token::move(token* head, token* tail)
     return head;
 } 
 
+// if region has space tokens (CAT_WSPC) on the left and on the right then move those spaces together with region.
 token* token::move_region(token* head, token* tail)
 {
     while (head->prev->cat == CAT_WSPC) { 
-	head = head->prev; 
+	    head = head->prev; 
     }
     while (tail->next->cat == CAT_WSPC && tail->next->tag != TKN_LN) {  
         tail = tail->next;
@@ -150,7 +181,7 @@ token* token::move_region(token* head, token* tail)
 void token::input(char *file) 
 {
     scanner_input(file); 
-    while (yylex() > 0) curr_token->insert_b (&dummy);
+    while (yylex() > 0) curr_token->insert_b(&dummy);
     curr_token = NULL; 
 }
 
@@ -158,9 +189,9 @@ void token::input(char *file)
 output_context::output_context(char* file)
 { 
     f = fopen(file, "w"); 
-    if (f == NULL) { 
-	fprintf(stderr, "Can't open output source file: %s\n", file); 
-	exit(1); 
+    if (f == NULL) {
+        fprintf(stderr, "Can't open output source file: %s\n", file);
+        exit(1);
     }
     pos = line = 0; 
     prev_tag = TKN_LN; 
@@ -182,32 +213,32 @@ void output_context::output(token* t)
         return;
     } else if (t->tag == TKN_END_SHIFT) { 
         shift = 0;
-	return;
+	    return;
     }
     t_pos = t->bind ? t->bind->pos : t->pos + shift;
 
     if (t->out_text == NULL || (t->tag == TKN_SPACE && prev_tag == TKN_LN)) { 
-	return; 
+	    return; 
     }
-    if (t_pos > pos && t->tag != TKN_LN && 
-	((t->attr & token::fix_pos) || t->tag == TKN_CMNT || 
-	 prev_tag == TKN_LN)) 
-    { 
-	//
-	// Set token to specified position
-	//
-	while (pos < t_pos) { 
-	    pos += 1; 
-	    putc(' ', f);
-	} 
-    }	
+    if (t_pos > pos && t->tag != TKN_LN &&
+        ((t->attr & token::fix_pos) || t->tag == TKN_CMNT ||
+            prev_tag == TKN_LN))
+    {
+        //
+        // Set token to specified position
+        //
+        while (pos < t_pos) {
+            pos += 1;
+            putc(' ', f);
+        }
+    }
     t->pos = pos;
     //
     // Separate output '>' symbols 
     //
     if (*t->out_text == '>' && prev_tag == TKN_GT) {
-	pos += 1; 
-	putc(' ', f);
+        pos += 1;
+        putc(' ', f);
     }
     // 
     // Ignoring starting (trailing) spaces in generated tokens
@@ -216,14 +247,14 @@ void output_context::output(token* t)
     char* out = t->out_text;
     int len = strlen(out);
 
-    if (t->cat == CAT_GEN) { 
-	if (out[0] == ' ' && (prev_tag == TKN_SPACE || prev_tag == TKN_LN)) { 
-	    out += 1; 
+    if (t->cat == CAT_GEN) {
+        if (out[0] == ' ' && (prev_tag == TKN_SPACE || prev_tag == TKN_LN)) {
+            out += 1;
             len -= 1;
-	}
-	if (out[len-1] == ' ' && t->next->tag == TKN_SPACE) { 
-	    len -= 1;
-        } 
+        }
+        if (out[len - 1] == ' ' && t->next->tag == TKN_SPACE) {
+            len -= 1;
+        }
     }
     //
     // Output text
@@ -299,6 +330,7 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
         interface_module = true;
     }
 
+    assert(t);
     for (; (tag = t->tag) != TKN_DUMMY; t = t->next) {
         switch (tag) {
         case TKN_INTERFACE:
