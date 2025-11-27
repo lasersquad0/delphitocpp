@@ -44,6 +44,32 @@
 * DONE - result := nil правильно транслируетс€ в result = nullptr;
 * DONE - методы, переменные, параметры ф-ций могут иметь следующие зарезервированные названи€: read, write, index 
 *
+* implement below
+* constructor THArrayObjects.Create(parsm:Integer);
+* begin
+*  inherited;
+*  FItemSize := sizeof(TObject);
+* end;
+* 
+* ====>>>>
+* 
+* THArrayObjects::THArrayObjects(int param): THArray(param)
+*{
+*  FItemSize = sizeof(TObject);
+*}
+* 
+* 
+* void THArrayString::delete_(unsigned int num)
+*{
+*    char* pStr;
+*  Get(num, pStr);
+*  StrDispose(pStr);
+*  THArrayPointer::delete_(num()); <==== WHY here num() instead num
+*}
+
+* Formal параметры с Default values плохо транслируютс€, см ';' - func(byte b, int i = 9; string str = 'default')
+
+* могут различатьс€ приоритеты операций Delphi и —++ и это может вли€ть на результат вычислений.
 * implement functions StrLen, StrDispose, StrAlloc
 * реализовать операторы is и as.
 * ≈сли у обьекта есть метод Read и он вызываетс€ в коде то парсер говорит ошибку.
@@ -72,107 +98,47 @@ static void load_predefined()
 { 
 	// all simple built-in types need to be aded to b_ring here
 
-    b_ring::add_cur(nm_entry::add("integer", TKN_IDENT), nm_entry::add("int", TKN_IDENT),
-				  symbol::s_type, 
-				  &integer_type);
-    b_ring::add_cur(nm_entry::add("real", TKN_IDENT), nm_entry::add("double", TKN_IDENT),
-				  symbol::s_type, 
-				  &real_type);
-    b_ring::add_cur(nm_entry::add("boolean", TKN_IDENT), nm_entry::add("bool", TKN_IDENT),
-				  symbol::s_type, 
-				  &bool_type);
-    b_ring::add_cur(nm_entry::add("char", TKN_IDENT),
-				  symbol::s_type, 
-				  &char_type);
-    b_ring::add_cur(nm_entry::add("text", TKN_IDENT), 
-				  symbol::s_type, 
-				  &text_type);
-    b_ring::add_cur(nm_entry::add("zero_terminated_string", TKN_IDENT), nm_entry::add("char *", TKN_IDENT), 
-				  symbol::s_type, 
-				  &string_type);
-    b_ring::add_cur(nm_entry::add("true", TKN_IDENT), 
-				  symbol::s_const, 
-				  &bool_type);
-    b_ring::add_cur(nm_entry::add("false", TKN_IDENT), 
-				  symbol::s_const, 
-				  &bool_type);
-    b_ring::add_cur(nm_entry::add("nil", TKN_IDENT), nm_entry::add("nullptr", TKN_IDENT),
-				  symbol::s_const, 
-				  &any_type);
+    b_ring::add_cur(nm_entry::add("integer", TKN_IDENT), nm_entry::add("int", TKN_IDENT),     symbol::s_type, &integer_type);
+    b_ring::add_cur(nm_entry::add("real",    TKN_IDENT), nm_entry::add("double", TKN_IDENT),  symbol::s_type, &real_type);
+    b_ring::add_cur(nm_entry::add("boolean", TKN_IDENT), nm_entry::add("bool", TKN_IDENT),    symbol::s_type, &bool_type);
+    b_ring::add_cur(nm_entry::add("nil",     TKN_IDENT), nm_entry::add("nullptr", TKN_IDENT), symbol::s_const, &any_type);
+	b_ring::add_cur(nm_entry::add("zero_terminated_string", TKN_IDENT), nm_entry::add("char *", TKN_IDENT), symbol::s_type, &string_type);
 
+	b_ring::add_cur(nm_entry::add("char", TKN_IDENT),  symbol::s_type, &char_type);
+	b_ring::add_cur(nm_entry::add("text", TKN_IDENT),  symbol::s_type, &text_type);
+	b_ring::add_cur(nm_entry::add("true", TKN_IDENT),  symbol::s_const, &bool_type);
+    b_ring::add_cur(nm_entry::add("false", TKN_IDENT), symbol::s_const, &bool_type);
+    
     if (hp_pascal) { 
         nm_entry::add("addr", TKN_ADDR);
     }
 
 	if (turbo_pascal)  // two out_nm entries cannot be equal, b_ring::add_cur will generate unique name from in_nm parameter
 	{
-		b_ring::add_cur(nm_entry::add("cardinal", TKN_IDENT), nm_entry::add("unsigned int", TKN_IDENT),
-			symbol::s_type,
-			&cardinal_type);
-		b_ring::add_cur(nm_entry::add("pointer", TKN_IDENT), nm_entry::add("void*", TKN_IDENT),
-			symbol::s_type,
-			&pointer_type);
-		b_ring::add_cur(nm_entry::add("pchar", TKN_IDENT), nm_entry::add("char*", TKN_IDENT),
-			symbol::s_type,
-			&string_type);
-		b_ring::add_cur(nm_entry::add("shortint", TKN_IDENT), nm_entry::add("signed char", TKN_IDENT),
-			symbol::s_type,
-			&char_type);
-		b_ring::add_cur(nm_entry::add("byte", TKN_IDENT), nm_entry::add("unsigned char", TKN_IDENT),
-			symbol::s_type,
-			&char_type);
-		b_ring::add_cur(nm_entry::add("smallint", TKN_IDENT), nm_entry::add("signed short", TKN_IDENT),
-			symbol::s_type,
-			&smallint_type);
-		b_ring::add_cur(nm_entry::add("word", TKN_IDENT), nm_entry::add("unsigned short", TKN_IDENT),
-			symbol::s_type,
-			&smallint_type);
-		b_ring::add_cur(nm_entry::add("longint", TKN_IDENT), nm_entry::add("signed int", TKN_IDENT),
-			symbol::s_type,
-			&longint_type);
-		b_ring::add_cur(nm_entry::add("longword", TKN_IDENT), nm_entry::add("unsigned int", TKN_IDENT),
-			symbol::s_type,
-			&cardinal_type);
-		b_ring::add_cur(nm_entry::add("uint32", TKN_IDENT), nm_entry::add("uint32_t", TKN_IDENT),
-			symbol::s_type,
-			&cardinal_type);
-		b_ring::add_cur(nm_entry::add("int32", TKN_IDENT), nm_entry::add("int32_t", TKN_IDENT),
-			symbol::s_type,
-			&integer_type);
-		b_ring::add_cur(nm_entry::add("uint64", TKN_IDENT), nm_entry::add("uint64_t", TKN_IDENT),
-			symbol::s_type,
-			&uint64_type);
-		b_ring::add_cur(nm_entry::add("int64", TKN_IDENT), nm_entry::add("int64_t", TKN_IDENT),
-			symbol::s_type,
-			&int64_type);
-		b_ring::add_cur(nm_entry::add("NativeInt", TKN_IDENT), nm_entry::add("int", TKN_IDENT),
-			symbol::s_type,
-			&integer_type);
-		b_ring::add_cur(nm_entry::add("NativeUInt", TKN_IDENT), nm_entry::add("unsigned int", TKN_IDENT),
-			symbol::s_type,
-			&cardinal_type);
-		b_ring::add_cur(nm_entry::add("FixedInt", TKN_IDENT), nm_entry::add("int", TKN_IDENT),
-			symbol::s_type,
-			&integer_type);
-		b_ring::add_cur(nm_entry::add("FixedUInt", TKN_IDENT), nm_entry::add("unsigned int", TKN_IDENT),
-			symbol::s_type,
-			&cardinal_type);
+		b_ring::add_cur(nm_entry::add("cardinal",  TKN_IDENT),  nm_entry::add("unsigned int", TKN_IDENT),   symbol::s_type, &cardinal_type);
+		b_ring::add_cur(nm_entry::add("pointer",   TKN_IDENT),  nm_entry::add("void*", TKN_IDENT),          symbol::s_type, &pointer_type);
+		b_ring::add_cur(nm_entry::add("pchar",     TKN_IDENT),  nm_entry::add("char*", TKN_IDENT),          symbol::s_type, &string_type);
+		b_ring::add_cur(nm_entry::add("shortint",  TKN_IDENT),  nm_entry::add("signed char", TKN_IDENT),    symbol::s_type, &char_type);
+		b_ring::add_cur(nm_entry::add("byte",      TKN_IDENT),  nm_entry::add("unsigned char", TKN_IDENT),  symbol::s_type, &char_type);
+		b_ring::add_cur(nm_entry::add("smallint",  TKN_IDENT),  nm_entry::add("signed short", TKN_IDENT),   symbol::s_type,	&smallint_type);
+		b_ring::add_cur(nm_entry::add("word",      TKN_IDENT),  nm_entry::add("unsigned short", TKN_IDENT), symbol::s_type, &smallint_type);
+		b_ring::add_cur(nm_entry::add("longint",   TKN_IDENT),  nm_entry::add("signed int", TKN_IDENT),     symbol::s_type, &longint_type);
+		b_ring::add_cur(nm_entry::add("longword",  TKN_IDENT),  nm_entry::add("unsigned int", TKN_IDENT),	symbol::s_type,	&cardinal_type);
+		b_ring::add_cur(nm_entry::add("uint32",    TKN_IDENT),  nm_entry::add("uint32_t", TKN_IDENT),       symbol::s_type, &cardinal_type);
+		b_ring::add_cur(nm_entry::add("int32",     TKN_IDENT),  nm_entry::add("int32_t", TKN_IDENT),	    symbol::s_type,	&integer_type);
+		b_ring::add_cur(nm_entry::add("uint64",    TKN_IDENT),  nm_entry::add("uint64_t", TKN_IDENT),       symbol::s_type, &uint64_type);
+		b_ring::add_cur(nm_entry::add("int64",     TKN_IDENT),  nm_entry::add("int64_t", TKN_IDENT),	    symbol::s_type,	&int64_type);
+		b_ring::add_cur(nm_entry::add("nativeint", TKN_IDENT),  nm_entry::add("int", TKN_IDENT),	        symbol::s_type,	&integer_type);
+		b_ring::add_cur(nm_entry::add("NativeUInt",TKN_IDENT),  nm_entry::add("unsigned int", TKN_IDENT),   symbol::s_type, &cardinal_type);
+		b_ring::add_cur(nm_entry::add("FixedInt",  TKN_IDENT),  nm_entry::add("int", TKN_IDENT),            symbol::s_type, &integer_type);
+		b_ring::add_cur(nm_entry::add("FixedUInt", TKN_IDENT),  nm_entry::add("unsigned int", TKN_IDENT),   symbol::s_type, &cardinal_type);
 
-		b_ring::add_cur(nm_entry::add("double", TKN_IDENT),
-			symbol::s_type,
-			&double_type);
-		b_ring::add_cur(nm_entry::add("single", TKN_IDENT), nm_entry::add("float", TKN_IDENT),
-			symbol::s_type,
-			&real_type);
-		b_ring::add_cur(nm_entry::add("extended", TKN_IDENT), nm_entry::add("long double", TKN_IDENT),
-			symbol::s_type,
-			&double_type);
-		b_ring::add_cur(nm_entry::add("currency", TKN_IDENT), nm_entry::add("double", TKN_IDENT),
-			symbol::s_type,
-			&double_type);
-		b_ring::add_cur(nm_entry::add("untyped_file", TKN_IDENT),
-			symbol::s_type,
-			&text_type);
+		b_ring::add_cur(nm_entry::add("single",    TKN_IDENT),  nm_entry::add("float", TKN_IDENT),          symbol::s_type, &real_type);
+		b_ring::add_cur(nm_entry::add("extended",  TKN_IDENT),  nm_entry::add("long double", TKN_IDENT),    symbol::s_type, &double_type);
+		b_ring::add_cur(nm_entry::add("currency",  TKN_IDENT),  nm_entry::add("double", TKN_IDENT),         symbol::s_type, &double_type);
+		b_ring::add_cur(nm_entry::add("double",    TKN_IDENT),  symbol::s_type, &double_type);
+
+		b_ring::add_cur(nm_entry::add("untyped_file", TKN_IDENT), symbol::s_type, &text_type);
 
 		//unit_tp* type = new unit_tp();
 		//b_ring::global_b_ring.add(nm_entry::add("system", TKN_IDENT), symbol::s_var, type);
