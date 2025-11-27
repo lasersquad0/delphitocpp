@@ -777,12 +777,12 @@ public:
 class fcall_node : public expr_node {
   public:
     expr_node       *fptr;
-    token           *lpar;
+    token           *t_lpar;
     expr_node       *args;
-    token           *rpar;
+    token           *t_rpar;
     char            *temp; // temporary variable used for returning array
 
-    fcall_node(expr_node* fptr, token* lpar, expr_node* args, token* rpar);
+    fcall_node(expr_node* fptr, token* t_lpar, expr_node* args, token* t_rpar);
 
     //void translate_read(int ctx, bool newl);
 
@@ -1234,7 +1234,7 @@ class proc_fwd_decl_node : public proc_decl_node {
 class method_decl_node : public decl_node
 {
 public:
-    token* t_class;
+    token* t_class; // for static methods ('class methods')
     proc_decl_node* proc;
 
     method_decl_node(token* t_cls, decl_node* prc) { t_class = t_cls; proc = (proc_decl_node*)prc; }
@@ -1584,8 +1584,7 @@ class object_tpd_node : public tpd_node {
 
     symbol*        super;
     
-    object_tpd_node(token* t_class, token* t_lbr, token_list* t_ancestorlist, token* t_rbr, 
-                    decl_node* parts, token* t_end);  
+    object_tpd_node(token* t_class, token* t_lbr, token_list* t_ancestorlist, token* t_rbr, decl_node* parts, token* t_end);  
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
