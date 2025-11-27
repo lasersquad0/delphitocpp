@@ -451,6 +451,7 @@ public:
     char body[max_size];
     typedef varying_string<MAX_STRING_SIZE> string;
 
+    // index is 1 based in operator[] here
 #define STRING_FETCH_OPERATOR(index_type, modifier) \
     char modifier& operator[](index_type index) modifier { \
 	assert(size_t(index) <= max_size); \
@@ -703,9 +704,7 @@ inline string copy(char const* str, integer p, integer n)
 }
 
 template<size_t max_size>
-inline void insert(string const&             ins, 
-		   varying_string<max_size>& str, 
-		   int                       pos)
+inline void insert(string const& ins, varying_string<max_size>& str, int pos) //pos is 1 based
 { 
     size_t len = str.length();
     size_t inslen = ins.length();
@@ -716,26 +715,42 @@ inline void insert(string const&             ins,
     str.set_length(len + inslen);
 }
 
-inline integer pos(string const& q, string const& z) 
-{ 
+// search q in z starting from start
+inline integer pos(string const& q, string const& z, unsigned start = 1) //start is 1 based
+{
+    assert(start > 0);
     int   q_len = q.length();
     int   z_len = z.length();
     char* q_ptr = q.get_body();
     char* z_ptr = z.get_body();
-    int pos = 0;
-    while (z_len - pos >= q_len) { 
-	int i;
-	for (i = 0; i < q_len && z_ptr[pos+i] == q_ptr[i]; i++);
-	if (i == q_len) { 
-	    return pos+1;
-	}
-	pos += 1;
-    } 
+    int pos = start - 1;
+    while (z_len - pos >= q_len) {
+        int i;
+        for (i = 0; i < q_len && z_ptr[pos + i] == q_ptr[i]; i++);
+        if (i == q_len) {
+            return pos + 1;
+        }
+        pos += 1;
+    }
+    return 0;
+}
+
+// search char c in z starting from start
+inline integer pos(const char c, string const& z, unsigned start = 1) //start is 1 based
+{
+    assert(start > 0);
+    int   z_len = z.length();
+    char* z_ptr = z.get_body();
+    int pos = start - 1;
+    while (pos < z_len) {
+        if (z_len[pos] == c) return pos + 1;
+        pos++;
+    }
     return 0;
 }
 
 template<size_t max_size>
-inline void Delete(varying_string<max_size>& s, integer index, integer count)
+inline void Delete(varying_string<max_size>& s, integer index, integer count) // index is 1 based here
 {
     integer len = s.length();
     assert(index > 0 && count >= 0);
@@ -750,11 +765,11 @@ inline void Delete(varying_string<max_size>& s, integer index, integer count)
 inline void val(string const& str, integer& val, integer& c)
 {
     int x, n;
-    if (sscanf(str.body, "%d%n", &x, &n) == 1) { 
-	val = x;
-	c = (n == str.length()) ? 0 : n+1;
-    } else { 
-	c = 1;
+    if (sscanf(str.body, "%d%n", &x, &n) == 1) {
+        val = x;
+        c = (n == str.length()) ? 0 : n + 1;
+    } else {
+        c = 1;
     }
 }
 
