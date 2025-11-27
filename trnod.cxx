@@ -1795,7 +1795,7 @@ void integer_node::attrib(int)
 
 void integer_node::translate(int)
 {
-    f_tkn = l_tkn = value_tkn;
+    f_tkn = l_tkn = value_tkn; //TODO move to attrib()? for consistency
 
     switch(radix) {
       case 8:
@@ -2856,7 +2856,10 @@ void op_node::translate(int)
 		token::swap(left->f_tkn, left->l_tkn, right->f_tkn, right->l_tkn);
 		token::disable(right->f_tkn->next, left->l_tkn->prev);
 		right->f_tkn->prepend("dynamic_cast<");
-		right->l_tkn->append(">(");
+		if(right->type->tag == tp_object) // object instances are pointers
+			right->l_tkn->append("*>(");
+		else
+			right->l_tkn->append(">(");
 		left->l_tkn->append(")");
 		break;
 	} // switch (tag)
@@ -2874,9 +2877,9 @@ void op_node::translate(int)
 	}
 }
 
-fcall_node::fcall_node(expr_node* fptr, token* lpar, expr_node* args, token* rpar) : expr_node(tn_fcall)
+fcall_node::fcall_node(expr_node* fptr, token* t_lpar, expr_node* args, token* t_rpar) : expr_node(tn_fcall)
 {
-    CONS4(fptr, lpar, args, rpar);
+    CONS4(fptr, t_lpar, args, t_rpar);
 	temp = NULL;
 }
 
@@ -3087,10 +3090,10 @@ void fcall_node::attrib(int ctx)
 			}
 			break;
 
-		case TKN_READ:
-		case TKN_READLN:
-			if (args) args->attrib(ctx_lvalue);
-			break;
+		//case TKN_READ:
+		//case TKN_READLN:
+		//	if (args) args->attrib(ctx_lvalue);
+		//	break;
 
 		//case TKN_EXIT: //TODO заглушка, may be later add some code 
 		   //args->attrib(ctx_value);
@@ -3106,7 +3109,7 @@ void fcall_node::attrib(int ctx)
 			}
 			//nobreak;
 		default:
-			if (args != NULL) { //TODO here we attrib parameters starting from second because first one has already attrib above
+			if (args) { //TODO here we attrib parameters starting from second because first one has already attrib above
 				for (expr_node* expr = args->next; expr != NULL; expr = expr->next)
 				{
 					expr->attrib(ctx_value);
@@ -3155,13 +3158,13 @@ void fcall_node::attrib(int ctx)
 					auto access = (access_expr_node*)fptr;
 					if (access->rec->tag == tn_atom) {
 						auto atom = (atom_expr_node*)(access->rec);
-						warning(lpar, "function '%s.%s' not defined.", atom->tkn->in_text, access->field->in_text);
+						warning(t_lpar, "function '%s.%s' not defined.", atom->tkn->in_text, access->field->in_text);
 					}
 					else
-						warning(lpar, "function not defined.");
+						warning(t_lpar, "function not defined.");
 				}
 				else
-					warning(lpar, "function not defined.");
+					warning(t_lpar, "function not defined.");
 			}
 
 			for (expr_node* e = args; e != NULL; e = e->next) {
@@ -3173,14 +3176,14 @@ void fcall_node::attrib(int ctx)
 
 void fcall_node::translate(int ctx)
 {
-    l_tkn = rpar;
+    l_tkn = t_rpar;
+	f_tkn = ((atom_expr_node*)fptr)->tkn;
 
-    if (fptr->tag == tn_atom && ((atom_expr_node*)fptr)->tkn->tag != TKN_IDENT)
+    if (fptr->tag == tn_atom && f_tkn->tag != TKN_IDENT)
     {
-		// We come here for special Delphi calls only. Which are defined in token.dpp and which have unique TKN_* ID.
+		// Built-in Delphi functions are processed here
+		// We come here for special Delphi function calls only. They are defined in token.dpp and which have unique ID - TKN_* .
 		// Like: New, Dispose, Pred, Succ, Inc, Dec, SetLength, Length, Move, etc. 
-
-		f_tkn = ((atom_expr_node*)fptr)->tkn;
 
       switch(/*((atom_expr_node*)fptr)->tkn*/f_tkn->tag) { //TODO replace by f_tkn->tag?
 	  case TKN_NEW: // procedure New(var P: Pointer);
@@ -3188,15 +3191,15 @@ void fcall_node::translate(int ctx)
 			  args->translate(ctx_value);
 			  args->f_tkn->set_pos(f_tkn);
 			  f_tkn->disable();
-			  lpar->disable();
+			  t_lpar->disable();
 			  if (args->next != NULL) {
-				  token::remove(args->l_tkn->next, rpar->prev);
+				  token::remove(args->l_tkn->next, t_rpar->prev);
 			  }
 			  if (args->type->is_reference()) {
 				  tpexpr* bt = ((ref_tp*)args->type->get_typedef())->base_type;
 				  assert(bt->name != NULL);
 
-				  rpar->set_trans(dprintf(" = (%s*)%s(%s))",
+				  t_rpar->set_trans(dprintf(" = (%s*)%s(%s))",
 					  bt->name,
 					  (bt->get_typedef()->flags & tp_need_init)
 					  ? "calloc(1,sizeof" : "malloc(sizeof",
@@ -3225,45 +3228,45 @@ void fcall_node::translate(int ctx)
 					  }
 					  if (ctx == ctx_rvalue) {
 						  if (args->next != NULL) {
-							  token::remove(lpar, args->next->f_tkn->prev);
+							  token::remove(t_lpar, args->next->f_tkn->prev);
 							  f_tkn->set_trans(dprintf("(new %s)->", cls_name));
-							  rpar->disable();
+							  t_rpar->disable();
 						  } else {
-							  token::remove(lpar, rpar);
+							  token::remove(t_lpar, t_rpar);
 							  l_tkn = f_tkn;
 							  f_tkn->set_trans(dprintf("new %s", cls_name));
 						  }
 					  } else {
 						  args->f_tkn->set_pos(f_tkn);
 						  f_tkn->disable();
-						  lpar->disable();
+						  t_lpar->disable();
 						  if (args->next != NULL) {
 							  token::disable(args->l_tkn->next,
 								  args->next->f_tkn->prev);
 							  args->l_tkn->append(dprintf(" = (new %s)->", cls_name));
-							  rpar->disable();
+							  t_rpar->disable();
 						  } else {
-							  token::disable(args->l_tkn->next, rpar);
+							  token::disable(args->l_tkn->next, t_rpar);
 							  args->l_tkn->append(dprintf(" = new %s", cls_name));
 						  }
 					  }
 				  } else {
-					  lpar->set_trans(" ");
-					  rpar->disable();
+					  t_lpar->set_trans(" ");
+					  t_rpar->disable();
 					  warning(f_tkn, "Unknown type '%s' for operator 'new'\n", args->type->name);
 				  }
 			  } else {
 				  args->f_tkn->set_pos(f_tkn);
 				  f_tkn->disable();
-				  lpar->disable();
+				  t_lpar->disable();
 				  if (args->next != NULL) {
-					  token::remove(args->l_tkn->next, rpar->prev);
+					  token::remove(args->l_tkn->next, t_rpar->prev);
 				  }
-				  rpar->set_trans(" = new ");
+				  t_rpar->set_trans(" = new ");
 				  if (args->type->is_reference()) {
 					  tpexpr* bt = ((ref_tp*)args->type->get_typedef())->base_type;
 					  assert(bt->name != NULL);
-					  l_tkn = rpar->append(bt->name);
+					  l_tkn = t_rpar->append(bt->name);
 				  }
 			  }
 		  }
@@ -3274,8 +3277,8 @@ void fcall_node::translate(int ctx)
 			f_tkn->set_trans("free");
 	    } else {
 			f_tkn->set_trans("delete ");
-			lpar->disable();
-			rpar->disable();
+			t_lpar->disable();
+			t_rpar->disable();
 			if (turbo_pascal) {
 				if (args->next) {
 					args->next->translate(ctx_value);
@@ -3288,18 +3291,18 @@ void fcall_node::translate(int ctx)
 	  case TKN_REF:
 	    args->translate(ctx_lvalue);
 	    f_tkn->set_trans("&");
-	    lpar->disable();
-	    rpar->disable();
+	    t_lpar->disable();
+	    t_rpar->disable();
 	    break;
 	  case TKN_PRED:
 	  case TKN_SUCC:
 	    assert(args->type->name != NULL);
 	    args->translate(ctx_rvalue);
-	    lpar->append(dprintf("%s,", args->type->name));
+	    t_lpar->append(dprintf("%s,", args->type->name));
 	    break;
 	  case TKN_INC:
 	    args->translate(ctx_lvalue);
-	    token::disable(f_tkn, lpar);
+	    token::disable(f_tkn, t_lpar);
 	    args->f_tkn->set_pos(f_tkn);
 	    if (args->next) {
 			args->next->translate(ctx_rvalue);
@@ -3309,12 +3312,12 @@ void fcall_node::translate(int ctx)
 	    } else {
 			args->l_tkn->append(" += 1");
 	    }
-	    rpar->disable();
+	    t_rpar->disable();
 	    break;
 	  case TKN_DEC:
 	    args->translate(ctx_lvalue);
 	    args->f_tkn->set_pos(f_tkn);
-	    token::disable(f_tkn, lpar);
+	    token::disable(f_tkn, t_lpar);
 	    if (args->next) {
 			args->next->translate(ctx_rvalue);
 			token::disable(args->l_tkn->next, args->next->f_tkn->prev);
@@ -3323,7 +3326,7 @@ void fcall_node::translate(int ctx)
 	    } else {
 			args->l_tkn->append(" -= 1");
 	    }
-	    rpar->disable();
+	    t_rpar->disable();
 	    break;
 	  case TKN_EXIT:
 		if (curr_proc && curr_proc->res_type) { // this is function call so we need result type
@@ -3334,8 +3337,8 @@ void fcall_node::translate(int ctx)
 
 				args->translate(ctx_value);
 				f_tkn->set_trans("return ");
-				lpar->disable();
-				rpar->disable();
+				t_lpar->disable();
+				t_rpar->disable();
 			}
 			else
 			{ 
@@ -3353,7 +3356,7 @@ void fcall_node::translate(int ctx)
 		  args->translate(ctx_lvalue);
 		  assert(args->next != NULL && args->next->next == NULL); // SetLength must have two arguments
 		  args->f_tkn->set_pos(f_tkn);
-		  token::disable(f_tkn, lpar);
+		  token::disable(f_tkn, t_lpar);
 		  //TODO improve this function to work with dynamic arrays
 		 // assert(args->type->tag == tp_varying_string);
 		  token* t_len = args->l_tkn->next_relevant()->next_relevant(); // look for second argument token
@@ -3371,7 +3374,7 @@ void fcall_node::translate(int ctx)
 			  args->translate(ctx_lvalue);
 			  assert(args->next == NULL); // Length must have one argument
 			  args->f_tkn->set_pos(f_tkn);
-			  token::disable(f_tkn, lpar);
+			  token::disable(f_tkn, t_lpar);
 			  if (args->type->tag == tp_array) args->l_tkn->append(".size(");
 			  if (args->type->tag == tp_varying_string) args->l_tkn->append(".length(");
 		  }
@@ -3391,10 +3394,11 @@ void fcall_node::translate(int ctx)
 
 		  args->f_tkn->prepend("&(");
 		  args->l_tkn->append(")");
+
+		  args->next->translate(ctx_rvalue);
 		  args->next->f_tkn->prepend("&(");
 		  args->next->l_tkn->append(")");
 
-		  args->next->translate(ctx_rvalue);
 		  args->next->next->translate(ctx_rvalue);
 		  break;
 
@@ -3420,21 +3424,20 @@ void fcall_node::translate(int ctx)
 
     }
 
+	// we come here for usual function calls and for Delphi style type casting e.g. TType(expr)
 normal_call:
     fptr->translate(ctx_apply);
     f_tkn = fptr->f_tkn;
-    l_tkn = rpar;
+    l_tkn = t_rpar;
 
-	if (fptr->type && fptr->type->tag == tp_proc) {
+	if (fptr->type && fptr->type->tag == tp_proc) { // usual prodecure call
 		proc_tp* prc = (proc_tp*)fptr->type->get_typedef();
 		param_spec* p = prc->params;
 		tpexpr* prev_param_type = NULL;
 
 		for (expr_node* e = args; e != NULL; e = e->next) {
 			if (p != NULL) {
-				e->translate(p->var->type->tag == tp_proc ? ctx_procptr
-					: (language_c && p->var->tag == symbol::s_ref)
-					? ctx_access : ctx_value);
+				e->translate(p->var->type->tag == tp_proc ? ctx_procptr : (language_c && p->var->tag == symbol::s_ref) ? ctx_access : ctx_value);
 				if (p->var->type->is_array() && e->type != NULL && e->type->tag == tp_char) {
 					if (e->tag == tn_char) {
 						char* s = ((string_node*)e)->value_tkn->out_text;
@@ -3513,22 +3516,22 @@ normal_call:
 		if (language_c) {
 			// push default values of skipped parameters
 			while (p != NULL) {
-				rpar->prepend(", 0");
+				t_rpar->prepend(", 0");
 				p = p->next;
 			}
 			if (type != NULL && type->tag == tp_array) {
 				if (ctx == ctx_rvalue) {
 					f_tkn->set_pos(assign_node::stmt->lval->f_tkn);
-					lpar->append(", ")->move(assign_node::stmt->lval->f_tkn, assign_node::stmt->lval->l_tkn);
+					t_lpar->append(", ")->move(assign_node::stmt->lval->f_tkn, assign_node::stmt->lval->l_tkn);
 					tag = tn_retarr;
 				} else {
-					lpar->append(dprintf("%s, ", temp));
+					t_lpar->append(dprintf("%s, ", temp));
 					f_tkn = f_tkn->prepend("*");
 				}
 			}
 		}
 
-		token* rest = rpar->prev_relevant();
+		token* rest = t_rpar->prev_relevant();
 
 		for (param_spec* prm = prc->extra_params; prm != NULL; prm = prm->next)
 		{
@@ -3546,10 +3549,24 @@ normal_call:
 			rest = rest->append(prm->var->out_name->text);
 		}
 
-	} else if (type != NULL && (type->tag == tp_record || type->tag == tp_object
+	} // delphi style type cast, not a procedure call  
+	else if (type != NULL && (type->tag == tp_record || type->tag == tp_object
 		|| (type->tag == tp_array && (language_c || ctx == ctx_constant))))
 	{
-		if (hp_pascal) {
+		// TType(aaa) => ( (TType*)(aaa) )
+		f_tkn = fptr->f_tkn->prepend("( (");
+		if (type->tag == tp_object)
+			fptr->l_tkn->append("*)");
+		else
+			fptr->l_tkn->append(")");
+
+		l_tkn = t_rpar->append(" )");
+
+		for (expr_node* e = args; e != NULL; e = e->next) {
+			e->translate(ctx_record);
+		}
+
+		/*if (hp_pascal) {
 			if (language_c) {
 				f_tkn = fptr->f_tkn->prepend("(");
 				fptr->l_tkn->append("*)");
@@ -3566,9 +3583,11 @@ normal_call:
 					rpar->set_trans("}}");
 				}
 			}
+
 			for (expr_node* e = args; e != NULL; e = e->next) {
 				e->translate(ctx_record);
 			}
+
 			if (ctx != ctx_constant) {
 				assert(type->name != NULL);
 
@@ -3584,18 +3603,21 @@ normal_call:
 
 				f_tkn = l_tkn = t->append(const_name);
 			}
-		}
+		}*/
 	} else { // undefined function call
 		if (fptr->type && fptr->type->tag >= tp_any &&
 			(fptr->type->tag < tp_proc || fptr->type->tag == tp_ref || fptr->type->tag == tp_fwd_ref))
 		{
 			// type conversion
-			f_tkn = fptr->f_tkn->prepend("(");
+			f_tkn = fptr->f_tkn->prepend("( (");
 			fptr->l_tkn->append(")");
+			t_rpar->append(" )");
 		}
+
 		for (expr_node* e = args; e != NULL; e = e->next) {
 			e->translate(ctx_value);
 		}
+
 		if (!language_c && type != NULL && type->tag == tp_array) {
 			fptr->l_tkn->append("::make");
 		}
@@ -3669,16 +3691,16 @@ field_init_node::field_init_node(token* t_field,token* t_coln,expr_node* value)
 void field_init_node::attrib(tpexpr* record_type)
 {
     int ctx = ctx_constant;
-    if (record_type != NULL && record_type->tag != tp_void) {
-	symbol* s = ((record_tp*)record_type)->shallow_search(t_field);
-	if (s == NULL) {
-	    warning(t_field, "Field '%s' is not found in record %s\n", t_field->in_text, record_type->name ? record_type->name : "");
-	} else {
-	    value->type = s->type;
-	    ctx = s->type->tag == tp_record || s->type->tag == tp_object ? ctx_record
-		: s->type->is_array() ? ctx_array : ctx_constant;
+	if (record_type != NULL && record_type->tag != tp_void) {
+		symbol* s = ((record_tp*)record_type)->shallow_search(t_field);
+		if (s == NULL) {
+			warning(t_field, "Field '%s' is not found in record %s\n", t_field->in_text, record_type->name ? record_type->name : "");
+		} else {
+			value->type = s->type;
+			ctx = s->type->tag == tp_record || s->type->tag == tp_object ? ctx_record : s->type->is_array() ? ctx_array : ctx_constant;
+		}
 	}
-    }
+
     value->attrib(ctx);
 }
 
@@ -3690,7 +3712,7 @@ void field_init_node::translate(int)
     token::disable(t_field, f_tkn->prev);
     token* sep = l_tkn->next_relevant();
     if (sep->tag == TKN_SEMICOLON) {
-	sep->set_trans(",");
+		sep->set_trans(",");
     }
 }
 
@@ -3733,21 +3755,21 @@ expr_group_node::expr_group_node(token* lpar, expr_node* expr, token* rpar)
 
 static expr_node* aggregate_constant(expr_node* expr, symbol* component)
 {
-    if (component != NULL) {
-	if (component->next != NULL) {
-	    expr = aggregate_constant(expr, component->next);
+	if (component != NULL) {
+		if (component->next != NULL) {
+			expr = aggregate_constant(expr, component->next);
+		}
 	}
-    }
-    if (expr != NULL) {
-	int ctx = ctx_constant;
-	if (component != NULL && component->type != NULL) {
-	    expr->type = component->type;
-	    ctx = component->type->tag == tp_record || component->type->tag == tp_object ? ctx_record
-		: component->type->is_array() ? ctx_array : ctx_constant;
+	if (expr != NULL) {
+		int ctx = ctx_constant;
+		if (component != NULL && component->type != NULL) {
+			expr->type = component->type;
+			ctx = component->type->tag == tp_record || component->type->tag == tp_object ? ctx_record
+				: component->type->is_array() ? ctx_array : ctx_constant;
+		}
+		expr->attrib(ctx);
+		return expr->next;
 	}
-	expr->attrib(ctx);
-	return expr->next;
-    }
     return NULL;
 }
 
@@ -4039,15 +4061,15 @@ void const_def_node::attrib(int)
 {
     constant->attrib(ctx_constant);
     sym = b_ring::add_cur(ident, symbol::s_const, constant->type);
-    if (constant->flags & tn_is_const) {
-	sym->flags |= symbol::f_const;
-	sym->value = constant->value;
-    }
+	if (constant->flags & tn_is_const) {
+		sym->flags |= symbol::f_const;
+		sym->value = constant->value;
+	}
     if (language_c && (sym->type->tag == tp_integer
 		       || sym->type->tag == tp_char
 		       || sym->type->tag == tp_set))
     {
-	sym->out_name->flags |= nm_entry::macro;
+		sym->out_name->flags |= nm_entry::macro;
     }
 }
 
@@ -4057,7 +4079,7 @@ void const_def_node::translate(int)
     if (curr_proc && curr_proc->make_all_constants_global
 	&& !(sym->flags & symbol::f_static))
     {
-	curr_proc->make_unique(sym);
+		curr_proc->make_unique(sym);
     }
     sym->translate(ident);
     l_tkn = constant->l_tkn;
@@ -4397,6 +4419,8 @@ void var_decl_node::attrib(int ctx)
 		tp = &any_type;
 	}
 
+	if (def_value) def_value->attrib(ctx);
+
 	for (token_list* tkn = vars; tkn != NULL; tkn = tkn->next) 
 	{
 		int prm_class = symbol::s_var;
@@ -4450,8 +4474,10 @@ void  var_decl_node::translate(int ctx)
 		tp = &any_type;
     }
 
+	if (def_value) def_value->translate(ctx); // need to be here to initialize def_value->l_tkn
+
     f_tkn = vars->ident;
-    l_tkn = coln ? coln : f_tkn;
+    l_tkn = def_value ? def_value->l_tkn: coln ? coln : f_tkn;
 
     if (coln != NULL) {
 		token::disable(coln->prev_relevant()->next, tpd->f_tkn->prev); // disables two tokens: ":" and "PascalType" in variable decl
@@ -4474,18 +4500,15 @@ void  var_decl_node::translate(int ctx)
 						tpd_node* eltd = ((array_tpd_node*)tpd)->eltd;
 						t = tkn->ident->copy(eltd->f_tkn, eltd->l_tkn);
 						if (tp->tag == tp_dynarray) {
-							tkn->ident->prepend(ctx == ctx_varpar
-								? "* " : " const* ");
+							tkn->ident->prepend(ctx == ctx_varpar ? "* " : " const* ");
 						} else {
-							tkn->ident->prepend(ctx == ctx_varpar
-								? " " : "  const ");
+							tkn->ident->prepend(ctx == ctx_varpar ? " " : "  const ");
 							tkn->ident->next->copy(tpd->f_tkn, tpd->l_tkn);
 						}
 					} else {
 						t = tkn->ident->prepend(ctx == ctx_varpar
 							? tp->tag == tp_array || tp->tag == tp_string ? " " : "* "
-							: tp->tag == tp_array ? " const " : " ")->
-							copy(tpd->f_tkn, tpd->l_tkn);
+							: tp->tag == tp_array ? " const " : " ")->copy(tpd->f_tkn, tpd->l_tkn);
 					}
 				} else {
 					t = tkn->ident->prepend("void* ");
@@ -4518,6 +4541,7 @@ void  var_decl_node::translate(int ctx)
 					}
 				}
 			}
+
 			if (var_decl_coln) {
 				t->set_bind(var_decl_coln);
 			} else {
@@ -4526,7 +4550,7 @@ void  var_decl_node::translate(int ctx)
 			if (tkn == vars) {
 				f_tkn = t;
 			}
-		}
+		} //for
 
 		if (tpd != NULL) {
 			token::remove(tpd->f_tkn, tpd->l_tkn);
@@ -4537,8 +4561,9 @@ void  var_decl_node::translate(int ctx)
 			token::remove(eltd->f_tkn, eltd->l_tkn);
 		}
 
-		if (l_tkn->next_relevant()->tag == TKN_SEMICOLON) {
-			l_tkn->next_relevant()->set_trans(",");
+		token* nr = l_tkn->next_relevant();
+		if (nr->tag == TKN_SEMICOLON) {
+			nr->set_trans(",");
 		}
 
 	}
@@ -4815,8 +4840,7 @@ void param_list_node::translate(int)
 // Class proc_decl_node is used for procedure formal parameter declaration
 
 proc_decl_node::proc_decl_node(token* t_proc, token* t_ident,
-			       param_list_node* params,
-			       token* t_coln, tpd_node* ret_type)
+			       param_list_node* params, token* t_coln, tpd_node* ret_type)
 {
     CONS5(t_proc, t_ident, params, t_coln, ret_type);
 	var = NULL;
@@ -4845,6 +4869,8 @@ void proc_decl_node::attrib(int ctx)
 void proc_decl_node::insert_return_type() {
     if (ret_type) {
         ret_type->translate(ctx_block);
+
+		// if return type is object type then make it a pointer
 		if (ret_type->type->tag == tp_object) ret_type->l_tkn = ret_type->l_tkn->append("*");
 
 		assert(ret_type->type->name != NULL);
@@ -5021,9 +5047,9 @@ void proc_fwd_decl_node::attrib(int ctx)
 		else if (t_proc->tag == TKN_DESTRUCTOR) type->is_destructor = true;
 	}
 
-	if ((var = b_ring::search_cur(t_ident)) == NULL || var->type == NULL
-		|| var->type->tag != tp_proc || var->ring != b_ring::curr_b_ring
-		|| (var->flags & symbol::f_syslib))
+	if ( (var = b_ring::search_cur(t_ident)) == NULL || var->type == NULL
+	     || var->type->tag != tp_proc || var->ring != b_ring::curr_b_ring
+		 || (var->flags & symbol::f_syslib))
 	{
 		var = b_ring::add_cur(t_ident, symbol::s_proc, type);
 	}
@@ -5538,9 +5564,7 @@ void enum_tpd_node::attrib(int)
     int n = 0;
     type = new enum_tp(this);
     for (token_list* t = items; t != NULL; t = t->next) {
-        ((enum_tp*)type)->last = t->var = b_ring::add_cur(t->ident,
-							  symbol::s_const,
-							  &integer_type);
+        ((enum_tp*)type)->last = t->var = b_ring::add_cur(t->ident, symbol::s_const, &integer_type);
 	t->var->value = n++;
 	t->var->flags |= symbol::f_const;
 	if (b_ring::curr_b_ring->scope != b_ring::global) {
@@ -6214,7 +6238,7 @@ void interface_tpd_node::attrib(int)
 {
 	if (t_superinterface != NULL) {
 		super = b_ring::search_cur(t_superinterface);
-		if (super == NULL) { // use first ancestor interface as a 'type'
+		if (super == NULL) { //		use first ancestor interface as a 'type'
 			warning(t_interface, "Base interface %s not defined.", t_superinterface->out_text);
 			type = new object_tp(this); // TODO object_tp class is very simple, not sure if we need another such class interface_tp
 		}
@@ -6372,14 +6396,14 @@ void record_tpd_node::attrib(int ctx)
 	
 	char* save_path = struct_path;
     struct_path = "";
-    b_ring::push((record_tp*)type);
 
+    b_ring::push((record_tp*)type);
 	for (decl_node* dcl = parts; dcl != NULL; dcl = dcl->next) {
 		dcl->attrib(ctx);
 	}
-
 	((record_tp*)type)->calc_flags();
     b_ring::pop((record_tp*)type);
+
     struct_path = save_path;
     cur_outer = outer;
 }
@@ -6624,6 +6648,14 @@ prop_read_node::prop_read_node(token* t_read, token* t_ident)
 void prop_read_node::attrib(int)
 {
 	sym = b_ring::search_cur(t_ident);
+	if (sym == NULL) {
+		// if property is inside of record or class then curr_b_ring is record_tp or object_tp
+		record_tp* tp = dynamic_cast<record_tp*>(b_ring::curr_b_ring);
+		if (tp)
+			warning("cannot find function/method '%s' in class/record '%s'", t_ident->in_text, tp->name);
+		else
+			warning("property '%s' is defined outside of class/record type", t_ident->in_text);
+	}
 }
 void prop_read_node::translate(int)
 {
