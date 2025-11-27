@@ -1,8 +1,7 @@
 #include <time.h>
 #include "ptoc.h"
 
-void timestamp(integer* day,  integer* month, integer* year, 
-	       integer* hour, integer* min,   integer* sec)
+void timestamp(integer* day,  integer* month, integer* year, integer* hour, integer* min,   integer* sec)
 {
     time_t ctime; 
     struct tm* tmp;
@@ -36,19 +35,19 @@ real get_realtime()
 
 #define CIRCULAR_BUFFER_SIZE  4096
 
-char* lpsz(int low, int high, const char* str) 
-{ 
+char* lpsz(int low, int high, const char* str)
+{
     static char buffer[CIRCULAR_BUFFER_SIZE];
     static int pos = 0;
     int size;
     char* ptr;
 
-    while (high >= low && str[high-low] == ' ') {
-	high -= 1;
+    while (high >= low && str[high - low] == ' ') {
+        high -= 1;
     }
     size = high - low + 1;
-    if (pos + size >= sizeof(buffer)) { 
-	pos = 0;
+    if (pos + size >= sizeof(buffer)) {
+        pos = 0;
     }
     ptr = &buffer[pos];
     pos += size + 1;
