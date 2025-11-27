@@ -845,6 +845,8 @@ proc_decl:
                { $$ = new proc_decl_node($1, $2, $3, $4, $5); } 
   */  
 
+// proc_fwd_decl and proc_spec - we cannot replace IDENT by ident_ext because bison generates too many warnings for unknown reason
+// while duplicated lines with IDENT replaced by READ, WRITE and INDEX work well
 proc_fwd_decl: 
       PROCEDURE IDENT formal_params ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
@@ -853,6 +855,10 @@ proc_fwd_decl:
     | PROCEDURE READ formal_params ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION READ formal_params ':' type ';' qualifiers ';' 
+        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
+    | PROCEDURE WRITE formal_params ';' qualifiers ';' 
+        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
+    | FUNCTION WRITE formal_params ':' type ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
     | PROCEDURE INDEX formal_params ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
@@ -867,6 +873,10 @@ proc_spec:
     | PROCEDURE READ formal_params ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
     | FUNCTION READ formal_params ':' type ';'
+        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
+    | PROCEDURE WRITE formal_params ';'
+        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
+    | FUNCTION WRITE formal_params ':' type ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
     | PROCEDURE INDEX formal_params ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
@@ -958,7 +968,7 @@ formal_param: VAR param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
     //| proc_decl - see comment to proc_decl definition
 
 param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3); }
-    |  ident_list ':' param_type EQ constant { $$ = new var_decl_node($1, $2, $3, $4, $5); }
+    |  ident_list ':' param_type EQ expr { $$ = new var_decl_node($1, $2, $3, $4, $5); }
     | ident_list { $$ = new var_decl_node($1, NULL, NULL); }
 
 param_type: simple_type | conformant_array_type
