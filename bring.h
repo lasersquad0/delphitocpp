@@ -103,9 +103,8 @@ class b_ring {
     virtual symbol* search(token* t);
     symbol* shallow_search(token* t) const;
     symbol* add(nm_entry* in_name, nm_entry* out_name, int tag, tpexpr* type);
-    symbol* add(nm_entry* in_name, int tag, tpexpr* type) { 
-        return add(in_name, in_name, tag, type);
-    }
+    symbol* add(nm_entry* in_name, int tag, tpexpr* type) { return add(in_name, in_name, tag, type); }
+  
     static symbol* search_cur(token* t) { return curr_b_ring->search(t); }
     static symbol* add_cur(token* t, int tag, tpexpr* type) {
         return 
@@ -114,8 +113,7 @@ class b_ring {
 			    ? t->name : nm_entry::add(t->out_text, TKN_IDENT), 
 			   tag, type);
     }
-    static symbol* add_cur(nm_entry* in_nm, nm_entry* out_nm, 
-			   int tag, tpexpr* type)
+    static symbol* add_cur(nm_entry* in_nm, nm_entry* out_nm, int tag, tpexpr* type)
       { return curr_b_ring->add(in_nm, out_nm, tag, type); }
 
     static symbol* add_cur(nm_entry* nm, int tag, tpexpr* type)

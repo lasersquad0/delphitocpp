@@ -40,9 +40,9 @@ symbol* b_ring::shallow_search(token* t) const
 {
     nm_entry* nm = t->name;
     for (symbol* vr = syms; vr != NULL; vr = vr->next) {
-	if (vr->in_name == nm) { 
-	    return vr->tag != symbol::s_dummy ? vr : (symbol*)0;
-	} 
+        if (vr->in_name == nm) {
+            return vr->tag != symbol::s_dummy ? vr : (symbol*)0; //TODO replace by nullptr?
+        }
     }
     return NULL;
 }
@@ -58,6 +58,7 @@ bool b_ring::find_scope(b_ring* type)
 }
 
 // Search for an entry in this binding ring
+// First search in syms list, then in parent class rings (br->inherite) then in outer ring(s) 
 symbol* b_ring::search(token* t)
 {
     nm_entry* nm = t->name;
@@ -66,7 +67,7 @@ symbol* b_ring::search(token* t)
         for (b_ring* br = scp; br != NULL; br = br->inherite) {
             for (symbol* vr = br->syms; vr != NULL; vr = vr->next) {
                 if (vr->in_name == nm) {
-                    return vr->tag != symbol::s_dummy ? vr : (symbol*)0;
+                    return vr->tag != symbol::s_dummy ? vr : (symbol*)0; //TODO replace by nullptr?
                 }
             }
         }
@@ -79,6 +80,7 @@ symbol* b_ring::search(token* t)
 // The goal of his function is prevent translating such names to C++ as is (to avoid conflict with C++ standard identificators).
 // Such names are be renamed by adding 1,2,3 postfix to identificator name.
 // That is why make_unique checks global_b_ring (instead of curr_b_ring) because C++ standard identificators are global names
+// If duplicate has found sym->out_name replaced by new nm_entry with new unique out_name
 void b_ring::make_unique(symbol* sym) 
 { 
     symbol *sp, **spp;
@@ -97,7 +99,7 @@ void b_ring::make_unique(symbol* sym)
     }
     if (scope != SCOPE::global) {
         *spp = sp = new symbol; // this symbol will never be found
-        sp->ring = top_b_ring; //TODO may be use global_b_ring instead of top_b_ring? 
+        sp->ring = top_b_ring;  //TODO may be use global_b_ring instead of top_b_ring? 
         sp->next = NULL;
         sp->type = NULL;
         sp->in_name = sym->in_name;
@@ -129,9 +131,9 @@ symbol* b_ring::add(nm_entry* in_name, nm_entry* out_name, int tag, tpexpr* type
         }
     }
 
-    // if ring is global then make_unique is called for all name entries 
-    // if ring's scope=record - make_unique never called for these name entries
-    // if ring's scope is proc or block name_unique is called for s_proc and s_const tags only 
+    // if ring's scope=SCOPE::global then make_unique is called for all name entries 
+    // if ring's scope=SCOPE::record then make_unique never called for such name entries
+    // if ring's scope is SCOPE::proc or SCOPE::block name_unique is called for s_proc and s_const tags only 
     if (scope != SCOPE::record && 
 	   (tag == symbol::s_proc || tag == symbol::s_const || scope == SCOPE::global))
     { 
