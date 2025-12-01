@@ -467,7 +467,7 @@ class repeat_node : public stmt_node {
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
-
+/*
 class return_node : public stmt_node {
   public:
     token        *t_return;
@@ -477,7 +477,7 @@ class return_node : public stmt_node {
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
-
+*/
 class empty_node : public stmt_node {
   public:
     token* t_last; 
@@ -1253,7 +1253,9 @@ class proc_def_node : public proc_decl_node {
     //token*              t_semi2; 
     //token*              t_attrib; 
     token*              t_semi3; 
-    bool                use_forward; 
+    bool                use_forward; // tell us that params for func/method need to be copied from func declaration in interface section
+                                     // this is because Delphi allows to do NOT repeat func parameters in implmenmetation section if function was declared in interface section
+                                     // that works for functions/procedures and does not work for methods.
 
     static record_tp* self; //object_tp*   self;
     symbol*             s_self;
@@ -1466,10 +1468,10 @@ class string_tpd_node: public tpd_node {
 
 class ptr_tpd_node: public tpd_node {
   public:
-    token*      tkn_ref; // '^'
+    token*      t_ref; // '^'
     tpd_node*   tpd;     
 
-    ptr_tpd_node(token* tkn_ref, tpd_node* tpd);
+    ptr_tpd_node(token* t_ref, tpd_node* tpd);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
