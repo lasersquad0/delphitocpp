@@ -69,21 +69,26 @@ class token : public heap_object {
     token(char const* v_text, int v_tag = TKN_GEN, int v_line = 0, int v_pos = 0, nm_entry* nm = NULL);
     token(token& t);
 
-    token* insert_b(token* t) { // insert token this before t (returns this)
+    // insert token this before t (returns this)
+    token* insert_b(token* t) { 
         next = t; prev = t->prev;   
         return t->prev = t->prev->next = this;
     }
 
-    token* insert_a(token* t) { // insert token this after t (returns this)
+    // insert token this after t (returns this)
+    token* insert_a(token* t) { 
         prev = t; next = t->next;
         return t->next = t->next->prev = this;
     }
 
-    void   remove();            // remove token from DL-ring
+    // remove token from DL-ring
+    void   remove();
+    
     static void remove(token* head, token* tail); 
     static void disable(token* head, token* tail); 
 
-    token* get_first_token(); // get first relevant token at line 
+    // get first relevant token at line 
+    token* get_first_token(); 
 
     token* prepend(char const* s) { 
         token* t = new token(s);
@@ -98,15 +103,23 @@ class token : public heap_object {
 	        cat = CAT_WSPC; tag = TKN_GEN; out_text = NULL; 
 	    }
     }
-    void   disappear(); // disable token with all white spaces after it
+
+    // disable token with all white spaces after it
+    void   disappear(); 
 
     void   set_pos(token* t) { pos = t->pos; } 
 
     void   set_bind(token* t) { bind = t; } 
 
-    token* copy(token* head, token* tail); // copy list of tokens before 'this' token, return pointer to clone of 'head' token 
-    token* move(token* head, token* tail); // move list of tokens before 'this' token, return pointer to head
-    token* move_region(token* head, token* tail); // move region (together with comments and white spaces)
+    // copy list of tokens before 'this' token, return pointer to clone of 'head' token 
+    token* copy(token* head, token* tail); 
+
+    // move list of tokens before 'this' token, return pointer to head
+    token* move(token* head, token* tail); 
+
+    // move region (together with comments and white spaces)
+    token* move_region(token* head, token* tail); 
+    
     static void swap(token* left_head, token* left_tail, token* right_head, token* right_tail); 
 
     token* next_relevant() const;
