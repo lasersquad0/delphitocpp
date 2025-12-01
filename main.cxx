@@ -41,46 +41,36 @@
 * DONE - Delphi constructor declarations and definitions are translated into C++ constructors
 * DONE - destructors declarations and definitions are translated into C++ destructors. 
          This may require manual fixes in code because Delphi destructors can have parameters while C++ - not.
-* DONE - result := nil правильно транслируетс€ в result = nullptr;
+* DONE - result := nil is correctly translates into result = nullptr;
 * DONE - методы, переменные, параметры ф-ций могут иметь следующие зарезервированные названи€: read, write, index 
-*
-* implement below
-* constructor THArrayObjects.Create(parsm:Integer);
-* begin
-*  inherited;
-*  FItemSize := sizeof(TObject);
-* end;
+* DONE - Implemented operators is and as.
+* DONE - implemented Delphi built-in functions implement functions FreeAndNil, Assigned, StrLen, StrDispose, StrAlloc, StrPLCopy
+* DONE - needs to be TObject* in this code: TObject GetValue_result; TObject& result = GetValue_result;
+* DONE - implemented proper work when inherited call has no explicit parameters (single keyword 'inherited')- need to add there function name and params e.g. => TParentClass::ProcName(ProcName_params)
 * 
-* ====>>>>
+* implement function StrToInt, IntToStr,
 * 
-* THArrayObjects::THArrayObjects(int param): THArray(param)
-*{
-*  FItemSize = sizeof(TObject);
-*}
+*  if Result <> -1 then Result := Result + Integer(Start);
+* translated to
+*   if (result != -1)  result = result + ( (int)(Start); );
+  
+  FAIndex: THArrayInteger;
+  далее вызов i := FAIndex[5]; подразумевает вызов default property of FAIndex в Delphi
+  он сейчас транслируетс€ в i = FAIndex[5]; что в с++ подразумевает массив из THArrayInteger.
+  как правильно: искать default property у класса вз€ть ее им€ и транслироваь в такую конструкцию
+  i = FAIndex->DefPropName[5];
 * 
-* 
-* void THArrayString::delete_(unsigned int num)
-*{
-*    char* pStr;
-*  Get(num, pStr);
-*  StrDispose(pStr);
-*  THArrayPointer::delete_(num()); <==== WHY here num() instead num
-*}
-
-* Formal параметры с Default values плохо транслируютс€, см ';' - func(byte b, int i = 9; string str = 'default')
-
 * могут различатьс€ приоритеты операций Delphi и —++ и это может вли€ть на результат вычислений.
-* implement functions StrLen, StrDispose, StrAlloc
-* реализовать операторы is и as.
-* ≈сли у обьекта есть метод Read и он вызываетс€ в коде то парсер говорит ошибку.
+* implement functions StrLen, StrDispose, StrAlloc, StrPLCopy
+
 * ≈сли в секции implementation процедура имеет qualifiers то парсинг выдает ошибку. пример: procedure memcpyfromend(pi, po: Pointer; Count: Cardinal); stdcall;
-* особенности реализации inherited -  In this case, inherited takes no explicit parameters, but passes to the inherited method the same parameters with which the enclosing method was called.
+
 * плохо работает грамматика если в implementation обь€вл€ешь 2 ф-ции c директивой overload. тогда срабатывает proc_fwd_decl а proc_def Ќ≈ срабатывает 
+
 * если в конструкторе inherited идет первой строчкой тогда parent можно вызывать так (часто это и единственный компилируемый метод). TTest::TTest(int a): TParent(a, 4);
+
 * добавить в tptoc.pas либо в passlib.h ф-ции Move, SetLength, Copy, Assert
 * посмотреть каких реализаций из tptoc.pas нехватает в paslib.h 
-* определени€ переменных вида a: MyClass; транслировать в MyClass* a; ???? (только дл€ классов).
-* но тогда понадобитс€ так же транслировать access operators из '.' в '->'
 * 
 * how to translate this: if Supports(Allocator, IMalloc) then ...
 * добавить проверку на правильность структуры guid (строки)
@@ -123,19 +113,19 @@ static void load_predefined()
 		b_ring::add_cur(nm_entry::add("smallint",  TKN_IDENT),  nm_entry::add("signed short", TKN_IDENT),   symbol::s_type,	&smallint_type);
 		b_ring::add_cur(nm_entry::add("word",      TKN_IDENT),  nm_entry::add("unsigned short", TKN_IDENT), symbol::s_type, &smallint_type);
 		b_ring::add_cur(nm_entry::add("longint",   TKN_IDENT),  nm_entry::add("signed int", TKN_IDENT),     symbol::s_type, &longint_type);
-		b_ring::add_cur(nm_entry::add("longword",  TKN_IDENT),  nm_entry::add("unsigned int", TKN_IDENT),	symbol::s_type,	&cardinal_type);
+		b_ring::add_cur(nm_entry::add("longword",  TKN_IDENT),  nm_entry::add("unsigned  int", TKN_IDENT),	symbol::s_type,	&cardinal_type);
 		b_ring::add_cur(nm_entry::add("uint32",    TKN_IDENT),  nm_entry::add("uint32_t", TKN_IDENT),       symbol::s_type, &cardinal_type);
 		b_ring::add_cur(nm_entry::add("int32",     TKN_IDENT),  nm_entry::add("int32_t", TKN_IDENT),	    symbol::s_type,	&integer_type);
 		b_ring::add_cur(nm_entry::add("uint64",    TKN_IDENT),  nm_entry::add("uint64_t", TKN_IDENT),       symbol::s_type, &uint64_type);
 		b_ring::add_cur(nm_entry::add("int64",     TKN_IDENT),  nm_entry::add("int64_t", TKN_IDENT),	    symbol::s_type,	&int64_type);
-		b_ring::add_cur(nm_entry::add("nativeint", TKN_IDENT),  nm_entry::add("int", TKN_IDENT),	        symbol::s_type,	&integer_type);
-		b_ring::add_cur(nm_entry::add("NativeUInt",TKN_IDENT),  nm_entry::add("unsigned int", TKN_IDENT),   symbol::s_type, &cardinal_type);
-		b_ring::add_cur(nm_entry::add("FixedInt",  TKN_IDENT),  nm_entry::add("int", TKN_IDENT),            symbol::s_type, &integer_type);
-		b_ring::add_cur(nm_entry::add("FixedUInt", TKN_IDENT),  nm_entry::add("unsigned int", TKN_IDENT),   symbol::s_type, &cardinal_type);
+		b_ring::add_cur(nm_entry::add("nativeint", TKN_IDENT),  nm_entry::add("int ", TKN_IDENT),	        symbol::s_type,	&integer_type);
+		b_ring::add_cur(nm_entry::add("nativeuint",TKN_IDENT),  nm_entry::add("unsigned int ", TKN_IDENT),   symbol::s_type, &cardinal_type);
+		b_ring::add_cur(nm_entry::add("fixedint",  TKN_IDENT),  nm_entry::add("int", TKN_IDENT),            symbol::s_type, &integer_type);
+		b_ring::add_cur(nm_entry::add("fixeduint", TKN_IDENT),  nm_entry::add("unsigned  int ", TKN_IDENT),   symbol::s_type, &cardinal_type);
 
 		b_ring::add_cur(nm_entry::add("single",    TKN_IDENT),  nm_entry::add("float", TKN_IDENT),          symbol::s_type, &real_type);
 		b_ring::add_cur(nm_entry::add("extended",  TKN_IDENT),  nm_entry::add("long double", TKN_IDENT),    symbol::s_type, &double_type);
-		b_ring::add_cur(nm_entry::add("currency",  TKN_IDENT),  nm_entry::add("double", TKN_IDENT),         symbol::s_type, &double_type);
+		b_ring::add_cur(nm_entry::add("currency",  TKN_IDENT),  nm_entry::add("double ", TKN_IDENT),         symbol::s_type, &double_type);
 		b_ring::add_cur(nm_entry::add("double",    TKN_IDENT),  symbol::s_type, &double_type);
 
 		b_ring::add_cur(nm_entry::add("untyped_file", TKN_IDENT), symbol::s_type, &text_type);
