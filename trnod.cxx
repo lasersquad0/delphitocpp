@@ -1057,8 +1057,9 @@ void inherited_node::attrib(int ctx)
 {
 	assert(!(t_ident == NULL && params != NULL));
 	
-	//assert(params != 0);
-	if(params) params->attrib(ctx);
+	for (expr_node* e = params; e != NULL; e = e->next) {
+		e->attrib(ctx_valpar); //TODO not sure if here should be ctx_valpar
+	}
 
 	f_tkn = t_inherited;
 	l_tkn = t_rpar ? t_rpar : (t_ident ? t_ident : t_inherited);
@@ -1067,36 +1068,63 @@ void inherited_node::translate(int ctx)
 {
 	// *** see function proc_def_node::attrib(int ctx) how to find class and work with it.
 	
-	//assert(params != 0);
-
-	auto r = dynamic_cast<object_tp*>(curr_proc->forward->var->ring);
+	object_tp* r = dynamic_cast<object_tp*>(curr_proc->forward->var->ring);
 	assert(r);
 	auto otpd = dynamic_cast<object_tpd_node*>(r->tpd);
 	assert(otpd);
+	token* anc_class = NULL;
+
 	if (otpd->t_ancestorlist == NULL)
 	{
+		anc_class = new token("TBaseClass");
 		warning(curr_proc->forward->f_tkn, "Class '%s' does not have superclass. 'inherited' does nothing.", curr_proc->forward->t_proc->out_text);
-	
 		t_inherited->set_trans("TBaseClass::"); //TODO temporary solution, think what to do in this case.
 	}
 	else 
 	{
-		token* sc = otpd->t_ancestorlist->ident; // first ancestor in list is a parent class
-
-		t_inherited->set_trans(dprintf("%s::", sc->in_text)); 
+		anc_class = otpd->t_ancestorlist->ident; // first ancestor in list is a parent class
+		t_inherited->set_trans(dprintf("%s::", anc_class->in_text)); 
 	}
 
-	if (t_ident == NULL)
-		l_tkn = t_ident = t_inherited->append(curr_proc->proc_name); // if ident is missing than use current proc name for it
-	else
+	if (params)
+	{
+		for (expr_node* e = params; e != NULL; e = e->next)
+			e->translate(ctx_valpar); //TODO not sure if here should be ctx_valpar
+
 		t_ident->prev->disable(); // remove space between 'inherited' and name of calling method, it is not needed any more
-
-	if (params == NULL)
-		l_tkn = t_ident->append("()");
+	}
 	else
-		params->translate(ctx);
+	{
+		if (t_ident)
+		{
+			t_inherited->next->disappear(); // remove space(s) between TBaseClass:: and method name
+			l_tkn = t_ident->append("()");
+		}
+		else
+		{
+			l_tkn = t_ident = t_inherited->append(curr_proc->proc_name); // if ident is missing than use current proc name for it
 
-//	token::disable(t_inherited->next, t_inherited->next_relevant()->prev); // remove space between 'inherited' and name of calling method, it is not needed any more
+			l_tkn = l_tkn->append("(");
+			for (param_spec* par = curr_proc->params; par != NULL; par = par->next)
+			{
+				l_tkn = l_tkn->append(par->var->out_name->text);
+				if (par->next) l_tkn = l_tkn->append(", ");
+			}
+			l_tkn = l_tkn->append(")");
+		}
+	}
+
+	if (curr_proc->is_constructor)
+	{
+		t_ident->set_trans(anc_class->in_text); // if ident is missing than use current proc name for it
+	}
+
+	if (curr_proc->is_destructor)
+	{
+		t_ident->set_trans(dprintf("~%s", anc_class->in_text)); // if ident is missing than use current proc name for it
+	}
+
+	//token::disable(t_inherited->next, t_inherited->next_relevant()->prev); // remove space between 'inherited' and name of calling method, it is not needed any more
 	//token::disable(t_ident->next, t_ident->next_relevant()->prev);
 }
 
@@ -1450,6 +1478,7 @@ void repeat_node::translate(int ctx)
     force_semicolon();
 }
 
+/*
 return_node::return_node(token* t_return)
 {
     CONS1(t_return);
@@ -1475,6 +1504,7 @@ void return_node::translate(int)
     }
     force_semicolon();
 }
+*/
 
 empty_node::empty_node(token* t_last)
 {
@@ -1542,8 +1572,8 @@ void atom_expr_node::attrib(int ctx)
 		if (var != NULL) {
 			if (var->type == NULL) {
 				warning(tkn, "type of variable '%s' is unknown", tkn->in_text);
-				var->type = &void_type;
-			}
+				var->type = &any_type; // &void_type
+ 			}
 
 			type = var->type;
 			with = var->ring->with;
@@ -1597,7 +1627,7 @@ void atom_expr_node::attrib(int ctx)
 			//TODO understand better whether it is good solution. it creates new tpexpr node for each unknown type
 			warning(tkn, "undefined identifier '%s'", tkn->in_text);
 			//type = new tpexpr(tp_last, NULL, tkn->in_text);
-			type = &void_type;
+			type = &any_type; //&void_type;
 			with = NULL;
 		}
 	}
@@ -1702,8 +1732,7 @@ void atom_expr_node::translate(int ctx)
 		}
 		else if (var->ring->scope == b_ring::record) {
 			if (with != NULL) {
-				f_tkn = tkn->prepend(language_c && with->tag == symbol::s_ref
-					? "->" : ".")->prepend(with->out_name->text);
+				f_tkn = tkn->prepend(language_c && with->tag == symbol::s_ref ? "->" : ".")->prepend(with->out_name->text);
 			}
 
 		}
@@ -2326,14 +2355,16 @@ access_expr_node::access_expr_node(expr_node* rec, token* pnt, token* field) : e
 	recfld = NULL;
 }
 
-void access_expr_node::attrib(int)
+void access_expr_node::attrib(int ctx)
 {
-    rec->attrib(ctx_access);
+	assert(rec);
+	assert(field);
 
+    rec->attrib(ctx_access);
+	
 	if (rec->type != NULL && (rec->type->tag == tp_record || rec->type->tag == tp_object || rec->type->tag == tp_unit)) {
 		recfld = ((record_tp*)rec->type->get_typedef())->search(field); // because object_tp and unit_tp are descendants of record_tp
 		if (recfld == NULL) { // recfld may be NULL when method is declared in parent type and this type is unknown for some reason.
-			//assert(rec->f_tkn);
 			if (rec->f_tkn == NULL)
 			{
 				assert(rec->type->name);
@@ -2344,14 +2375,44 @@ void access_expr_node::attrib(int)
 				warning(field, "component '%s.%s' is not found.", rec->f_tkn->in_text, field->in_text);
 			}
 		}
-	} else {
+	}
+	// Delphi allows to access fields/methods by ref variable e.g.
+	// ppt: ^TMyClass;
+	// ppt.FValue := 'str1';
+	// ppt^.FValue : = 'str2'; //equivalent to the line above 
+	else if (rec->type != NULL && (rec->type->tag == tp_ref)) {
+		ref_tp* rf = dynamic_cast<ref_tp*>(rec->type);
+		if (rf->base_type->tag == tp_record || rf->base_type->tag == tp_object /*|| rf->base_type->tag == tp_unit*/)
+		{
+			recfld = ((record_tp*)rf->base_type->get_typedef())->search(field); // because object_tp is descendant of record_tp
+			if (recfld == NULL) { // recfld may be NULL when method is declared in parent type and this type is unknown for some reason.
+				if (rec->f_tkn == NULL)
+				{
+					assert(rec->type->name);
+					warning(field, "component '%s' is not found in type '%s'.", field->in_text, rec->type->name);
+				}
+				else
+				{
+					warning(field, "component '%s.%s' is not found.", rec->f_tkn->in_text, field->in_text);
+				}
+			}
+		}
+		else
+		{
+			warning(field, "unknown record/class type '%s'", rec->type->name);
+			recfld = NULL;
+		}
+	}
+	else 
+	{
+		assert(rec->type);
 		assert(rec->type->name);
 		warning(field, "unknown record/class type '%s'", rec->type->name);
 		recfld = NULL;
 	}
 
 	if (recfld == NULL)
-		type = &void_type;
+		type = &any_type; //&void_type;
 	else
 		type = recfld->type;
 }
@@ -2363,7 +2424,7 @@ void access_expr_node::translate(int ctx)
     l_tkn = field;
 
 	// whether 'rec' is object typename
-	bool is_typename = rec->tag == tn_atom && rec->type->tag == tp_object && dynamic_cast<atom_expr_node*>(rec)->var->tag == symbol::s_type;
+	bool is_typename = (rec->tag == tn_atom) && (rec->type->tag == tp_object) && (dynamic_cast<atom_expr_node*>(rec)->var->tag == symbol::s_type);
 
 	// whether 'field' is constructor
 	if (is_typename && type->tag == tp_proc && ((proc_tp*)type)->is_constructor)
@@ -2375,7 +2436,8 @@ void access_expr_node::translate(int ctx)
 	}
 	else 
 	{
-		if (rec->tag == tn_address || rec->tag == tn_self || (rec->type->tag == tp_object && !is_typename)) {
+		if (rec->tag == tn_address || rec->tag == tn_self || (rec->type->tag == tp_object && !is_typename) 
+			|| (rec->type->tag == tp_ref && ((ref_tp*)(rec->type))->base_type->tag == tp_object) ) {
 			pnt->set_trans("->");
 		}
 		else if (rec->type != NULL && (rec->type->tag == tp_unit || rec->type->tag == tp_object)) { // TMyClass.StaticField => TMyClass::StaticField
@@ -4565,7 +4627,6 @@ void  var_decl_node::translate(int ctx)
 		if (nr->tag == TKN_SEMICOLON) {
 			nr->set_trans(",");
 		}
-
 	}
 	else { // working with var declaration here
 		bool is_static = false;
@@ -4596,10 +4657,25 @@ void  var_decl_node::translate(int ctx)
 			token::remove(tpd->f_tkn, tpd->l_tkn);
 		} else {
 			assert(tpd);
-			if (tp->tag == tp_object) f_tkn = vars->ident->prepend("*"); // special case for classes as pointers in Delphi
-			if (/*language_c &&*/ tpd->tag == tpd_node::tpd_ref || tp->tag == tp_object) { // processing this case: a,b,c:^Integer => int *a, *b, *c;
+
+			if (tp->tag == tp_object) {
+				f_tkn = vars->ident->prepend("*"); // special case for classes as pointers in Delphi
+			} else if (tpd->tag == tpd_node::tpd_ref && (tp->tag == tp_ref && dynamic_cast<ref_tp*>(tp)->base_type->tag == tp_object) ) {
+				// if tpd is ref then it already contains on '*' in its translated name
+				f_tkn = f_tkn->prepend("*");
+			}
+			if (/*language_c &&*/ (tpd->tag == tpd_node::tpd_ref) || (tp->tag == tp_object) || (tp == &pointer_type) ) {
+				// processing this case: a,b,c:^Integer => int* a, *b, *c;
+				// for a we do not need to add '*' because translated ref type already contains it. for b and c we need to add '*'
+				// that is why we start loop from vars->next
 				for (token_list* tkn = vars->next; tkn != NULL; tkn = tkn->next) {
-					tkn->ident->prepend("*");
+					if (tp->tag == tp_object) tkn->ident->prepend("*"); 
+					if (tp == &pointer_type) tkn->ident->prepend("*"); // special processing for Pointer type
+
+					if (tpd->tag == tpd_node::tpd_ref) {
+						tkn->ident->prepend("*"); 
+						if(tp->tag == tp_ref && dynamic_cast<ref_tp*>(tp)->base_type->tag == tp_object)	tkn->ident->prepend("*");
+					}
 				}
 			}
 			f_tkn = f_tkn->prepend(" ");
@@ -4942,16 +5018,18 @@ void proc_decl_node::insert_params()
         rest = t_ident->append("(")->append(")");
 		first = true;
     }
-    if (language_c && type->res_type != NULL
-	&& type->res_type->tag == tp_array)
+
+    if (language_c && type->res_type != NULL && type->res_type->tag == tp_array)
     {
-	if (params) {
-	    params->lpar->append(dprintf("%s %s_result, ", type->res_type->name, type->proc_name));
-	} else {
-	    rest->prepend(dprintf("%s %s_result", type->res_type->name, type->proc_name));
-	}
+		if (params) {
+			params->lpar->append(dprintf("%s %s_result, ", type->res_type->name, type->proc_name));
+		} else {
+		    rest->prepend(dprintf("%s %s_result", type->res_type->name, type->proc_name));
+		}
+
 	first = false;
     }
+
 	for (param_spec* p = type->extra_params; p != NULL; p = p->next) {
 
 		if (p->var->flags & symbol::f_static) continue;
@@ -5234,17 +5312,19 @@ void proc_def_node::attrib(int ctx)
 			b_ring::push(self);
 			if (ret_type)
 				ret_type->attrib(ctx); //need b_ring::push(self) before ret_type->attrib() to find return type in class bring then in unit bring.
-			//b_ring::pop(self);
 
-			var = self->search(t_ident);
-			
+			var = self->search(t_ident); // searches in curr class, then searches in parent class and then searches in outer scope
+
+			type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)nullptr);
+			// important to preserve reference to method forward declaration here, it is further used to find class's d_ring
+			type->forward = ((proc_tp*)var->type)->forward; //TODO add dynamic_cast here
+
 			if (var == NULL || var->type->tag != tp_proc) {
 				warning(t_class, "Method '%s' not found in class '%s'", t_ident->out_text, t_class->out_text);
-				type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)NULL);
 				var = self->add(t_ident->name, symbol::s_proc, type);
-			} else {
-				type = (proc_tp*)var->type;
-			}
+			}// else {
+				//type = (proc_tp*)var->type;// this line caused parameters duplication in 'type' because var->type already contains params from forward declaration
+			//}
 
 			//b_ring::push(self);
 			
@@ -5276,14 +5356,15 @@ void proc_def_node::attrib(int ctx)
 		type->proc_name = var->out_name->text;
     }
 
-	if (ret_type) // built-in variable Resilt for functions only.
+	if (ret_type) // built-in variable Result for functions only.
 		// name of variable must be in lower case. 'Result' does not work while 'result' - does 
 		type->add(nm_entry::add("result", TKN_IDENT), symbol::s_var, ret_type->type);
 
     b_ring::push(type);
     proc_tp* save_proc = curr_proc;
     curr_proc = type;
-    if (params) params->attrib(ctx);
+    if (params) 
+		params->attrib(ctx);
     block->attrib(ctx_block);
     if (save_proc) {
 		save_proc->n_subproc += curr_proc->n_subproc + 1;
@@ -5310,7 +5391,7 @@ void proc_def_node::translate(int ctx)
     //if (t_attrib != NULL) token::remove(t_attrib, t_semi2);
 
     if (use_forward) {
-        f_tkn = t_proc->copy(type->forward->f_tkn, type->forward->t_semi1->prev);
+        f_tkn = t_proc->copy(type->forward->f_tkn, type->forward->t_semi1->prev);// copy procedure name, lpar. params, rpar from forward decl to currect proc def
 		token::remove(t_proc, t_semi1->prev);
     } else {
 		insert_return_type();
@@ -5327,7 +5408,7 @@ void proc_def_node::translate(int ctx)
 			auto lself = (object_tp*)s_self->type->get_typedef();
 			assert(lself);
 			assert(ret_type->f_tkn);
-			auto local = lself->shallow_search(ret_type->f_tkn); //search only inside a class here
+			auto local = lself->shallow_search(ret_type->f_tkn); //TODO search only inside a class here. what if this type is declared in parent class?
 			if (local != NULL && local->tag == symbol::s_type)
 				f_tkn = f_tkn->prepend("::")->prepend(s_self->out_name->text);
 		}
@@ -5405,11 +5486,13 @@ void proc_def_node::translate(int ctx)
 		} else {
 			// define two variables that share the same memory.
 			// one is Delphi built-in 'Result' variable (works for functions only)
-			// TODO type->res_type->name will be 'void' for underfined types. needs to be fixed.
+			//TODO type->res_type->name will be 'void' for underfined types. needs to be fixed.
 			token* tmp = first_stmt->prepend("\n");
-			tmp = tmp->append(dprintf("%s %s_result;\n", type->res_type->name, type->proc_name));
+			char* modifier = " ";
+			if (type->res_type->tag == tp_object) modifier = "*";
+			tmp = tmp->append(dprintf("%s%s %s_result;\n", type->res_type->name, modifier, type->proc_name));
 			tmp->set_pos(first_stmt);
-			tmp = tmp->append(dprintf("%s& result = %s_result;\n", type->res_type->name, type->proc_name));
+			tmp = tmp->append(dprintf("%s%s& result = %s_result;\n", type->res_type->name, modifier, type->proc_name));
 			tmp->set_pos(first_stmt);
 			block->body_end_tkn()->prepend(dprintf("return %s_result;\n", type->proc_name))->set_bind(first_stmt);
 		}
@@ -5445,10 +5528,10 @@ void simple_tpd_node::attrib(int ctx)
 	if (t_ident1) {   // 't_ident1.t_ident2' 
 		sym1 = b_ring::search_cur(t_ident1);
 		assert(sym1); 
-		auto otp = dynamic_cast<object_tp*>(sym1->type->get_typedef()); //TODO may be it is enough to cast to record_tp* here ?
+		auto otp = dynamic_cast<record_tp*>(sym1->type->get_typedef()); //it is enough to cast to record_tp*
 		assert(otp);
 		sym2 = otp->shallow_search(t_ident2);
-		if (sym2 == NULL) 
+		if (sym2 == NULL)
 		{
 			if (ctx == ctx_reftyp)
 			{
@@ -5460,7 +5543,7 @@ void simple_tpd_node::attrib(int ctx)
 				warning(t_ident2, "unknown type '%s'", full_name);
 				// tp_last because we do not know its type yet
 				//TODO understand better whether it is good solution. it creates new tpexpr node for each TBytes unknown type
-				type = new tpexpr(tp_last, this, full_name); //&void_type;
+				type = new tpexpr(tp_last, this, full_name); //&void_type; //TODO Or shall we use any_type here?
 			}
 		}
 	} else {
@@ -5481,27 +5564,26 @@ void simple_tpd_node::attrib(int ctx)
 	}
 
 	if(sym2) type = sym2->type;
+
+	f_tkn = t_ident1 ? t_ident1 : t_ident2;
+	l_tkn = t_ident2;
 }
 
-void simple_tpd_node::translate(int ctx)
+void simple_tpd_node::translate(int)
 {
-    f_tkn = t_ident1? t_ident1: t_ident2;
-	l_tkn = t_ident2;
 	if (sym1 != NULL) sym1->translate(t_ident1);
 	if (sym2 != NULL) sym2->translate(t_ident2); // does actually the following: tkn->set_trans(out_name->text);
-	else if (ctx == ctx_reftyp)	f_tkn = t_ident1->prepend("struct ");
+	//else if (ctx == ctx_reftyp) f_tkn = t_ident2->prepend("struct "); //TODO this is old code, I am not sure why 'struct' is needed for ctx_reftyp type
 
 	if(t_dot) t_dot->set_trans("::");
 }
 
-fptr_tpd_node::fptr_tpd_node(token* t_proc, param_list_node* params,
-			     token* t_coln, tpd_node* ret_type, token* t_of, token* t_object)
-: tpd_node(tpd_proc)
+fptr_tpd_node::fptr_tpd_node(token* t_proc, param_list_node* params, token* t_coln, 
+	                         tpd_node* ret_type, token* t_of, token* t_object) : tpd_node(tpd_proc)
 {
     CONS6(t_proc, params, t_coln, ret_type, t_of, t_object);
 	t_params = NULL;
 }
-
 
 void fptr_tpd_node::attrib(int ctx)
 {
@@ -6001,30 +6083,26 @@ void string_tpd_node::translate(int)
 
 //----------------------------------------------------------------------
 
-ptr_tpd_node::ptr_tpd_node(token* tkn_ref, tpd_node* tpd)
-: tpd_node(tpd_ref)
+ptr_tpd_node::ptr_tpd_node(token* t_ref, tpd_node* tpd) : tpd_node(tpd_ref)
 {
-    CONS2(tkn_ref, tpd);
+    CONS2(t_ref, tpd);
 }
 
 void ptr_tpd_node::attrib(int)
 {
     tpd->attrib(ctx_reftyp);
-    type = (tpd->type->tag == tp_fwd_ref)
-	? tpd->type : new ref_tp(tpd->type, this);
+    type = (tpd->type->tag == tp_fwd_ref) ? tpd->type : new ref_tp(tpd->type, this);
 }
 
 void ptr_tpd_node::translate(int)
 {
-    tkn_ref->disable();
+    t_ref->disable();
     tpd->translate(ctx_reftyp);
     f_tkn = tpd->f_tkn;
     l_tkn = tpd->l_tkn->append("*");
 }
 
-variant_node::variant_node(expr_node* tag_list, token* t_coln,
-			  token* t_lpar, field_list_node* fields,
-			  token* t_rpar)
+variant_node::variant_node(expr_node* tag_list, token* t_coln, token* t_lpar, field_list_node* fields, token* t_rpar)
 {
     CONS5(tag_list, t_coln, t_lpar, fields, t_rpar);
     next = NULL;
@@ -6164,8 +6242,7 @@ void variant_part_node::translate(int ctx)
     }
 }
 
-field_list_node::field_list_node(var_decl_node* fix_part,
-				 variant_part_node* var_part)
+field_list_node::field_list_node(var_decl_node* fix_part, variant_part_node* var_part)
 {
     CONS2(fix_part, var_part);
 	ctx = -1; // because 0 is valid value (ctx_program)
@@ -6228,7 +6305,7 @@ void guid_node::translate(int)
 }
 
 interface_tpd_node::interface_tpd_node(token* t_interface, token* t_lbr, token* t_superinterface, token* t_rbr,
-decl_node* guid, decl_node* components, token* t_end) : tpd_node(tpd_object) //TODO shall we introduce tpd_interface tag here?
+                       decl_node* guid, decl_node* components, token* t_end) : tpd_node(tpd_object) //TODO shall we introduce tpd_interface tag here?
 {
 	CONS7(t_interface, t_lbr, t_superinterface, t_rbr, guid, components, t_end);
 	super = NULL;
@@ -6452,7 +6529,7 @@ void record_tpd_node::assign_name()
 {
     static int anonymous_struct_counter = 0;
 
-    assert(tag == tpd_record || tag == tpd_object);
+    assert(tag == tpd_node::tpd_record || tag == tpd_node::tpd_object);
 
     char* name = dprintf("A%d", ++anonymous_struct_counter);
     t_record->append(dprintf("%s ", name));
