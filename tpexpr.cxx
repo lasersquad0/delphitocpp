@@ -6,20 +6,20 @@
 #include "util.h"
 
 tpexpr void_type(tp_void, NULL, "void");
-tpexpr any_type(tp_any, NULL, "void*");
-tpexpr integer_type(tp_integer, NULL, "int_2");
+tpexpr any_type(tp_any, NULL, "unknown_type");
+tpexpr integer_type(tp_integer, NULL, "int ");
 tpexpr longint_type(tp_longint, NULL, "int32_t");
 tpexpr real_type(tp_real, NULL, "single"); // this is actually 4 bytes delphi single type
 tpexpr double_type(tp_double, NULL, "double"); // this is 8 bytes double type
 tpexpr char_type(tp_char, NULL, "char");
-tpexpr bool_type(tp_bool, NULL, "bool2");
+tpexpr bool_type(tp_bool, NULL, "bool ");
 ref_tp pointer_type(&void_type); 
 string_tp string_type;
 varying_string_tp varying_string_type;
 text_tp text_type;
 
 tpexpr smallint_type(tp_longint, NULL, "short");
-tpexpr cardinal_type(tp_integer, NULL, "uint32_t1"); //TODO whether we need tp_uint32 tag or not? 
+tpexpr cardinal_type(tp_integer, NULL, "uint32_t "); //TODO whether we need tp_uint32 tag or not? 
 tpexpr uint64_type(tp_integer, NULL, "uint64_t"); //TODO whether we need tp_uint64 tag or not? 
 tpexpr int64_type(tp_integer, NULL, "int64_t"); //TODO whether we need tp_int64 tag or not? 
 
@@ -34,30 +34,14 @@ token *tpexpr::insert_before(token *t)
 }
 
 
-tpexpr* tpexpr::get_typedef() { return this; }
-
-bool tpexpr::is_reference() { return false; }
-
-bool tpexpr::is_array() { return false; }
-
 //---------------------------------------------------------------------
 
-tpexpr* simple_tp::get_typedef() { return alias->get_typedef(); }
-
-bool simple_tp::is_reference() { return alias->is_reference(); }
-bool simple_tp::is_array()     { return alias->is_array(); }
-
-//---------------------------------------------------------------------
-
-ref_tp::ref_tp(tpexpr* tp, tpd_node* tpd) 
-: tpexpr(tp_ref, tpd), base_type(tp) 
+ref_tp::ref_tp(tpexpr* tp, tpd_node* tpd) : tpexpr(tp_ref, tpd), base_type(tp) 
 {
-  if (tp != NULL && tp->name != NULL) { 
-	name = dprintf("%s*", tp->name); 
+    if (tp != NULL && tp->name != NULL) { 
+	    name = dprintf("%s*", tp->name); 
     } 
 }
-
-bool ref_tp::is_reference() { return true; }
 
 //---------------------------------------------------------------------
 
@@ -67,7 +51,6 @@ fwd_ref_tp::fwd_ref_tp(token* t)
     ident = t;
     name = dprintf("struct %s*", t->out_text); 
 }
-
 
 tpexpr* fwd_ref_tp::get_typedef() 
 {
@@ -88,18 +71,16 @@ void enum_tp::set_bounds(symbol* var)
     max = dprintf("last_%s", var->out_name->text); 
 }
    
-
 void enum_tp::set_enumeration_name(tpexpr* type) 
 {
     symbol* sym = last; 
-    do { 
-	sym->type = type;
-	if (sym == first) break;
-	sym = sym->next;
+    do {
+        sym->type = type;
+        if (sym == first) break;
+        sym = sym->next;
     } while (true);
 }
     
-
 //---------------------------------------------------------------------
 
 void range_tp::set_bounds(symbol* var)
@@ -120,20 +101,15 @@ array_tp::array_tp(tpexpr* tp, tpd_node* tpd)
     base = -1;
 }
 
-bool array_tp::is_array() { return true; }
-
 void array_tp::insert_bounds_definition(symbol* array, token* block, int n)
 { 
     if (elem_type->tag == tp_dynarray || n > 0) n += 1;
 
-    block->prepend(dprintf("const int %s = %s.%s%.0d;\n", 
-			   low, array->out_name->text, "low", n)); 
-    block->prepend(dprintf("const int %s = %s.%s%.0d;\n", 
-			   high, array->out_name->text, "high", n)); 
+    block->prepend(dprintf("const int %s = %s.%s%.0d;\n", low, array->out_name->text, "low", n)); 
+    block->prepend(dprintf("const int %s = %s.%s%.0d;\n", high, array->out_name->text, "high", n)); 
 
-    if (elem_type->tag == tp_dynarray) { 
-	((array_tp*)elem_type->get_typedef())->
-	    insert_bounds_definition(array, block, n);
+    if (elem_type->tag == tp_dynarray) {
+        ((array_tp*)elem_type->get_typedef())->insert_bounds_definition(array, block, n);
     }
 }
 
@@ -199,7 +175,6 @@ void array_tp::insert_dimensions(expr_node* e, array_tp* conf_arr, int n)
 	}
     } 
 }
-
 
 void array_tp::insert_length(token* before) 
 {
@@ -351,7 +326,7 @@ void proc_tp::add_extra_param(symbol *var)
     if (var->ring->scope == b_ring::proc && var->type
     	&& !var->type->is_scalar() && var->type->get_typedef() == var->type) 
     { 
-	((proc_tp*)var->ring)->make_all_constants_global = true;
+	    ((proc_tp*)var->ring)->make_all_constants_global = true;
     }
 
     if (language_c && var->type->tag == tp_dynarray) { 

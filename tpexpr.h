@@ -45,9 +45,9 @@ class tpexpr : public heap_object {
     }
 
     token*  insert_before(token *t);     
-    virtual tpexpr* get_typedef(); 
-    virtual bool is_reference();
-    virtual bool is_array();
+    virtual tpexpr* get_typedef() { return this; }
+    virtual bool is_reference() { return false; }
+    virtual bool is_array() { return false; }
 
     tpexpr(int tp_tag, tpd_node* tp_tpd = NULL, char* tp_name = NULL) { 
         tag = tp_tag;
@@ -60,10 +60,10 @@ class tpexpr : public heap_object {
 class simple_tp : public tpexpr { 
   public:
     tpexpr* alias;
-    virtual tpexpr* get_typedef(); 
-    virtual bool is_reference();
-    virtual bool is_array();
- 
+    virtual tpexpr* get_typedef() { return alias->get_typedef();  }
+    virtual bool is_reference()   { return alias->is_reference(); }
+    virtual bool is_array()       { return alias->is_array();     }
+    
     simple_tp(tpexpr* def) : tpexpr(def->tag, def->tpd) { alias = def; }
 };
 
@@ -73,7 +73,8 @@ class ref_tp : public tpexpr {
   public:
     tpexpr*   base_type;
 
-    virtual bool is_reference();
+    virtual bool is_reference() { return true; }
+
     ref_tp(tpexpr* tp = NULL, tpd_node* tpd = NULL);
 };
 
@@ -131,15 +132,12 @@ class array_tp : public tpexpr {
     expr_node  *high_expr;  
     int        base;
 
-    virtual bool   is_array();
+    virtual bool   is_array() { return true; }
 
-    void           set_dim(char *low, char *high, 
-			   expr_node *low_expr = NULL, 
-			   expr_node *high_expr = NULL);
-    void           set_conformant_dim(symbol* slow, 
-				      symbol* shigh);
-    virtual void   insert_dimensions(expr_node* e, array_tp* conf_arr = NULL,
-				    int n = 0);
+    void           set_dim(char *low, char *high, expr_node *low_expr = NULL, expr_node *high_expr = NULL);
+
+    void           set_conformant_dim(symbol* slow, symbol* shigh);
+    virtual void   insert_dimensions(expr_node* e, array_tp* conf_arr = NULL, int n = 0);
     void           insert_length(token* t);
     void           insert_bound_params(token* before);
     void           add_proc_param(proc_tp* proc);
@@ -276,7 +274,7 @@ class proc_tp : public tpexpr, public b_ring {
     bool           is_constructor;
     bool           is_destructor;
 
-    proc_fwd_decl_node *forward;
+    proc_fwd_decl_node *forward; //reference to func/proc forward declaration from interface section or from inside class
      
     caller_spec    *callers;    
 
