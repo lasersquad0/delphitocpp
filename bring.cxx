@@ -20,7 +20,7 @@ rename_item* rename_item::list;
 
 void symbol::translate(token* t) const
 {
-    if( path != NULL)
+    if(path)
 	    t->set_trans(dprintf("%s%s", path, out_name->text)); 
     else
 	    t->set_trans(out_name->text); 
@@ -39,17 +39,17 @@ b_ring::b_ring(int scope) {
 symbol* b_ring::shallow_search(token* t) const
 {
     nm_entry* nm = t->name;
-    for (symbol* vr = syms; vr != NULL; vr = vr->next) {
+    for (symbol* vr = syms; vr != nullptr; vr = vr->next) {
         if (vr->in_name == nm) {
-            return vr->tag != symbol::s_dummy ? vr : (symbol*)0; //TODO replace by nullptr?
+            return vr->tag != symbol::s_dummy ? vr : nullptr;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 bool b_ring::find_scope(b_ring* type)
 {
-    for (b_ring* scp = this; scp != NULL; scp = scp->outer) {
+    for (b_ring* scp = this; scp != nullptr; scp = scp->outer) {
         if (type == scp) { 
             return true;
         }
@@ -63,16 +63,16 @@ symbol* b_ring::search(token* t)
 {
     nm_entry* nm = t->name;
 
-    for (b_ring* scp = this; scp != NULL; scp = scp->outer) {
-        for (b_ring* br = scp; br != NULL; br = br->inherite) {
-            for (symbol* vr = br->syms; vr != NULL; vr = vr->next) {
+    for (b_ring* scp = this; scp != nullptr; scp = scp->outer) {
+        for (b_ring* br = scp; br != nullptr; br = br->inherite) {
+            for (symbol* vr = br->syms; vr != nullptr; vr = vr->next) {
                 if (vr->in_name == nm) {
-                    return vr->tag != symbol::s_dummy ? vr : (symbol*)0; //TODO replace by nullptr?
+                    return vr->tag != symbol::s_dummy ? vr : nullptr;
                 }
             }
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 // C++ has its own keywords and standard function names - further 'standard identificators'
