@@ -49,6 +49,9 @@
 * DONE - implemented proper work when inherited call has no explicit parameters (single keyword 'inherited')- need to add there function name and params e.g. => TParentClass::ProcName(ProcName_params)
 * 
 * implement function StrToInt, IntToStr,
+*  
+* investigate why break keyword is replaced by flush()
+* investigate why double1 happend instead double
 * 
 *  if Result <> -1 then Result := Result + Integer(Start);
 * translated to
@@ -119,14 +122,14 @@ static void load_predefined()
 		b_ring::add_cur(nm_entry::add("uint64",    TKN_IDENT),  nm_entry::add("uint64_t", TKN_IDENT),       symbol::s_type, &uint64_type);
 		b_ring::add_cur(nm_entry::add("int64",     TKN_IDENT),  nm_entry::add("int64_t", TKN_IDENT),	    symbol::s_type,	&int64_type);
 		b_ring::add_cur(nm_entry::add("nativeint", TKN_IDENT),  nm_entry::add("int ", TKN_IDENT),	        symbol::s_type,	&integer_type);
-		b_ring::add_cur(nm_entry::add("nativeuint",TKN_IDENT),  nm_entry::add("unsigned int ", TKN_IDENT),   symbol::s_type, &cardinal_type);
+		b_ring::add_cur(nm_entry::add("nativeuint",TKN_IDENT),  nm_entry::add("unsigned int ", TKN_IDENT),  symbol::s_type, &cardinal_type);
 		b_ring::add_cur(nm_entry::add("fixedint",  TKN_IDENT),  nm_entry::add("int", TKN_IDENT),            symbol::s_type, &integer_type);
-		b_ring::add_cur(nm_entry::add("fixeduint", TKN_IDENT),  nm_entry::add("unsigned  int ", TKN_IDENT),   symbol::s_type, &cardinal_type);
+		b_ring::add_cur(nm_entry::add("fixeduint", TKN_IDENT),  nm_entry::add("unsigned  int ", TKN_IDENT), symbol::s_type, &cardinal_type);
 
 		b_ring::add_cur(nm_entry::add("single",    TKN_IDENT),  nm_entry::add("float", TKN_IDENT),          symbol::s_type, &real_type);
 		b_ring::add_cur(nm_entry::add("extended",  TKN_IDENT),  nm_entry::add("long double", TKN_IDENT),    symbol::s_type, &double_type);
-		b_ring::add_cur(nm_entry::add("currency",  TKN_IDENT),  nm_entry::add("double ", TKN_IDENT),         symbol::s_type, &double_type);
-		b_ring::add_cur(nm_entry::add("double",    TKN_IDENT),  symbol::s_type, &double_type);
+		b_ring::add_cur(nm_entry::add("currency",  TKN_IDENT),  nm_entry::add("double ", TKN_IDENT),        symbol::s_type, &double_type);
+		b_ring::add_cur(nm_entry::add("double",    TKN_IDENT),  nm_entry::add(" double ", TKN_IDENT),       symbol::s_type, &double_type);
 
 		b_ring::add_cur(nm_entry::add("untyped_file", TKN_IDENT), symbol::s_type, &text_type);
 
