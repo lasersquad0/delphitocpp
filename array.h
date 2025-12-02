@@ -20,16 +20,26 @@ char* lpsz(int low, int high, const char* ptr);
 #endif
 #endif
 
+// low and high indices are initialised in constructor and then never be changed
 template<class Type>
-class conf_array { 
+class conf_array {
+  protected:
+    Type* buf;
+    bool owned_buf = false;
   public:
-    const integer low, high; 
+    integer low, high; 
+
+    conf_array(integer l, integer h) : low(l), high(h), owned_buf(true) {
+        buf = malloc(high - low + 1);
+    }
 
     conf_array(integer l, integer h, Type* ptr) : low(l), high(h), buf(ptr) {} 
 
-    conf_array(Type const* ptr); /* intialization with string literal */
+    conf_array(Type const* ptr); // intialization with string literal, impl can be found below 
 
-    conf_array(Type elem); /* intialization with character literal */
+    conf_array(Type elem);  // intialization with character literal, impl can be found below
+
+    ~conf_array() { if (owned_buf) free(buf); }
 
     void copy(void* buf_copy) { 
 	    memcpy(buf_copy, buf, (high-low+1)*sizeof(Type));
@@ -39,6 +49,19 @@ class conf_array {
     Type& operator[](integer index) { 
         assert(BETWEEN(low, index, high));
 	    return buf[index-low]; 
+    }
+
+    // recalculate high bound only, low left unchanged
+    // changing size only possible if buf is owned by class
+    // if buf is NOT owned by class then do nothing and return false
+    bool set_size(integer sz) 
+    { 
+        if (!owned_buf) return false;
+        if (size() == sz) return true;
+
+        buf = realloc(buf, sz);
+        high = low + sz - 1; // calc high from low and sz, leaving low unchanged
+        return true;
     }
 
     integer size() const { return high - low + 1; }
@@ -60,8 +83,6 @@ class conf_array {
     friend char* lpsz(conf_array const& a) { 
 	    return lpsz(a.low, a.high, (char*)a.buf); 
     }
-  protected: 
-    Type *buf;  
 };
 
 #define copy_conformant_array(a) a.copy(alloca(a.size_in_bytes()))
@@ -75,6 +96,7 @@ TEMPLATE_SPEC inline conf_array<char>::conf_array(char ch) : low(1), high(1), bu
 
 #endif /* not Turbo Pascal */
 
+// low and high indices are fixed as template parameters during array definition and and cannot be changed
 template<integer low_bound, integer high_bound, class Type>
 class array {
   public:    
@@ -341,7 +363,7 @@ class varying_string_header {
     void set_length(integer new_length) { 
 	    len = new_length;
     }
-    void to_array(char* dst_buf, size_t dst_buf_size) const {
+    char* to_array(char* dst_buf, size_t dst_buf_size) const {
         size_t size = length();
         if (size > dst_buf_size) {
             size = dst_buf_size;
@@ -350,6 +372,7 @@ class varying_string_header {
         if (size < dst_buf_size) {
             dst_buf[size] = '\0';
         }
+        return dst_buf;
     }
 
     char& operator*() { return *get_body(); }
@@ -743,7 +766,7 @@ inline integer pos(const char c, string const& z, unsigned start = 1) //start is
     char* z_ptr = z.get_body();
     int pos = start - 1;
     while (pos < z_len) {
-        if (z_len[pos] == c) return pos + 1;
+        if (z_ptr[pos] == c) return pos + 1;
         pos++;
     }
     return 0;
