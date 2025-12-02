@@ -113,8 +113,7 @@ void array_tp::insert_bounds_definition(symbol* array, token* block, int n)
     }
 }
 
-void array_tp::set_dim(char *lw, char *hgh, 
-		       expr_node *lw_expr, expr_node *hgh_expr)
+void array_tp::set_dim(char *lw, char *hgh, expr_node *lw_expr, expr_node *hgh_expr)
 {
     this->low = lw;
     this->high = hgh;
@@ -122,9 +121,9 @@ void array_tp::set_dim(char *lw, char *hgh,
     this->high_expr = hgh_expr;
     
     if (low != NULL && strcmp(low, "0") == 0) { 
-	base = 0;
-    } else if (low_expr != NULL && low_expr->is_const_literal())  { 
-	base = low_expr->value;
+	    base = 0;
+    } else if (low_expr != NULL && low_expr->is_const_literal()) { 
+	    base = low_expr->value;
     }
 }
 
