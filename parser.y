@@ -999,6 +999,8 @@ simple_type: IDENT { $$ = new simple_tpd_node(NULL, NULL, $1); }
 
 array_type: packed ARRAY '[' indices ']' OF type 
        { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
+    | packed ARRAY OF type 
+       { $$ = new array_tpd_node($1, $2, NULL, NULL, NULL, $3, $4); }
 
 const_array_type: packed ARRAY '[' indices ']' OF const_type 
        { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
