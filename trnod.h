@@ -729,8 +729,7 @@ class idx_expr_node : public expr_node {
     token*     t_rbr; // ']'
     expr_node* indices; 
 
-    idx_expr_node(expr_node* arr, token* t_lbr, expr_node* indices, 
-                  token* t_rbr); 
+    idx_expr_node(expr_node* arr, token* t_lbr, expr_node* indices, token* t_rbr); 
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1400,14 +1399,13 @@ class range_index_node : public idx_node {
 
 class conformant_index_node : public idx_node { 
   public: 
-    token    *low;
-    token    *dots;       
-    token    *high;
-    token    *coln;
+    token    *t_low;
+    token    *t_dots;       
+    token    *t_high;
+    token    *t_coln;
     tpd_node *tpd; 
     
-    conformant_index_node(token *low, token *dots, token *high, token *coln, 
-                          tpd_node* tpd); 
+    conformant_index_node(token *t_low, token *t_dots, token *t_high, token *t_coln, tpd_node* tpd); 
 
     virtual void attrib(int ctx);
     virtual void  translate(int ctx);
@@ -1416,11 +1414,11 @@ class conformant_index_node : public idx_node {
 
 class array_tpd_node: public tpd_node {
   public:
-    token*      t_packed;          // 'Packed' (if any)
+    token*      t_packed;      // 'Packed' (if any)
     token*      t_array;	   // 'Array'
-    token*      t_lbr;             // '['
-    token*      t_rbr;             // ']'
-    token*      t_of;              // 'of'
+    token*      t_lbr;         // '['
+    token*      t_rbr;         // ']'
+    token*      t_of;          // 'of'
     idx_node*   indices;	   // indices (possibly with comma)
     tpd_node*   eltd;		   // Declaration of element type
 
