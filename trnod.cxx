@@ -1053,7 +1053,7 @@ inherited_node::inherited_node(token* t_inherited, token* t_ident, token* t_lpar
 {
 	CONS5(t_inherited, t_ident, t_lpar, params, t_rpar);
 }
-void inherited_node::attrib(int ctx)
+void inherited_node::attrib(int)
 {
 	assert(!(t_ident == NULL && params != NULL));
 	
@@ -1064,7 +1064,7 @@ void inherited_node::attrib(int ctx)
 	f_tkn = t_inherited;
 	l_tkn = t_rpar ? t_rpar : (t_ident ? t_ident : t_inherited);
 }
-void inherited_node::translate(int ctx)
+void inherited_node::translate(int)
 {
 	// *** see function proc_def_node::attrib(int ctx) how to find class and work with it.
 	
@@ -1077,7 +1077,7 @@ void inherited_node::translate(int ctx)
 	if (otpd->t_ancestorlist == NULL)
 	{
 		anc_class = new token("TBaseClass");
-		warning(curr_proc->forward->f_tkn, "Class '%s' does not have superclass. 'inherited' does nothing.", curr_proc->forward->t_proc->out_text);
+		warning(t_inherited/*curr_proc->forward->f_tkn*/, "Class '%s' does not have superclass. 'inherited' does nothing.", otpd->type->name /*curr_proc->forward->t_proc->out_text*/);
 		t_inherited->set_trans("TBaseClass::"); //TODO temporary solution, think what to do in this case.
 	}
 	else 
@@ -2187,8 +2187,7 @@ void idx_expr_node::translate(int ctx)
     f_tkn = arr->f_tkn;
     l_tkn = t_rbr;
 
-    array_tp* arr_type = arr->type ? (array_tp*)arr->type->get_typedef()
-	                           : (array_tp*)NULL;
+    array_tp* arr_type = arr->type ? (array_tp*)arr->type->get_typedef() : (array_tp*)NULL;
 
     for (expr_node* e = indices; e != NULL; e = e->next) {
         e->translate(ctx_value);
@@ -2399,7 +2398,8 @@ void access_expr_node::attrib(int ctx)
 		}
 		else
 		{
-			warning(field, "unknown record/class type '%s'", rec->type->name);
+			
+			warning(field, "unknown type '%s' for expression '%s.%s'", rec->type->name, rec->f_tkn->in_text, field->in_text);
 			recfld = NULL;
 		}
 	}
@@ -2407,7 +2407,7 @@ void access_expr_node::attrib(int ctx)
 	{
 		assert(rec->type);
 		assert(rec->type->name);
-		warning(field, "unknown record/class type '%s'", rec->type->name);
+		warning(field, "unknown type '%s' for expression '%s.%s'", rec->type->name, rec->f_tkn->in_text, field->in_text);
 		recfld = NULL;
 	}
 
@@ -5318,6 +5318,9 @@ void proc_def_node::attrib(int ctx)
 			type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)nullptr);
 			// important to preserve reference to method forward declaration here, it is further used to find class's d_ring
 			type->forward = ((proc_tp*)var->type)->forward; //TODO add dynamic_cast here
+			
+			if (t_proc->tag == TKN_CONSTRUCTOR) type->is_constructor = true;
+			else if (t_proc->tag == TKN_DESTRUCTOR) type->is_destructor = true;
 
 			if (var == NULL || var->type->tag != tp_proc) {
 				warning(t_class, "Method '%s' not found in class '%s'", t_ident->out_text, t_class->out_text);
@@ -5329,12 +5332,12 @@ void proc_def_node::attrib(int ctx)
 			//b_ring::push(self);
 			
 			if (type == NULL)
-				type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)NULL);
+				type = new proc_tp(ret_type ? ret_type->type : nullptr);
 		}
 	} else { // procedure-function  (not a method)
 		if (ret_type)
 			ret_type->attrib(ctx); 
-		type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)NULL);
+		type = new proc_tp(ret_type ? ret_type->type : nullptr);
 
 		if ((var = b_ring::search_cur(t_ident)) == NULL || var->type == NULL
 			|| var->type->tag != tp_proc || var->ring != b_ring::curr_b_ring
@@ -5405,7 +5408,7 @@ void proc_def_node::translate(int ctx)
 		s_self->translate(t_class);
 
 		if (ret_type) { // if type is defined inside a class then add 'MyClassName::' prefix to such return type
-			auto lself = (object_tp*)s_self->type->get_typedef();
+			record_tp* lself = (record_tp*)s_self->type->get_typedef();
 			assert(lself);
 			assert(ret_type->f_tkn);
 			auto local = lself->shallow_search(ret_type->f_tkn); //TODO search only inside a class here. what if this type is declared in parent class?
@@ -5892,17 +5895,15 @@ void range_index_node::translate(int)
     }
 }
 
-conformant_index_node::conformant_index_node(token *low, token *dots,
-				             token *high, token *coln,
-		                             tpd_node* tpd)
+conformant_index_node::conformant_index_node(token *t_low, token *t_dots, token *t_high, token *t_coln, tpd_node* tpd)
 {
-    CONS5(low, dots, high, coln, tpd);
+    CONS5(t_low, t_dots, t_high, t_coln, tpd);
 }
 
 void conformant_index_node::attrib(int)
 {
-    symbol *l = b_ring::add_cur(low, symbol::s_const, &integer_type);
-    symbol *h = b_ring::add_cur(high, symbol::s_const, &integer_type);
+    symbol *l = b_ring::add_cur(t_low, symbol::s_const, &integer_type);
+    symbol *h = b_ring::add_cur(t_high, symbol::s_const, &integer_type);
     l->flags |= symbol::f_val_param;
     h->flags |= symbol::f_val_param;
     curr_array->set_conformant_dim(l, h);
@@ -5910,15 +5911,12 @@ void conformant_index_node::attrib(int)
 
 void conformant_index_node::translate(int)
 {
-
     // last and first tokens are not calculated here since it is not possible
     // (and not necessary)
 }
 
-array_tpd_node::array_tpd_node(token *t_packed, token *t_array,
-                               token* t_lbr, idx_node *indices,
- 			       token* t_rbr, token* t_of, tpd_node *eltd)
-: tpd_node(tpd_array)
+array_tpd_node::array_tpd_node(token *t_packed, token *t_array, token* t_lbr, idx_node *indices,
+	              token* t_rbr, token* t_of, tpd_node *eltd) : tpd_node(tpd_array)
 {
     CONS7(t_packed, t_array, t_lbr, indices, t_rbr, t_of, eltd);
 }
@@ -5926,7 +5924,7 @@ array_tpd_node::array_tpd_node(token *t_packed, token *t_array,
 void array_tpd_node::set_indices_attrib(idx_node* idx)
 {
     if (idx->next) {
-	set_indices_attrib(idx->next);
+		set_indices_attrib(idx->next);
     }
     type = curr_array = new array_tp(type, this);
     idx->attrib(ctx_component);
@@ -5936,96 +5934,95 @@ void array_tpd_node::attrib(int)
 {
     eltd->attrib(ctx_component);
     type = eltd->type;
-    set_indices_attrib(indices);
+    if (indices) set_indices_attrib(indices);
 }
 
 void array_tpd_node::translate(int ctx)
 {
     f_tkn = t_array;
 
-    if (t_packed) {
-	t_packed->disable();
-    }
+    if (t_packed) t_packed->disable();
+    
     eltd->translate(ctx_component);
 
-    if (language_c) {
-	token::disable(t_array, t_lbr->prev);
-	token::disable(t_rbr->next, eltd->f_tkn->prev);
-	f_tkn = t_lbr;
-	l_tkn = t_rbr;
-	if (eltd->tag == tpd_array) {
-	    l_tkn = eltd->l_tkn;
-	    eltd = ((array_tpd_node*)eltd)->eltd;
-	}
-	if (type->tag == tp_dynarray) {
-	    token::remove(t_lbr, t_rbr);
-	    f_tkn = eltd->f_tkn;
-	    l_tkn = eltd->l_tkn;
-	} else {
-	    curr_array = (array_tp*)type;
-
-	    for (idx_node* idx = indices; idx != NULL; idx = idx->next) {
-		idx->translate(ctx);
-		if (idx->next) {
-		    token* comma = idx->l_tkn->next_relevant();
-		    assert(comma->tag == TKN_COMMA);
-		    token::disable(idx->l_tkn->next,
-				   comma->next_relevant()->prev);
-		    idx->l_tkn->append("][");
-		    curr_array = (array_tp*)curr_array->elem_type;
-		}
-	    }
-	}
-    } else { // C++
-	if (type->tag == tp_dynarray) {
-
-	    if (eltd->type->tag == tp_dynarray) {
-		array_tpd_node* atp = (array_tpd_node*)eltd;
-		eltd = atp->eltd;
-		t_of = atp->t_of;
-		t_array->set_trans("conf_matrix");
-	    } else {
-		t_array->set_trans(indices->next == NULL
-				   ? "conf_array" : "conf_matrix");
-	    }
-	    token::disable(t_array->next, eltd->f_tkn->prev);
-	    eltd->f_tkn->prepend("<");
-	    l_tkn = eltd->l_tkn->append(">");
-
-	} else {
-
-	    for (idx_node* idx = indices; idx != NULL; idx = idx->next) {
-		idx->translate(ctx_component);
-	    }
-	    t_lbr->set_trans("<");
-	    t_rbr->set_trans(",");
-	    if (t_array->next != t_lbr) {
-		token::disable(t_array->next, t_lbr->prev);
-	    }
-	    if (indices->next == NULL && eltd->tag == tpd_array && !((array_tp*)eltd->type)->elem_type->is_array()) {
-		token::disable(t_rbr->next, ((array_tpd_node*)eltd)->t_lbr);
-		t_array->set_trans("matrix");
-		l_tkn = eltd->l_tkn;
-	    } else {
-		if (indices->next != NULL && indices->next->next == NULL) {
-		    t_array->set_trans("matrix");
-		}
+	if (language_c) {
+		token::disable(t_array, t_lbr->prev);
 		token::disable(t_rbr->next, eltd->f_tkn->prev);
-		l_tkn = eltd->l_tkn->append(">");
-	    }
+		f_tkn = t_lbr;
+		l_tkn = t_rbr;
+		if (eltd->tag == tpd_array) {
+			l_tkn = eltd->l_tkn;
+			eltd = ((array_tpd_node*)eltd)->eltd;
+		}
+		if (type->tag == tp_dynarray) {
+			token::remove(t_lbr, t_rbr);
+			f_tkn = eltd->f_tkn;
+			l_tkn = eltd->l_tkn;
+		} else {
+			curr_array = (array_tp*)type;
+
+			for (idx_node* idx = indices; idx != NULL; idx = idx->next) {
+				idx->translate(ctx);
+				if (idx->next) {
+					token* comma = idx->l_tkn->next_relevant();
+					assert(comma->tag == TKN_COMMA);
+					token::disable(idx->l_tkn->next,
+						comma->next_relevant()->prev);
+					idx->l_tkn->append("][");
+					curr_array = (array_tp*)curr_array->elem_type;
+				}
+			}
+		}
+	} else { // C++
+		if (type->tag == tp_dynarray) {
+
+			if (eltd->type->tag == tp_dynarray) {
+				array_tpd_node* atp = (array_tpd_node*)eltd;
+				eltd = atp->eltd;
+				t_of = atp->t_of;
+				t_array->set_trans("conf_matrix");
+			} else {
+				t_array->set_trans(indices->next == NULL ? "conf_array" : "conf_matrix");
+			}
+			token::disable(t_array->next, eltd->f_tkn->prev);
+			eltd->f_tkn->prepend("<");
+			l_tkn = eltd->l_tkn->append(">");
+
+		} else if (indices) {
+
+			for (idx_node* idx = indices; idx != NULL; idx = idx->next) {
+				idx->translate(ctx_component);
+			}
+			t_lbr->set_trans("<");
+			t_rbr->set_trans(",");
+			if (t_array->next != t_lbr) {
+				token::disable(t_array->next, t_lbr->prev);
+			}
+			if (indices->next == NULL && eltd->tag == tpd_array && !((array_tp*)eltd->type)->elem_type->is_array()) {
+				token::disable(t_rbr->next, ((array_tpd_node*)eltd)->t_lbr);
+				t_array->set_trans("matrix");
+				l_tkn = eltd->l_tkn;
+			} else {
+				if (indices->next != NULL && indices->next->next == NULL) {
+					t_array->set_trans("matrix");
+				}
+				token::disable(t_rbr->next, eltd->f_tkn->prev);
+				l_tkn = eltd->l_tkn->append(">");
+			}
+		} else { // Delphi dynamic array		
+			t_array->set_trans("conf_array<");
+			token::disable(t_array->next, eltd->f_tkn->prev);
+			l_tkn = eltd->l_tkn->append(">");
+		}
 	}
-    }
 }
 
 //-------------------------------------------------------------------
 
-varying_tpd_node::varying_tpd_node(token *t_string,
-				   token* t_lbr, expr_node *size,
-				   token* t_rbr)
-: tpd_node(tpd_string)
+varying_tpd_node::varying_tpd_node(token *t_string, token* t_lbr, expr_node *size, token* t_rbr) : tpd_node(tpd_string)
 {
     if (language_c) {
-	error(t_string,"Varying string are supported only for C++ conversion");
+		error(t_string,"Varying string are supported only for C++ conversion");
     }
     CONS4(t_string, t_lbr, size, t_rbr);
 }
@@ -6034,9 +6031,9 @@ void varying_tpd_node::attrib(int ctx)
 {
     size->attrib(ctx_component);
     if (use_c_strings && (ctx == ctx_record || ctx == ctx_component)) {
-	type = &string_type;
+		type = &string_type;
     } else {
-	type = &varying_string_type;
+		type = &varying_string_type;
     }
 }
 
@@ -6044,22 +6041,22 @@ void varying_tpd_node::translate(int)
 {
     f_tkn = t_string;
     l_tkn = t_rbr;
-    if (type->tag == tp_string) {
-	t_string->set_trans("asciiz");
-	token::disable(t_lbr, t_rbr);
-    } else {
-	size->translate(ctx_component);
-	t_lbr->set_trans("<");
-	t_rbr->set_trans(">");
-	t_string->set_trans("varying_string");
-    }
+	if (type->tag == tp_string) {
+		t_string->set_trans("asciiz");
+		token::disable(t_lbr, t_rbr);
+	} else {
+		size->translate(ctx_component);
+		t_lbr->set_trans("<");
+		t_rbr->set_trans(">");
+		t_string->set_trans("varying_string");
+	}
 }
 //-------------------------------------------------------------------
 
 string_tpd_node::string_tpd_node(token *t_string) : tpd_node(tpd_string)
 {
     if (language_c) {
-	error(t_string,"Varying string are supported only for C++ conversion");
+		error(t_string,"Varying string are supported only for C++ conversion");
     }
     CONS1(t_string);
 }
@@ -6067,9 +6064,9 @@ string_tpd_node::string_tpd_node(token *t_string) : tpd_node(tpd_string)
 void string_tpd_node::attrib(int ctx)
 {
     if (use_c_strings && (ctx == ctx_record || ctx == ctx_component)) {
-	type = &string_type;
+		type = &string_type;
     } else {
-	type = &varying_string_type;
+		type = &varying_string_type;
     }
 }
 
@@ -6077,7 +6074,7 @@ void string_tpd_node::translate(int)
 {
     f_tkn = l_tkn = t_string;
     if (type->tag == tp_string) {
-	f_tkn->set_trans("asciiz");
+		f_tkn->set_trans("asciiz");
     }
 }
 
@@ -6726,7 +6723,7 @@ void prop_read_node::attrib(int)
 {
 	sym = b_ring::search_cur(t_ident);
 	if (sym == NULL) {
-		// if property is inside of record or class then curr_b_ring is record_tp or object_tp
+		// if property is inside of record or class then curr_b_ring is record_tp or object_tp accordingly
 		record_tp* tp = dynamic_cast<record_tp*>(b_ring::curr_b_ring);
 		if (tp)
 			warning("cannot find function/method '%s' in class/record '%s'", t_ident->in_text, tp->name);
