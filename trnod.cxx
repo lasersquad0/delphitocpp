@@ -1542,9 +1542,9 @@ bool expr_node::is_parameter()
 		&& var->ring->scope != b_ring::global));
 }
 
-atom_expr_node::atom_expr_node(token* tkn) : expr_node(tn_atom)
+atom_expr_node::atom_expr_node(token* t_tkn) : expr_node(tn_atom)
 {
-    CONS1(tkn);
+    CONS1(t_tkn);
 	var = NULL;
 	temp = NULL;
 	with = NULL;
@@ -1552,26 +1552,26 @@ atom_expr_node::atom_expr_node(token* tkn) : expr_node(tn_atom)
 
 void atom_expr_node::attrib(int ctx)
 {
-	l_tkn = f_tkn = tkn;
+	l_tkn = f_tkn = t_tkn;
 
-	if (turbo_pascal && tkn->name->tag == TKN_SELF) {
+	if (turbo_pascal && t_tkn->name->tag == TKN_SELF) {
 		assert(proc_def_node::self != NULL);
 		type = proc_def_node::self;
 		with = proc_def_node::self->with;
 		tag = tn_self;
 		var = NULL;
-	} else if (turbo_pascal && tkn->name->tag == TKN_EXIT) {
+	} else if (turbo_pascal && t_tkn->name->tag == TKN_EXIT) {
 		type = &void_type;
 	}
 	// TKN_NIL implemented as built-in constant that is added to b_ring together with true/false contants and integer, cardinal etc. types
 //	else if (tkn->name->tag == TKN_NIL) {
 //		type = &any_type; // void*
 //	}
-	else if (!turbo_pascal || tkn->name->tag != TKN_ABSTRACT) {
-		var = b_ring::search_cur(tkn);
+	else if (!turbo_pascal || t_tkn->name->tag != TKN_ABSTRACT) {
+		var = b_ring::search_cur(t_tkn);
 		if (var != NULL) {
 			if (var->type == NULL) {
-				warning(tkn, "type of variable '%s' is unknown", tkn->in_text);
+				warning(t_tkn, "type of variable '%s' is unknown", t_tkn->in_text);
 				var->type = &any_type; // &void_type
  			}
 
@@ -1588,7 +1588,7 @@ void atom_expr_node::attrib(int ctx)
 					if (type == curr_proc) {
 						type = curr_proc->res_type;
 						if (type == NULL) {
-							error(tkn, "attempt to return value from procedure");
+							error(t_tkn, "attempt to return value from procedure");
 						}
 					}
 				} else {
@@ -1625,7 +1625,7 @@ void atom_expr_node::attrib(int ctx)
 			// Let converter work well even with incorrect code
 			// tp_last because we do not know its type yet
 			//TODO understand better whether it is good solution. it creates new tpexpr node for each unknown type
-			warning(tkn, "undefined identifier '%s'", tkn->in_text);
+			warning(t_tkn, "undefined identifier '%s'", t_tkn->in_text);
 			//type = new tpexpr(tp_last, NULL, tkn->in_text);
 			type = &any_type; //&void_type;
 			with = NULL;
@@ -1635,45 +1635,45 @@ void atom_expr_node::attrib(int ctx)
 
 void atom_expr_node::translate(int ctx)
 {
-	if (turbo_pascal && tkn->name->tag == TKN_SELF) {
+	if (turbo_pascal && t_tkn->name->tag == TKN_SELF) {
 		if (ctx == ctx_access) 
-			tkn->set_trans("this");
+			t_tkn->set_trans("this");
 		else 
-			tkn->set_trans("(*this)");
+			t_tkn->set_trans("(*this)");
 
 		return;
 	}
-	else if (turbo_pascal && tkn->name->tag == TKN_EXIT) {
+	else if (turbo_pascal && t_tkn->name->tag == TKN_EXIT) {
 		if (curr_proc && curr_proc->res_type) {
 			if (curr_proc->proc_name != NULL) 
-				tkn->set_trans(dprintf("return %s_result", curr_proc->proc_name));
+				t_tkn->set_trans(dprintf("return %s_result", curr_proc->proc_name));
 			else 
-				tkn->set_trans("return 0");
+				t_tkn->set_trans("return 0");
 		}
 		else {
-			tkn->set_trans("return");
+			t_tkn->set_trans("return");
 		}
 		return;
 	}
-	else if (turbo_pascal && tkn->name->tag == TKN_ABSTRACT) {
-		tkn->set_trans("assert(\"abstract method is called\",false)");
+	else if (turbo_pascal && t_tkn->name->tag == TKN_ABSTRACT) {
+		t_tkn->set_trans("assert(\"abstract method is called\",false)");
 		return;
 	}
 
 	if (var != NULL) {
-		var->translate(tkn);
+		var->translate(t_tkn);
 		if (var->type == curr_proc && ctx == ctx_lvalue) {
-			tkn->set_trans(dprintf("%s_result", curr_proc->proc_name));
+			t_tkn->set_trans(dprintf("%s_result", curr_proc->proc_name));
 
 		}
 		else if (var->type->tag == tp_proc) {
-			if (turbo_pascal && tkn->name->tag == TKN_HALT) {
-				tkn->set_trans(ctx == ctx_apply ? "exit" : "exit(0)");
+			if (turbo_pascal && t_tkn->name->tag == TKN_HALT) {
+				t_tkn->set_trans(ctx == ctx_apply ? "exit" : "exit(0)");
 				return;
 			}
 			proc_tp* prc = (proc_tp*)var->type->get_typedef();
 			if (ctx != ctx_procptr && ctx != ctx_apply && ctx != ctx_lvalue) {
-				token* lpar = tkn->append("(");
+				token* lpar = t_tkn->append("(");
 				token* t = lpar;
 				bool first = true;
 				param_spec* prm;
@@ -1732,7 +1732,7 @@ void atom_expr_node::translate(int ctx)
 		}
 		else if (var->ring->scope == b_ring::record) {
 			if (with != NULL) {
-				f_tkn = tkn->prepend(language_c && with->tag == symbol::s_ref ? "->" : ".")->prepend(with->out_name->text);
+				f_tkn = t_tkn->prepend(language_c && with->tag == symbol::s_ref ? "->" : ".")->prepend(with->out_name->text);
 			}
 
 		}
@@ -1748,13 +1748,13 @@ void atom_expr_node::translate(int ctx)
 			if (ctx == ctx_access) {
 				tag = tn_address;
 			} else if (ctx == ctx_array || ctx == ctx_lvalarray) {
-				f_tkn = tkn->prepend("(*");
-				l_tkn = tkn->append(")");
+				f_tkn = t_tkn->prepend("(*");
+				l_tkn = t_tkn->append(")");
 			} else {
-				f_tkn = tkn->prepend("*");
+				f_tkn = t_tkn->prepend("*");
 			}
 		} else if (ctx == ctx_statement) {
-			l_tkn = tkn->append("()");
+			l_tkn = t_tkn->append("()");
 		}
 	}
 }
@@ -2473,7 +2473,7 @@ void address_node::translate(int)
 {
 	f_tkn = t_adr;
     if (turbo_pascal && var->tag == tn_self) {
-       ((atom_expr_node*)var)->tkn->remove();
+       ((atom_expr_node*)var)->t_tkn->remove();
        l_tkn = f_tkn;
 	   f_tkn->set_trans("this");
     } else {
@@ -3091,7 +3091,7 @@ void fcall_node::translate_read(int ctx, bool newl)
 
 void fcall_node::attrib(int ctx)
 {
-	token* tok = ((atom_expr_node*)fptr)->tkn;
+	token* tok = ((atom_expr_node*)fptr)->t_tkn;
 	if (fptr->tag == tn_atom && tok->tag != TKN_IDENT)
 	{
 		if (args) {
@@ -3220,7 +3220,7 @@ void fcall_node::attrib(int ctx)
 					auto access = (access_expr_node*)fptr;
 					if (access->rec->tag == tn_atom) {
 						auto atom = (atom_expr_node*)(access->rec);
-						warning(t_lpar, "function '%s.%s' not defined.", atom->tkn->in_text, access->field->in_text);
+						warning(t_lpar, "function '%s.%s' not defined.", atom->t_tkn->in_text, access->field->in_text);
 					}
 					else
 						warning(t_lpar, "function not defined.");
@@ -3239,7 +3239,7 @@ void fcall_node::attrib(int ctx)
 void fcall_node::translate(int ctx)
 {
     l_tkn = t_rpar;
-	f_tkn = ((atom_expr_node*)fptr)->tkn;
+	f_tkn = ((atom_expr_node*)fptr)->t_tkn;
 
     if (fptr->tag == tn_atom && f_tkn->tag != TKN_IDENT)
     {
@@ -4494,8 +4494,7 @@ void var_decl_node::attrib(int ctx)
 				if (ctx == ctx_valpar) {
 					prm_class = symbol::s_const;
 				}
-			}
-			else {
+			} else {
 				if (ctx == ctx_varpar) {
 					prm_class = symbol::s_ref;
 				}
@@ -4638,13 +4637,11 @@ void  var_decl_node::translate(int ctx)
 				&& (tp->get_typedef()->flags & tp_need_init))
 			{
 				// initialize file structure
-				tkn->ident->append(
-					(tp->tag == tp_file || tp->tag == tp_text)
-					? " = VOID_FILE" : " = {0}");
+				tkn->ident->append((tp->tag == tp_file || tp->tag == tp_text) ? " = VOID_FILE" : " = {0}");
 			}
 			if (tkn->var->flags & symbol::f_static) is_static = true;
 
-			//if (tp->tag == tp_object) tkn->ident->prepend("*"); // special case fot classes
+			//if (tp->tag == tp_object) tkn->ident->prepend("*"); // special case for classes
 		}
 
 		if (language_c && tpd->tag == tpd_node::tpd_array) {
@@ -4658,7 +4655,10 @@ void  var_decl_node::translate(int ctx)
 		} else {
 			assert(tpd);
 
-			if (tp->tag == tp_object) {
+			//tpd->tag == tpd_node::tpd_array
+			
+			if (tp->tag == tp_object && tpd->tag != tpd_node::tpd_array) { // arrays have tpd->type = type of array element
+				assert(tp->tag == tp_object);
 				f_tkn = vars->ident->prepend("*"); // special case for classes as pointers in Delphi
 			} else if (tpd->tag == tpd_node::tpd_ref && (tp->tag == tp_ref && dynamic_cast<ref_tp*>(tp)->base_type->tag == tp_object) ) {
 				// if tpd is ref then it already contains on '*' in its translated name
@@ -5797,60 +5797,55 @@ void type_index_node::translate(int)
 
     tpexpr* typ = tpd->type->get_typedef();
 
-    if (language_c) {
-	switch(typ->tag) {
-	  case tp_bool:
-	    f_tkn->set_trans("2");
-	    curr_array->set_dim("0", "1");
-	    break;
-	  case tp_range:
-	    { range_tp* range = (range_tp*)typ->get_typedef();
-  	      if (no_index_decrement) {
-		  f_tkn->set_trans(dprintf("%s+1", range->max));
-	      } else {
-		  f_tkn->set_trans(dprintf("%s-%s+1", range->max, range->min));
-	      }
-	      curr_array->set_dim(range->min, range->max);
-	    }
-	    break;
-	  case tp_char:
-	    f_tkn->set_trans("256");
-	    curr_array->set_dim(" -128", "127");
-	    break;
-	  case tp_enum:
-	    f_tkn->set_trans(((enum_tp*)typ->get_typedef())->max);
-	    curr_array->set_dim("0", dprintf("%s-1",
-				       ((enum_tp*)typ->get_typedef())->max));
-	    break;
-	  default:
-	    warning(f_tkn, "Illegal type of index");
+	if (language_c) {
+		switch (typ->tag) {
+		case tp_bool:
+			f_tkn->set_trans("2");
+			curr_array->set_dim("0", "1");
+			break;
+		case tp_range:
+		{
+			range_tp* range = (range_tp*)typ->get_typedef();
+			if (no_index_decrement) {
+				f_tkn->set_trans(dprintf("%s+1", range->max));
+			} else {
+				f_tkn->set_trans(dprintf("%s-%s+1", range->max, range->min));
+			}
+			curr_array->set_dim(range->min, range->max);
+		}
+		break;
+		case tp_char:
+			f_tkn->set_trans("256");
+			curr_array->set_dim(" -128", "127");
+			break;
+		case tp_enum:
+			f_tkn->set_trans(((enum_tp*)typ->get_typedef())->max);
+			curr_array->set_dim("0", dprintf("%s-1", ((enum_tp*)typ->get_typedef())->max));
+			break;
+		default:
+			warning(f_tkn, "Illegal type of index");
+		}
+	} else {
+		switch (typ->tag) {
+		case tp_bool:
+			f_tkn->set_trans("false,true");
+			break;
+		case tp_char:
+			f_tkn->set_trans("-128,127");
+			break;
+		case tp_range:
+			f_tkn->set_trans(dprintf("%s,%s", ((range_tp*)typ->get_typedef())->min,	((range_tp*)typ->get_typedef())->max));
+			break;
+		case tp_enum:
+			f_tkn->set_trans(dprintf("0,%s", ((enum_tp*)typ->get_typedef())->max));
+			break;
+		default:
+			warning(f_tkn, "Illegal type of index");
+		}
 	}
-    } else {
-	switch(typ->tag) {
-	  case tp_bool:
-	    f_tkn->set_trans("false,true");
-	    break;
-	  case tp_char:
-	    f_tkn->set_trans("-128,127");
-	    break;
-	  case tp_range:
-	    f_tkn->set_trans(dprintf("%s,%s",
-				     ((range_tp*)typ->get_typedef())->min,
-				     ((range_tp*)typ->get_typedef())->max));
-	    break;
-	  case tp_enum:
-	    f_tkn->set_trans(dprintf("0,%s",
-				     ((enum_tp*)typ->get_typedef())->max));
-	    break;
-	  default:
-	    warning(f_tkn, "Illegal type of index");
-	}
-    }
-
 }
 
-range_index_node::range_index_node(expr_node *low, token* dots,
-				   expr_node* high)
+range_index_node::range_index_node(expr_node *low, token* dots, expr_node* high)
 {
     CONS3(low, dots, high);
 }
@@ -6118,7 +6113,7 @@ void variant_node::attrib(int ctx)
 	char* save_path = struct_path;
 	number += 1;
         if (tag_list->tag == tn_atom) {
-	    token* tag = ((atom_expr_node*)tag_list)->tkn;
+	    token* tag = ((atom_expr_node*)tag_list)->t_tkn;
 	    struct_name = isdigit(tag->out_text[0])
 	        ? dprintf("s%s", tag->out_text)
 		: dprintf("s_%s", tag->out_text);

@@ -4,7 +4,7 @@
 
 #include "tpexpr.h"
 
-enum {
+enum context {
   ctx_program,      // 0 program
   ctx_module,       // list of declaration
   ctx_object,       // list of object components
@@ -610,17 +610,17 @@ class expr_node : public node {
 
 class atom_expr_node : public expr_node { 
   public: 
-    token  *tkn;
-    symbol *var;
+    token *  t_tkn;
+    symbol*  var;
 
-    symbol *with;  // variable stored result of 'with' expression 
-    char   *temp;  // temporary variable for returning array
+    symbol*  with;  // variable stored result of 'with' expression 
+    char*    temp;  // temporary variable for returning array
  
-    atom_expr_node(token* tkn);
+    atom_expr_node(token* t_tkn);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
-    void print_debug() override { fprintf(stderr, "atom_expr_node:%s", tkn->in_text); };
+    void print_debug() override { fprintf(stderr, "atom_expr_node:%s", t_tkn->in_text); };
 };
 
 class literal_node : public expr_node {
@@ -888,11 +888,11 @@ class write_list_node : public node {
 
 class inherited_node : public expr_node {
 public:
-    token* t_inherited;
-    token* t_ident;
-    token* t_lpar;
-    token* t_rpar;
-    expr_node* params;
+    token*      t_inherited;
+    token*      t_ident;
+    token*      t_lpar;
+    token*      t_rpar;
+    expr_node*  params;
 
     inherited_node(token* t_inherited, token* t_ident, token* t_lpar, expr_node* params, token* t_rpar);
 
