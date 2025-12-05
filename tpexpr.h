@@ -7,10 +7,10 @@
 
 enum type_tag {
     tp_void, tp_any, //1
-    tp_real, tp_double, tp_integer, tp_longint, //5
-    tp_char, tp_string, tp_varying_string, tp_bool, tp_set, //10
-    tp_enum, tp_range, tp_proc, tp_array, tp_dynarray, tp_record, tp_ref, //17
-    tp_file, tp_text, tp_fwd_ref, tp_unit, tp_object, //22
+    tp_real, tp_double, tp_integer, tp_long, tp_char, tp_short, tp_int64, //8 
+    tp_string, tp_varying_string, tp_bool, tp_set, //12
+    tp_enum, tp_range, tp_proc, tp_array, tp_dynarray, tp_record, tp_ref, //19
+    tp_file, tp_text, tp_fwd_ref, tp_unit, tp_object, //24
     tp_last	// Not a type really
 };
 enum type_flags { 
@@ -24,7 +24,7 @@ class param_spec : public heap_object {
     symbol     *var;
 
     param_spec(symbol* variable) { 
-	var = variable, next = NULL; 
+	    var = variable, next = NULL; 
     }
 }; 
 
@@ -60,6 +60,7 @@ class tpexpr : public heap_object {
 class simple_tp : public tpexpr { 
   public:
     tpexpr* alias;
+
     virtual tpexpr* get_typedef() { return alias->get_typedef();  }
     virtual bool is_reference()   { return alias->is_reference(); }
     virtual bool is_array()       { return alias->is_array();     }
@@ -102,16 +103,16 @@ class enum_tp : public tpexpr {
 
 class range_tp : public tpexpr {
   public:
-    char*  min;
-    char*  max;
-    int    min_value; 
-    int    max_value; 
-    int    size;  // size of type representing range 
+    char*     min;
+    char*     max;
+    long long min_value; // was int here 
+    long long max_value; // was int here
+    int       size;  // size of type representing range 
  
     range_tp(tpd_node* tpd = NULL) : tpexpr(tp_range, tpd) {
-	min_value = max_value = 0;
+	    min_value = max_value = 0;
         min = max = NULL;
-	size = 0;
+	    size = 0;
     }
     void set_bounds(symbol* name);
 };
@@ -130,7 +131,7 @@ class array_tp : public tpexpr {
     char       *high;  
     expr_node  *low_expr;  
     expr_node  *high_expr;  
-    int        base;
+    long long   base; //was int here
 
     virtual bool   is_array() { return true; }
 
@@ -299,7 +300,7 @@ class proc_tp : public tpexpr, public b_ring {
 extern tpexpr    integer_type;
 extern tpexpr    real_type;
 extern tpexpr    double_type;
-extern tpexpr    longint_type;
+extern tpexpr    long_type;
 extern tpexpr    char_type;
 extern tpexpr    void_type;
 extern tpexpr    any_type;

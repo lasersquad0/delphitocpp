@@ -8,7 +8,7 @@
 tpexpr void_type(tp_void, NULL, "void");
 tpexpr any_type(tp_any, NULL, "unknown_type");
 tpexpr integer_type(tp_integer, NULL, "int ");
-tpexpr longint_type(tp_longint, NULL, "int32_t");
+tpexpr long_type(tp_long, NULL, "long"); // 32bit on Windows and 64bits on Linux
 tpexpr real_type(tp_real, NULL, "single"); // this is actually 4 bytes delphi single type
 tpexpr double_type(tp_double, NULL, "double"); // this is 8 bytes double type
 tpexpr char_type(tp_char, NULL, "char");
@@ -18,10 +18,10 @@ string_tp string_type;
 varying_string_tp varying_string_type;
 text_tp text_type;
 
-tpexpr smallint_type(tp_longint, NULL, "short");
+tpexpr smallint_type(tp_short, NULL, "short"); // 16bits
 tpexpr cardinal_type(tp_integer, NULL, "uint32_t "); //TODO whether we need tp_uint32 tag or not? 
-tpexpr uint64_type(tp_integer, NULL, "uint64_t"); //TODO whether we need tp_uint64 tag or not? 
-tpexpr int64_type(tp_integer, NULL, "int64_t"); //TODO whether we need tp_int64 tag or not? 
+tpexpr uint64_type(tp_int64, NULL, "uint64_t");
+tpexpr int64_type(tp_int64, NULL, "int64_t");  
 
 
 //---------------------------------------------------------------------
