@@ -41,7 +41,7 @@ class symbol : public heap_object {
 	  f_lvalue        = 0x100 // variable is used as lvalue
     };
     int	        flags;
-    int         value;  
+    long long   value; // was in here  
     tpexpr	    *type;
 
     void translate(token* t) const;

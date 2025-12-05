@@ -158,5 +158,3 @@ void b_ring::make_vars_static()
     }
 }
 	
- 
-	    
