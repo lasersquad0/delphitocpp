@@ -47,13 +47,21 @@
 * DONE - implemented Delphi built-in functions implement functions FreeAndNil, Assigned, StrLen, StrDispose, StrAlloc, StrPLCopy
 * DONE - needs to be TObject* in this code: TObject GetValue_result; TObject& result = GetValue_result;
 * DONE - implemented proper work when inherited call has no explicit parameters (single keyword 'inherited')- need to add there function name and params e.g. => TParentClass::ProcName(ProcName_params)
-* 
+* DONE - implemented conversion Delphi binary constants into C++ binary constants 
+* DONE - 64bit integer constants are translated correctly now. Delphi group digits separator '_' is supported as well.
+*
+*
 * implement function StrToInt, IntToStr,
-*  
+*
+* implement proper parsing integer constant that have format: 50_000_000
+* implement proper parting int64 constants
+*
 * investigate why break keyword is replaced by flush()
-* investigate why double1 happend instead double
+* investigate why double1 happend instead double  
 * 
-*  if Result <> -1 then Result := Result + Integer(Start);
+* { result = ( (int)(index); ); return IndexOfFrom_result; }
+* 
+* if Result <> -1 then Result := Result + Integer(Start);
 * translated to
 *   if (result != -1)  result = result + ( (int)(Start); );
   
@@ -64,7 +72,6 @@
   i = FAIndex->DefPropName[5];
 * 
 * могут различаться приоритеты операций Delphi и С++ и это может влиять на результат вычислений.
-* implement functions StrLen, StrDispose, StrAlloc, StrPLCopy
 
 * Если в секции implementation процедура имеет qualifiers то парсинг выдает ошибку. пример: procedure memcpyfromend(pi, po: Pointer; Count: Cardinal); stdcall;
 
@@ -72,7 +79,6 @@
 
 * если в конструкторе inherited идет первой строчкой тогда parent можно вызывать так (часто это и единственный компилируемый метод). TTest::TTest(int a): TParent(a, 4);
 
-* добавить в tptoc.pas либо в passlib.h ф-ции Move, SetLength, Copy, Assert
 * посмотреть каких реализаций из tptoc.pas нехватает в paslib.h 
 * 
 * how to translate this: if Supports(Allocator, IMalloc) then ...
@@ -92,7 +98,7 @@ static void load_predefined()
 	// all simple built-in types need to be aded to b_ring here
 
     b_ring::add_cur(nm_entry::add("integer", TKN_IDENT), nm_entry::add("int", TKN_IDENT),     symbol::s_type, &integer_type);
-    b_ring::add_cur(nm_entry::add("real",    TKN_IDENT), nm_entry::add("double", TKN_IDENT),  symbol::s_type, &real_type);
+    b_ring::add_cur(nm_entry::add("real",    TKN_IDENT), nm_entry::add(" double ", TKN_IDENT),  symbol::s_type, &real_type);
     b_ring::add_cur(nm_entry::add("boolean", TKN_IDENT), nm_entry::add("bool", TKN_IDENT),    symbol::s_type, &bool_type);
     b_ring::add_cur(nm_entry::add("nil",     TKN_IDENT), nm_entry::add("nullptr", TKN_IDENT), symbol::s_const, &any_type);
 	b_ring::add_cur(nm_entry::add("zero_terminated_string", TKN_IDENT), nm_entry::add("char *", TKN_IDENT), symbol::s_type, &string_type);
@@ -115,8 +121,8 @@ static void load_predefined()
 		b_ring::add_cur(nm_entry::add("byte",      TKN_IDENT),  nm_entry::add("unsigned char", TKN_IDENT),  symbol::s_type, &char_type);
 		b_ring::add_cur(nm_entry::add("smallint",  TKN_IDENT),  nm_entry::add("signed short", TKN_IDENT),   symbol::s_type,	&smallint_type);
 		b_ring::add_cur(nm_entry::add("word",      TKN_IDENT),  nm_entry::add("unsigned short", TKN_IDENT), symbol::s_type, &smallint_type);
-		b_ring::add_cur(nm_entry::add("longint",   TKN_IDENT),  nm_entry::add("signed int", TKN_IDENT),     symbol::s_type, &longint_type);
-		b_ring::add_cur(nm_entry::add("longword",  TKN_IDENT),  nm_entry::add("unsigned  int", TKN_IDENT),	symbol::s_type,	&cardinal_type);
+		b_ring::add_cur(nm_entry::add("longint",   TKN_IDENT),  nm_entry::add("long", TKN_IDENT),           symbol::s_type, &long_type);
+		b_ring::add_cur(nm_entry::add("longword",  TKN_IDENT),  nm_entry::add("unsigned long", TKN_IDENT),	symbol::s_type,	&long_type);
 		b_ring::add_cur(nm_entry::add("uint32",    TKN_IDENT),  nm_entry::add("uint32_t", TKN_IDENT),       symbol::s_type, &cardinal_type);
 		b_ring::add_cur(nm_entry::add("int32",     TKN_IDENT),  nm_entry::add("int32_t", TKN_IDENT),	    symbol::s_type,	&integer_type);
 		b_ring::add_cur(nm_entry::add("uint64",    TKN_IDENT),  nm_entry::add("uint64_t", TKN_IDENT),       symbol::s_type, &uint64_type);
@@ -129,7 +135,7 @@ static void load_predefined()
 		b_ring::add_cur(nm_entry::add("single",    TKN_IDENT),  nm_entry::add("float", TKN_IDENT),          symbol::s_type, &real_type);
 		b_ring::add_cur(nm_entry::add("extended",  TKN_IDENT),  nm_entry::add("long double", TKN_IDENT),    symbol::s_type, &double_type);
 		b_ring::add_cur(nm_entry::add("currency",  TKN_IDENT),  nm_entry::add("double ", TKN_IDENT),        symbol::s_type, &double_type);
-		b_ring::add_cur(nm_entry::add("double",    TKN_IDENT),  nm_entry::add(" double ", TKN_IDENT),       symbol::s_type, &double_type);
+		b_ring::add_cur(nm_entry::add("double",    TKN_IDENT),  nm_entry::add("double", TKN_IDENT),         symbol::s_type, &double_type);
 
 		b_ring::add_cur(nm_entry::add("untyped_file", TKN_IDENT), symbol::s_type, &text_type);
 
@@ -448,7 +454,6 @@ int main(int argc, char* argv[])
 	zzdebug = 1;
 
 	token::input(input_file);
-
 
 	try
 	{
