@@ -124,8 +124,9 @@ class token : public heap_object {
 
     token* next_relevant() const;
     token* prev_relevant() const;
-    static token* first_relevant();
-    static token* last_relevant();
+
+    static token* first_relevant() { return dummy.next_relevant(); }
+    static token* last_relevant() { return dummy.prev_relevant(); }
 
     void   set_trans (char const* str) {
         cat = CAT_GEN;
