@@ -77,29 +77,28 @@ token* token::prev_relevant() const
     return t;
 }
 
-token* token::first_relevant() { return dummy.next_relevant(); }
-
-token* token::last_relevant()  { return dummy.prev_relevant(); }
-
 void   token::remove(token* head, token* tail)
 { 
     head->prev->next = tail->next; 
     tail->next->prev = head->prev; 
 } 
 
-void   token::disable(token* head, token* tail)
+void token::disable(token* head, token* tail)
 { 
-    while(true) {
-	if (head->tag != TKN_CMNT && head->tag != TKN_LN) { 
-	    head->disable();
+    assert(tail);
+
+    while (true) {
+        if (head->tag != TKN_CMNT && head->tag != TKN_LN) {
+            head->disable();
         }
-	if (head == tail) break;
-        head = head->next; 
+        if (head == tail) break;
+        assert(head != head->next); // to avoid infinite loop
+        head = head->next;
     }
 }
 
-void   token::disappear() 
-{ 
+void token::disappear() 
+{
     token* t = this;
     do { 
 	    t->disable();
@@ -119,6 +118,8 @@ token* token::get_first_token()
 // returns pointer to clone of head
 token* token::copy(token* head, token* tail)
 {
+    assert(tail);
+
     token* first = head;
     while (true) {
          (new token(*head))->insert_b(this); //insert new token (copy of head) before 'this' 
@@ -129,8 +130,7 @@ token* token::copy(token* head, token* tail)
     return first->clone; 
 } 
 
-void token::swap(token* left_head, token* left_tail,
-		 token* right_head, token* right_tail)
+void token::swap(token* left_head, token* left_tail, token* right_head, token* right_tail)
 {  
     token* t;
 
