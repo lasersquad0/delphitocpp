@@ -6,11 +6,10 @@
 //extern "C" 
 char* lpsz(int low, int high, const char* ptr);
 
-#define BETWEEN(down, value, up)  \
-                (unsigned(value) - down <= unsigned(up - down))
+#define BETWEEN(down, value, up) (unsigned(value) - down <= unsigned(up - down))
 #define noconst 
 
-#ifndef TURBO_PASCAL
+//#ifndef TURBO_PASCAL
 
 #ifdef _WIN32
 #include "malloc.h"
@@ -29,7 +28,7 @@ class conf_array {
   public:
     integer low, high; 
 
-    conf_array(integer l, integer h) : low(l), high(h), owned_buf(true) {
+    conf_array(integer l = 0, integer h = 0) : low(l), high(h), owned_buf(true) {
         buf = malloc(high - low + 1);
     }
 
@@ -54,7 +53,7 @@ class conf_array {
     // recalculate high bound only, low left unchanged
     // changing size only possible if buf is owned by class
     // if buf is NOT owned by class then do nothing and return false
-    bool set_size(integer sz) 
+    bool set_length(integer sz) 
     { 
         if (!owned_buf) return false;
         if (size() == sz) return true;
@@ -94,7 +93,7 @@ TEMPLATE_SPEC inline conf_array<char>::conf_array(char const* str) : low(1), hig
 
 TEMPLATE_SPEC inline conf_array<char>::conf_array(char ch) : low(1), high(1), buf(&ch) {}
 
-#endif /* not Turbo Pascal */
+//#endif /* not Turbo Pascal */
 
 // low and high indices are fixed as template parameters during array definition and and cannot be changed
 template<integer low_bound, integer high_bound, class Type>
@@ -335,7 +334,7 @@ class array {
 
 #ifdef TURBO_PASCAL
 
-inline size_t length(const char* str) { return strlen(str); }
+//inline size_t length(const char* str) { return strlen(str); }
 
 #ifndef MAX_STRING_SIZE
 #define MAX_STRING_SIZE 255
