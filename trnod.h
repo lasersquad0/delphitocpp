@@ -582,27 +582,20 @@ class expr_node : public node {
     char       tag;   // enum expr_tag{}
     char       parent_tag;  
     char       flags;
-    int        value; // value of constant expression
+    long long  value; // was int here // integer value of constant expression
     tpexpr*    type;
 
-    bool       is_const_literal() const {
+    bool is_const_literal() const {
 	    return (flags & (tn_is_const|tn_is_literal)) == (tn_is_const|tn_is_literal); 
     } 
     
-    bool       is_parameter();
+    bool is_parameter();
 
-    expr_node(int expr_tag, int expr_flags = 0) {
-        tag = (char)expr_tag;
-        parent_tag = tn_group;
-        type = NULL;
-        flags = (char)expr_flags;
-        next = NULL;
-        value = 0;
-    }
+    expr_node(int expr_tag, int expr_flags = 0);
 
     void print_debug() override 
     { 
-        fprintf(stderr, "tag:%d val:%d", (int)(tag), value);
+        fprintf(stderr, "tag:%d val:%lld", (int)(tag), value);
     }
 };
 
@@ -611,8 +604,8 @@ class expr_node : public node {
 class atom_expr_node : public expr_node { 
   public: 
     token *  t_tkn;
-    symbol*  var;
 
+    symbol*  var;
     symbol*  with;  // variable stored result of 'with' expression 
     char*    temp;  // temporary variable for returning array
  
@@ -738,10 +731,10 @@ class idx_expr_node : public expr_node {
 
 class deref_expr_node : public expr_node { 
   public:
-    token*     op; // '^'
+    token*     t_op; // '^'
     expr_node* ptr; 
 
-    deref_expr_node(expr_node* ptr, token* op); 
+    deref_expr_node(expr_node* ptr, token* t_op); 
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -779,6 +772,7 @@ class fcall_node : public expr_node {
     token           *t_lpar;
     expr_node       *args;
     token           *t_rpar;
+
     char            *temp; // temporary variable used for returning array
 
     fcall_node(expr_node* fptr, token* t_lpar, expr_node* args, token* t_rpar);
@@ -1004,13 +998,13 @@ class label_decl_part_node : public decl_node {
 
 class const_def_node : public decl_node { 
   public: 
-    token*           ident; 
-    token*           equal;
+    token*           t_ident; 
+    token*           t_equal;
     expr_node*       constant; 
     symbol*          sym;
     static const_def_node* enumeration;
 
-    const_def_node(token* ident, token* equal, expr_node* value); 
+    const_def_node(token* t_ident, token* t_equal, expr_node* value); 
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1048,12 +1042,12 @@ class const_def_part_node : public decl_node {
 
 class type_def_node : public decl_node { 
   public: 
-    token*           ident; 
-    token*           equal;
-    tpd_node*        tpd; 
-    symbol*          sym;
+    token*       t_ident; 
+    token*       t_equal;
+    tpd_node*    tpd; 
+    symbol*      sym;
   
-    type_def_node(token* ident, token* equal, tpd_node* tpd); 
+    type_def_node(token* t_ident, token* t_equal, tpd_node* tpd); 
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1274,15 +1268,15 @@ class proc_def_node : public proc_decl_node {
 
 class tpd_node : public node {
   public:
-    tpexpr*     type; /* Type which is designated by this typenode */
+    tpexpr*  type; // Type which is designated by this typenode 
      
-    enum { tpd_simple, tpd_set, tpd_enum, tpd_range, tpd_proc, //TODO what is the difference from enum type_tag{} ? 
+    enum tpd_type { tpd_simple, tpd_set, tpd_enum, tpd_range, tpd_proc, //TODO what is the difference from enum type_tag{} ? 
            tpd_array, tpd_string, tpd_ref, tpd_object, tpd_record, tpd_file };  
-    int         tag;  
+    
+    int  tag;  
 
     tpd_node(int tpd_tag) { type = NULL; tag = tpd_tag; }
 };
-
 
 
 class simple_tpd_node: public tpd_node {
@@ -1417,15 +1411,14 @@ class array_tpd_node: public tpd_node {
     token*      t_packed;      // 'Packed' (if any)
     token*      t_array;	   // 'Array'
     token*      t_lbr;         // '['
+    idx_node*   indices;	   // indices (possibly with comma)
     token*      t_rbr;         // ']'
     token*      t_of;          // 'of'
-    idx_node*   indices;	   // indices (possibly with comma)
     tpd_node*   eltd;		   // Declaration of element type
 
     void set_indices_attrib(idx_node* idx);
 
-    array_tpd_node(token* t_packed, token *t_array, 
-                   token* t_lbr, idx_node *indices, 
+    array_tpd_node(token* t_packed, token *t_array, token* t_lbr, idx_node *indices, 
                    token* t_rbr, token* t_of, tpd_node *eltd);
 
     virtual void attrib(int ctx);
