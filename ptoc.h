@@ -19,9 +19,11 @@ typedef unsigned char  byte;
 #endif
 
 #ifdef TURBO_PASCAL
-typedef long           longint;
-typedef signed char    shortint; 
-typedef void*          pointer;
+// three types below are correctly translated into appropriate C++ types by translator
+// so we do not need these defines any more
+//typedef long           longint; 
+//typedef signed char    shortint; 
+//typedef void*          pointer;
 typedef const char*    asciiz;
 #endif               
 
@@ -29,7 +31,7 @@ typedef unsigned char boolean;
 //#define true          (1)
 //#define false         (0)
 
-#define nil           NULL
+//#define nil           NULL
 
 #define EXTERN        extern
 
