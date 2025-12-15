@@ -27,13 +27,14 @@ typedef unsigned char  byte;
 typedef const char*    asciiz;
 #endif               
 
-typedef unsigned char boolean; 
+typedef bool boolean; //unsigned char boolean; 
 //#define true          (1)
 //#define false         (0)
 
 //#define nil           NULL
 
 #define EXTERN        extern
+
 
 /*
  * Pascal runtime library headers
