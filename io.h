@@ -53,15 +53,12 @@ void pio_put_record(file_descriptor* fd, void* record, size_t record_size);
 void pio_access_record(file_descriptor* fd, void* record, size_t record_size);
 
 
-void pio_store_record(file_descriptor* fd, void* record, size_t record_size, 
-		      void* src);
+void pio_store_record(file_descriptor* fd, void* record, size_t record_size, void* src);
 
 
-void pio_read_record(file_descriptor* fd, void* record, size_t record_size, 
-		     void* dst);
+void pio_read_record(file_descriptor* fd, void* record, size_t record_size, void* dst);
 
-void pio_write_record(file_descriptor* fd, void* record, size_t record_size,
-		  void* src);
+void pio_write_record(file_descriptor* fd, void* record, size_t record_size, void* src);
 
 void pio_copy_record(file_descriptor* src_fd, void* src_record, 
 		     file_descriptor* dst_fd, void* dst_record, 
@@ -79,8 +76,7 @@ void pio_file_ignore_error(file_descriptor* fd);
 
 void pio_close_file(file_descriptor* fd);
 
-void pio_seek_file(file_descriptor* fd, void* record, size_t record_size, 
-	       integer position);
+void pio_seek_file(file_descriptor* fd, void* record, size_t record_size, integer position);
 
 void pio_rename_file(file_descriptor* fd, const char* new_name);
 
@@ -112,28 +108,21 @@ int  pio_input_string(text_descriptor* td, char* buf, size_t len, int padding);
 void pio_input_newline(text_descriptor* td);
 
 
-void pio_output_real(text_descriptor* td, double val, const int* width, 
-		 const int* prec); 
+void pio_output_real(text_descriptor* td, double val, const int* width, const int* prec); 
 
-void pio_output_integer(text_descriptor* td, int val, 
-			const int* width); 
+void pio_output_integer(text_descriptor* td, int val, const int* width); 
 
-void pio_output_unsigned(text_descriptor* td, unsigned val, 
-			 const int* width); 
+void pio_output_unsigned(text_descriptor* td, unsigned val, const int* width); 
 
-void pio_output_long(text_descriptor* td, long val, 
-		     const int* width); 
+void pio_output_long(text_descriptor* td, long val, const int* width); 
 
-void pio_output_ulong(text_descriptor* td, unsigned long val, 
-		      const int* width); 
+void pio_output_ulong(text_descriptor* td, unsigned long val, const int* width); 
 
 void pio_output_char(text_descriptor* td, char val, const int* width); 
 
-void pio_output_boolean(text_descriptor* td, boolean val, 
-			const int* width); 
+void pio_output_boolean(text_descriptor* td, boolean val, const int* width); 
 
-void pio_output_string(text_descriptor* td, const char* buf, size_t len, 
-		       const int* width);
+void pio_output_string(text_descriptor* td, const char* buf, size_t len, const int* width);
 
 void pio_output_newline(text_descriptor* td);
 
@@ -212,8 +201,7 @@ class file {
 	pio_rewrite_file(&f.desc, sizeof(T), file_name, NULL, NULL);
     }
 
-    friend void reset(file& f, const char* file_name, 
-		      const char* options, integer& error_code) 
+    friend void reset(file& f, const char* file_name, const char* options, integer& error_code) 
     { 
 	pio_reset_file(&f.desc, sizeof(T), file_name, options, &error_code); 
     }
