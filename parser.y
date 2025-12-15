@@ -108,6 +108,7 @@ void zzerror(const char* text)
              OBJECT
              OF
              ON
+	     OPERATOR
              ORIGIN
              OTHERWISE
              OVERLOAD
@@ -172,6 +173,10 @@ void zzerror(const char* text)
 %left  <tok>    MOD DIV DIVR MUL AND SHR SHL BINAND AS
 %right <tok>    UPLUS UMINUS NOT ADDRESS BINNOT
 
+%left  <tok>    EQUAL NOTEQUAL LESSTH GREATERTH 
+%left  <tok>    ADD SUBSTRACT 
+%left  <tok>    MULTIPLY DIVIDE INTDIVIDE MODULUS IMPLICIT EXPLICIT
+
 %type <toks>    ident_list
 %type <toks>    label_list
 %type <toks>    qualifiers   
@@ -186,7 +191,6 @@ void zzerror(const char* text)
 %type <tok>     record_access_spec_tok
 %type <tok>     const
 %type <tok>     ident_ext
-
 
 %type <n_imp>   prog_param_list
 
@@ -204,12 +208,12 @@ void zzerror(const char* text)
 %type <n_stmt>  try_except
 %type <n_stmt>  except
 %type <n_stmt>  except_many
-%type <n_grp>   actual_params
+//%type <n_grp>   actual_params
 
 %type <n_comp>  compoundst
-%type <n_wrls>  write_params
-%type <n_wrtp>  write_list
-%type <n_wrtp>  write_param
+//%type <n_wrls>  write_params
+//%type <n_wrtp>  write_list
+//%type <n_wrtp>  write_param
 
 %type <n_expr>  expr
 %type <n_expr>  simple_expr
@@ -223,7 +227,7 @@ void zzerror(const char* text)
 %type <n_expr>  case_elem_list
 %type <n_expr>  inherited
 
-%type <n_grp>   expr_group
+//%type <n_grp>   expr_group
 
 %type <n_field> field_init_list
 %type <n_field> field_init_item
@@ -255,6 +259,7 @@ void zzerror(const char* text)
 %type <n_decl>  object_component
 %type <n_decl>  record_components
 %type <n_decl>  record_component
+%type <n_decl>  record_methods
 %type <n_decl>  record_body
 %type <n_decl>  record_field_list
 %type <n_decl>  record_access_spec_decl
@@ -290,6 +295,8 @@ void zzerror(const char* text)
 
 //%type <n_decl>  proc_decl
 %type <n_decl>  proc_fwd_decl
+%type <n_decl>  operator_fwd_decl
+%type <n_decl>  record_method_decl
 %type <n_decl>  method_decl_list
 %type <n_decl>  method_decl
 %type <n_decl>  proc_spec
@@ -304,6 +311,7 @@ void zzerror(const char* text)
 %type <n_tpd>   type
 %type <n_tpd>   param_type
 %type <n_tpd>   simple_type
+%type <n_tpd>   simple_templ_type
 %type <n_tpd>   fptr_type
 %type <n_tpd>   const_type
 %type <n_tpd>   const_array_type
@@ -333,7 +341,7 @@ void zzerror(const char* text)
 %type <n_vari>  variant
 
 %type <tok>    asm_kwd
-%type <toks>   asm_ident_list
+//%type <toks>   asm_ident_list
 %type <n_asm>  asm_line
 %type <n_asm>  asm_text
 %type <n_basm> assemblerst
@@ -404,8 +412,8 @@ translation:
   }      
 }	
 input_file { 
-    $2->attrib(ctx_program); 
-    $2->translate(ctx_program); 
+    $2->attrib(ctx_program);
+    $2->translate(ctx_program);
 } 
 
 input_file: program | module | unit
@@ -465,7 +473,7 @@ prog_param_list: { $$ = NULL; }
 
 // read, write, index are reserved keywords in Delphi. However they can be used as variable and function names in source code.
 // ident_ext non-terminal is an implementation for that.
-ident_ext: IDENT | READ | WRITE | INDEX
+ident_ext: IDENT | INDEX //| READ | WRITE
 
 ident_list: ident_ext ',' ident_list { $$ = new token_list($1, $3); }
     | ident_ext { $$ = new token_list($1); }
@@ -562,8 +570,8 @@ statement: { $$ = new empty_node(curr_token->prev_relevant()); }
         { $$ = new for_node($1, $2, $3, $4, $5, $6, $7, $8); }
     | WHILE expr DO statement { $$ = new while_node($1, $2, $3, $4); }
     | REPEAT sequence UNTIL expr { $$ = new repeat_node($1, $2, $3, $4); }
-    | WRITE write_params { $$ = new write_node($1, $2); }
-    | READ actual_params { $$ = new read_node($1, $2); }
+  //  | WRITE write_params { $$ = new write_node($1, $2); }
+  //  | READ actual_params { $$ = new read_node($1, $2); }
     | RAISE expr { $$ = new raise_node($1, $2); }
     | primary { $$ = new pcall_node($1); } 
  //   | RETURN { $$ = new return_node($1); }
@@ -579,24 +587,27 @@ compoundst: BEGIN sequence END { $$ = new compound_node($1, $2, $3); }
 assemblerst: ASM asm_text END { $$ = new asm_block_node($1, $2, $3); }
 
 // this "stub" for pascal assembler functions, no real assembler parsing yet.
-asm_kwd: IDENT | XOR | ICONST | '@' | ':' | '[' | ']' | '(' | ')' | PLUS | MINUS
+asm_kwd: IDENT | XOR | ICONST | '@' | ':' | '[' | ']' | '(' | ')' | ',' | PLUS | MINUS
 
-asm_ident_list: asm_kwd { $$ = new token_list($1); }
-    | asm_kwd asm_ident_list { $$ = new token_list($1, $2); }
+//asm_ident_list: asm_kwd { $$ = new token_list($1); }
+//    | asm_kwd asm_ident_list { $$ = new token_list($1, $2); }
 
-asm_line: asm_ident_list   { $$ = new asm_line_node($1, NULL); }
-    | asm_ident_list ',' { $$ = new asm_line_node($1, $2); }
+//asm_line: asm_ident_list   { $$ = new asm_line_node($1, NULL); }
+//    | asm_ident_list ',' { $$ = new asm_line_node($1, $2); }
     //| IDENT IDENT ',' IDENT { $$ = new asm_line_node($1, $2, $3, $4); }
 
+asm_line: asm_kwd { $$ = new asm_line_node($1, NULL); }
+
 asm_text: asm_line
-    | asm_text asm_line
+    | asm_line asm_text 
+
 
 sequence: statement | statement ';' sequence { $1->next = $3; $$ = $1; }
 
-actual_params: { $$ = NULL; } | expr_group { $$ = $1; }
+//actual_params: { $$ = NULL; } | expr_group { $$ = $1; }
 
-write_params:  { $$ = NULL; } 
-    | '(' write_list ')' { $$ = new write_list_node($1, $2, $3); } 
+//write_params:  { $$ = NULL; } 
+//    | '(' write_list ')' { $$ = new write_list_node($1, $2, $3); } 
 
 case_list: case_items
          | case_items otherwise sequence
@@ -736,14 +747,13 @@ field_init_list: field_init_item { $$ = $1; }
 field_init_item: IDENT ':' expr { $$ = new field_init_node($1, $2, $3); }
 
 
-expr_group: '(' expr_list ')' { $$ = new expr_group_node($1, $2, $3); }
+//expr_group: '(' expr_list ')' { $$ = new expr_group_node($1, $2, $3); }
 
+//write_list: write_param | write_param ',' write_list { $1->next = $3; $$ = $1; }
 
-write_list: write_param | write_param ',' write_list { $1->next = $3; $$ = $1; }
-
-write_param: expr  { $$ = new write_param_node($1); }
-    | expr ':' expr { $$ = new write_param_node($1, $2, $3); }
-    | expr ':' expr ':' expr { $$ = new write_param_node($1, $2, $3, $4, $5); }
+//write_param: expr  { $$ = new write_param_node($1); }
+//    | expr ':' expr { $$ = new write_param_node($1, $2, $3); }
+//    | expr ':' expr ':' expr { $$ = new write_param_node($1, $2, $3, $4, $5); }
 
 
 /*
@@ -795,27 +805,29 @@ label_list: ICONST { $$ = new token_list($1); }
 
 const: CONST | RESOURCESTRING
 
-const_def_part: const const_def_list  
-    { $$ = new const_def_part_node($1, $2); } 
+const_def_part: const const_def_list { $$ = new const_def_part_node($1, $2); } 
 
 const_def_list: { $$ = NULL; } 
     | const_def ';' const_def_list { $1->next = $3; $$ = $1; }
 
-const_def: IDENT EQ expr { $$ = new const_def_node($1, $2, $3); }
-| IDENT ':' const_type EQ expr { $$ = new typed_const_def_node($1, $2, $3, $4, $5); }
+const_def: IDENT EQ expr 
+        { $$ = new const_def_node($1, $2, $3); }
+    | IDENT ':' const_type EQ expr 
+        { $$ = new typed_const_def_node($1, $2, $3, $4, $5); }
 
 type_def_part: TYPE type_def_list  
-    { $$ = new type_def_part_node($1, $2); }
+        { $$ = new type_def_part_node($1, $2); }
 
 type_def_list: { $$ = NULL; }
     | type_def ';' type_def_list { $1->next = $3; $$ = $1; }
 
 type_def: IDENT EQ type { $$ = new type_def_node($1, $2, $3); }
+    | simple_templ_type EQ type { $$ = new type_def_templ_node($1, $2, $3); }
 
-var_decl_part: VAR var_decl_list 
-     { $$ = new var_decl_part_node(NULL, $1, $2); }
+var_decl_part: VAR var_decl_list { $$ = new var_decl_part_node(NULL, $1, $2); }
 
 var_decl_list: { $$ = NULL; }
+    | var_decl ';' var_decl_list { $1->next = $3; $$ = $1; }
 //     | var_decl
 // SCOPE was either 'external' or 'static' - remove it temporary since external or static keywords are not supported for variables any more 
 //     | var_decl ';' SCOPE 
@@ -829,7 +841,6 @@ var_decl_list: { $$ = NULL; }
 //	 token::remove($3, $4);	    
 //	 $1->next = $5; $$ = $1; 
 //       }
-     | var_decl ';' var_decl_list { $1->next = $3; $$ = $1; }
 
 var_decl: ident_list ':' type { $$ = new var_decl_node($1, $2, $3); }
    // temporarity commented out since it generates too many bison warnings (ambiguities)
@@ -852,6 +863,7 @@ proc_fwd_decl:
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION IDENT formal_params ':' type ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
+    /*
     | PROCEDURE READ formal_params ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION READ formal_params ':' type ';' qualifiers ';' 
@@ -860,6 +872,7 @@ proc_fwd_decl:
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION WRITE formal_params ':' type ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
+    */
     | PROCEDURE INDEX formal_params ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION INDEX formal_params ':' type ';' qualifiers ';' 
@@ -870,6 +883,7 @@ proc_spec:
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
     | FUNCTION IDENT formal_params ':' type ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
+    /*
     | PROCEDURE READ formal_params ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
     | FUNCTION READ formal_params ':' type ';'
@@ -878,11 +892,16 @@ proc_spec:
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
     | FUNCTION WRITE formal_params ':' type ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
+    */
     | PROCEDURE INDEX formal_params ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
     | FUNCTION INDEX formal_params ':' type ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
 
+operator_fwd_decl: 
+       OPERATOR IDENT formal_params ':' type ';'
+        { $$ = new operator_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
+  
 
 property_decl: PROPERTY IDENT prop_array prop_type_def prop_index prop_read prop_write prop_stored prop_default ';' prop_default_directive
         { $$ = new property_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); } 
@@ -923,17 +942,21 @@ prop_param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3);
 
 proc_def: 
       PROCEDURE IDENT formal_params ';' block ';' 
-               { $$ = new proc_def_node(NULL, $1, NULL, NULL, $2, $3, NULL, NULL, $4, $5, $6); } 
+          { $$ = new proc_def_node(NULL, $1, NULL, NULL, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION IDENT formal_params ':' type ';' block ';' 
-               { $$ = new proc_def_node(NULL, $1, NULL, NULL, $2, $3, $4, $5, $6, $7, $8); } 
+          { $$ = new proc_def_node(NULL, $1, NULL, NULL, $2, $3, $4, $5, $6, $7, $8); } 
     | PROCEDURE IDENT '.' ident_ext formal_params ';' block ';' 
-               { $$ = new proc_def_node(NULL, $1, $2, $3, $4, $5, NULL, NULL, $6, $7, $8); } 
+          { $$ = new proc_def_node(NULL, $1, $2, $3, $4, $5, NULL, NULL, $6, $7, $8); } 
     | FUNCTION IDENT '.' ident_ext formal_params ':' type ';' block ';' 
-               { $$ = new proc_def_node(NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10); } 
+          { $$ = new proc_def_node(NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10); } 
     | CLASS PROCEDURE IDENT '.' ident_ext formal_params ';' block ';' 
-               { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, NULL, NULL, $7, $8, $9); } 
+          { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, NULL, NULL, $7, $8, $9); } 
     | CLASS FUNCTION IDENT '.' ident_ext formal_params ':' type ';' block ';' 
-               { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); } 
+          { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); } 
+    | CLASS OPERATOR IDENT formal_params ':' type ';' block ';'
+          { $$ = new proc_def_node($1, $2, NULL,NULL, $3, $4, $5, $6, $7, $8, $9); } 
+    | CLASS OPERATOR IDENT '.' IDENT formal_params ':' type ';' block ';'
+          { $$ = new proc_def_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); } 
  
   //  | FUNCTION IDENT ';' block ';' 
   //             { $$ = new proc_def_node($1, NULL, NULL, $2, NULL, NULL, NULL, $3, NULL, NULL, $4, $5); } 
@@ -978,7 +1001,7 @@ param_type: simple_type | conformant_array_type
 /* Types definition */ 
 
 type: simple_type | array_type | record_type | class_type | interface_type | set_type | file_type 
-    | pointer_type | enum_type | range_type | string_type | fptr_type
+    | pointer_type | enum_type | range_type | string_type | fptr_type | simple_templ_type
 
 const_type: simple_type | const_array_type | record_type | const_set_type | string_type
 
@@ -992,6 +1015,8 @@ fptr_type: FUNCTION formal_params ':' type
        { $$ = new fptr_tpd_node($1, $2, NULL, NULL, $3, $4); }
 
 string_type: STRING '[' expr ']' { $$ = new varying_tpd_node($1, $2, $3, $4); }
+
+simple_templ_type: IDENT LT const_type GT { $$ = new simple_templ_tpd_node($1, $2, $3, $4); }
 
 simple_type: IDENT { $$ = new simple_tpd_node(NULL, NULL, $1); }
     | IDENT '.' ident_ext { $$ = new simple_tpd_node($1, $2, $3); }  
@@ -1057,9 +1082,25 @@ record_component: record_access_spec_decl
        { $1->next = $2; $$ = $1; }
     | VAR field_list
        { $$ = new record_field_part_node($1, $2); } 
-    | object_methods
+    | record_methods
+    | object_properties
     | const_def_part 
     | type_def_part 
+
+record_methods: record_method_decl
+    | record_method_decl record_methods { $1->next = $2; $$ = $1; }
+
+record_method_decl: 
+      proc_fwd_decl 
+       { $$ = new method_decl_node(NULL, $1); }
+    | proc_spec 
+       { $$ = new method_decl_node(NULL, $1); }
+    | CLASS proc_fwd_decl  
+       { $$ = new method_decl_node($1, $2); }
+    | CLASS proc_spec  
+       { $$ = new method_decl_node($1, $2); }
+    | CLASS operator_fwd_decl  
+       { $$ = new method_decl_node($1, $2); }
 
 record_field_list: field_list
        { $$ = new record_field_part_node(NULL, $1); }
@@ -1163,10 +1204,13 @@ field_decl_list: var_decl ';' { $$ = $1; }
     | var_decl ';' field_decl_list { $1->next = $3; $$ = $1; }
 
 object_methods: method_decl_list
-    //   { $$ = new proc_decl_part_node($1); }
 
 object_properties: property_decl_list
        { $$ = new property_decl_part_node($1); }
+
+method_decl_list: method_decl
+    | method_decl method_decl_list { $1->next = $2; $$ = $1; }
+  //  | proc_spec     proc_fwd_decl_list { $1->next = $2; $$ = $1; }
 
 method_decl: proc_fwd_decl 
        { $$ = new method_decl_node(NULL, $1); }
@@ -1176,10 +1220,6 @@ method_decl: proc_fwd_decl
        { $$ = new method_decl_node($1, $2); }
     | CLASS proc_spec  
        { $$ = new method_decl_node($1, $2); }
-
-method_decl_list: method_decl
-    | method_decl method_decl_list { $1->next = $2; $$ = $1; }
-  //  | proc_spec     proc_fwd_decl_list { $1->next = $2; $$ = $1; }
   
 
 file_type: packed FIL OF type { $$ = new file_tpd_node($1, $2, $3, $4); }
