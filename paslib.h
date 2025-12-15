@@ -30,9 +30,9 @@ double sqrt(double);
 
 //#define trunc(x)  ((integer)(x))
 
-#define pred(type,x) ((type)((x) - 1))
+//#define pred(type,x) ((type)((x) - 1))
 
-#define succ(type,x) ((type)((x) + 1))
+//#define succ(type,x) ((type)((x) + 1))
 
 //conflict with '#pragma pack' directive  
 //#define pack(a_l,a_h,a,i,z) memcpy(z, &(a)[(i)-(a_l)], sizeof(z))
@@ -131,11 +131,15 @@ const double pi = 3.14159265359;
 #define ParamStr(i)      paramstr(i)
 #define GetMem(p, size)  getmem(p, size)
 #define FreeMem(p, size) freemem(p, size)
-#define AllocMem(size) calloc(size, 1)
+#define AllocMem(size)   calloc(size, 1)
 #define ReAllocMem(p, size) realloc(p, size)
-#define StrAlloc(size) malloc(size)
-#define StrDispose(str) free(str)
-#define StrLen(str) strlen(str)
+#define StrAlloc(size)   malloc(size)
+#define StrDispose(str)  free(str)
+#define StrLen(str)      strlen(str)
+#define Assigned(p)      (p != nullptr)
+#define FreeAndNil(p)    { delete p; p = nullptr; } 
+#define StrPLCopy(dst, src, mxlen) (src.to_array(dst, mxlen))
+#define StrPCopy(dst, src) (src.to_array(dst, src.length()))
 
 
 #define upcase(c)        ((char)toupper(c))
@@ -174,6 +178,24 @@ extern double   randreal();
 
 inline unsigned Random(unsigned range) { return randint(range); }
 inline double   Random() { return randreal(); }
+
+// converts int Value to string
+string IntToStr(int Value);
+
+// converts unsigned int Value to string
+string IntToStr(unsigned int Value);
+
+//converts unsigned long Value to string
+string IntToStr(unsigned long Value);
+
+//converts long Value to string
+string IntToStr(long Value);
+
+//converts long long Value to string
+string IntToStr(long long Value);
+
+//converts unsigned long long Value to string
+string IntToStr(unsigned long long Value);
 
 #endif
 
