@@ -106,3 +106,54 @@ char* get_time()
     return buf;
 }
 
+constexpr auto CONV_BUF = 20;
+
+// converts int Value to string
+string IntToStr(int Value)
+{
+    char buf[CONV_BUF];
+    sprintf(buf, "%d", Value);
+    return buf;
+}
+
+// converts unsigned int Value to string
+string IntToStr(unsigned int Value)
+{
+    char buf[CONV_BUF];
+    sprintf(buf, "%u", Value);
+    return buf;
+}
+
+//converts unsigned long Value to string
+string IntToStr(unsigned long Value)
+{
+    char buf[CONV_BUF];
+    sprintf(buf, "%lu", Value);
+    return buf;
+}
+
+//converts long Value to string
+string IntToStr(long Value)
+{
+    char buf[CONV_BUF];
+    sprintf(buf, "%ld", Value);
+    return buf;
+}
+
+//converts long long Value to string
+string IntToStr(long long Value)
+{
+    char buf[CONV_BUF];
+    sprintf(buf, "%lld", Value);
+    return buf;
+}
+
+//converts unsigned long long Value to string
+string IntToStr(unsigned long long Value)
+{
+    char buf[CONV_BUF];
+    sprintf(buf, "%llu", Value);
+    return buf;
+}
+
+
