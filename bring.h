@@ -126,26 +126,26 @@ class b_ring {
 };
 
 class rename_item { 
-  protected:
+protected:
     static rename_item* list;
 
     rename_item* next; 
     nm_entry*    nm_old;
     nm_entry*    nm_new;
     
-  public:
-    static void add(nm_entry *nm_new, nm_entry *nm_old) {
-	rename_item* item = new rename_item;
-	item->nm_new = nm_new;
-	item->nm_old = nm_old;
-	item->next = list;
-	list = item;
+public:
+    static void add(nm_entry* nm_new, nm_entry* nm_old) {
+        rename_item* item = new rename_item;
+        item->nm_new = nm_new;
+        item->nm_old = nm_old;
+        item->next = list;
+        list = item;
     }
-    static nm_entry* rename(nm_entry* name) { 
-	for (rename_item *item = list; item != NULL; item = item->next) { 
-	    if (item->nm_old == name) return item->nm_new;
-	}
-	return name;
+    static nm_entry* rename(nm_entry* name) {
+        for (rename_item* item = list; item != NULL; item = item->next) {
+            if (item->nm_old == name) return item->nm_new;
+        }
+        return name;
     }
 };
 
