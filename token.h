@@ -100,7 +100,7 @@ class token : public heap_object {
     }
     void   disable() { 
 	    if (cat != CAT_WSPC || tag < TKN_GEN) { 
-	        cat = CAT_WSPC; tag = TKN_GEN; out_text = NULL; 
+	        cat = CAT_WSPC; tag = TKN_GEN; out_text = nullptr; 
 	    }
     }
 

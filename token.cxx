@@ -245,7 +245,7 @@ void output_context::output(token* t)
     // if there are space tokens before (after) generated token
     //
     char* out = t->out_text;
-    int len = strlen(out);
+    int len = (int)strlen(out);
 
     if (t->cat == CAT_GEN) {
         if (out[0] == ' ' && (prev_tag == TKN_SPACE || prev_tag == TKN_LN)) {
@@ -295,7 +295,7 @@ static char* normalize_file_name(char* file)
 {
     char* nfile = _strdup(file);
     char* f = nfile;
-    int len = strrchr(f, '.') - nfile;
+    int len = (int)(strrchr(f, '.') - f);
 
     while (len-- > 0) {
         if (*f == '.' || *f == ' ') *f = '_';
@@ -324,9 +324,8 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
 	    fputs("#include \"ptoc.h\"\n\n", ctx.file());
     } else if (unit_spec) {
         char* nfile = normalize_file_name(file);
-        file_name_len = strrchr(nfile, '.') - nfile;
-        fprintf(ctx.file(), "#ifndef __%.*s_h__\n#define __%.*s_h__\n",
-            file_name_len, nfile, file_name_len, nfile);
+        file_name_len = (int)(strrchr(nfile, '.') - nfile);
+        fprintf(ctx.file(), "#ifndef __%.*s_h__\n#define __%.*s_h__\n", file_name_len, nfile, file_name_len, nfile);
         interface_module = true;
     }
 
@@ -344,7 +343,7 @@ static token* print_rec (char *file, token *t, bool unit_spec) {
                 fprintf(ctx.file(), "#include \"%s\"\n", inc_file);
                 t = print_rec(inc_file, t->next, true);
                 if (t->tag == TKN_IMPLEMENTATION && use_namespaces) {
-                    file_name_len = strrchr(file, '.') - file;
+                    file_name_len = (int)(strrchr(file, '.') - file);
                     fprintf(ctx.file(), "\nnamespace %.*s {\n", file_name_len, file);
                     unit_implementation = true;
                 }
