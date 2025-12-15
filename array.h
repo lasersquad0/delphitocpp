@@ -503,6 +503,10 @@ public:
         }
     }
 
+    operator char* () const {
+        return lpsz(1, length(), body);
+    }
+
     friend text& operator >> (text& t, varying_string& str)
     {
         str.set_length(pio_input_string((text_descriptor*)&t, str.get_body(),
@@ -597,7 +601,7 @@ inline string varying_string<max_size>::operator + (const char* str) const
     result.set_length(left_len + append_len);
     return result;
 }
-
+`   
 template<size_t max_size>
 inline string varying_string<max_size>::operator + (char ch) const 
 { 
