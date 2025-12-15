@@ -1564,7 +1564,7 @@ void atom_expr_node::attrib(int ctx)
 		tag = tn_self;
 		var = NULL;
 	} else if (turbo_pascal && t_tkn->name->tag == TKN_EXIT) {
-		type = &void_type;
+		type = &void_type; //TODO shall we replace to &any_type?
 	}
 	// TKN_NIL implemented as built-in constant that is added to b_ring together with true/false contants and integer, cardinal etc. types
 //	else if (tkn->name->tag == TKN_NIL) {
@@ -3900,16 +3900,15 @@ static expr_node* aggregate_constant(expr_node* expr, symbol* component)
     return NULL;
 }
 
-void expr_group_node::attrib(int ctx)
+void expr_group_node::attrib(int ctx1)
 {
 	f_tkn = lpar;
 	l_tkn = rpar;
 
-    this->ctx = ctx;
+    ctx = ctx1;
 	if (type != NULL) {
 		if (type->tag == tp_record || type->tag == tp_object) {
-			for (expr_node* e = aggregate_constant(expr,
-				((record_tp*)type->get_typedef())->syms);
+			for (expr_node* e = aggregate_constant(expr, ((record_tp*)type->get_typedef())->syms);
 				e != NULL;
 				e = e->next)
 			{
@@ -3929,7 +3928,7 @@ void expr_group_node::attrib(int ctx)
 	}
 
     for(expr_node* e = expr; e != NULL; e = e->next) {
-		e->attrib(ctx);
+		e->attrib(ctx1);
     }
 
     type = expr->type;
@@ -4184,7 +4183,9 @@ const_def_node::const_def_node(token* t_ident, token* t_equal, expr_node* consta
 void const_def_node::attrib(int)
 {
     constant->attrib(ctx_constant);
-    sym = b_ring::add_cur(t_ident, symbol::s_const, constant->type);
+    
+	sym = b_ring::add_cur(t_ident, symbol::s_const, constant->type);
+	
 	if (constant->flags & tn_is_const) {
 		sym->flags |= symbol::f_const;
 		sym->value = constant->value;
@@ -4447,6 +4448,73 @@ void type_def_node::translate(int ctx)
         t_ident->set_trans("typedef");
     }
     force_semicolon();
+}
+
+type_def_templ_node::type_def_templ_node(tpd_node* ident, token* t_equal, tpd_node* tpd): type_def_node(nullptr, t_equal, tpd)
+{
+	CONS2(t_equal, tpd);
+	this->ident = dynamic_cast<simple_templ_tpd_node*>(ident);
+}
+
+void type_def_templ_node::attrib(int ctx)
+{
+	ident->attrib(ctx);
+	t_ident = ident->t_ident;
+	type_def_node::attrib(ctx);
+}
+
+void type_def_templ_node::translate(int ctx)
+{
+	ident->translate(ctx);
+	tpd->translate(ctx);
+	sym->translate(t_ident);
+	f_tkn = t_ident;
+	l_tkn = tpd->l_tkn;
+	token::disable(t_ident->next, tpd->f_tkn->prev);
+
+    if (small_enum && tpd->tag == tpd_node::tpd_enum) {
+		int n_elems = ((enum_tp*)tpd->type)->n_elems;
+		t_ident->set_trans(dprintf("typedef %s %s;\n",
+			n_elems < 0x100 ? "unsigned char" :
+			n_elems < 0x10000 ? "unsigned short" :
+			"unsigned", t_ident->out_text));
+		((enum_tpd_node*)tpd)->f_tkn->set_bind(t_ident);
+
+	}
+	else if (!language_c && tpd->tag == tpd_node::tpd_enum) {
+		t_ident->append(" ");
+		f_tkn = t_ident->prepend("enum ");
+		((enum_tpd_node*)tpd)->f_tkn->disable();
+
+	}
+	else if (tpd->tag == tpd_node::tpd_object) {
+		auto tmp = tpd->f_tkn->append(t_ident->out_text);
+		if (tpd->f_tkn == tpd->l_tkn) l_tkn = tmp; // case of class forward declarations TMyClass = class;
+		tpd->f_tkn->set_pos(t_ident);
+		t_ident->disappear();
+
+	}
+	else if (tpd->tag == tpd_node::tpd_record) {
+		record_tpd_node* rec_tpd = (record_tpd_node*)tpd;
+		rec_tpd->t_record->set_trans(dprintf("%s%s ", rec_tpd->t_record->out_text, t_ident->out_text));
+		rec_tpd->t_record->set_pos(t_ident);
+		t_ident->disappear();
+
+	}
+	else if (tpd->tag == tpd_node::tpd_proc) {
+		fptr_tpd_node* fptr = (fptr_tpd_node*)tpd;
+		fptr->t_params->prepend(dprintf("(*%s)", t_ident->out_text));
+		t_ident->set_trans("typedef ");
+	}
+	else {
+		f_tkn = t_ident->prepend("using ");
+		f_tkn = f_tkn->prepend(dprintf("template<typename %s>\n", ident->base_type->f_tkn->in_text));
+		//l_tkn = l_tkn->append(" ")->append(t_ident->out_text);
+		//l_tkn->next->move(t_ident, ident->t_rbr);
+		t_ident->append(" = ");
+		//l_tkn = ident->t_rbr;
+	}
+	force_semicolon();
 }
 
 
@@ -4841,6 +4909,7 @@ void record_field_part_node::translate(int ctx)
 	if(t_var) t_var->disable();
 }
 
+/*
 var_origin_decl_node::var_origin_decl_node(token* t_ident,
 					   token* t_origin, expr_node *addr,
 					   token* t_colon, tpd_node *tpd)
@@ -4855,8 +4924,7 @@ void var_origin_decl_node::attrib(int ctx)
 {
     tpd->attrib(ctx);
     type = tpd->type;
-    sym = b_ring::add_cur(t_ident,
-			  language_c ? symbol::s_ref : symbol::s_var, type);
+    sym = b_ring::add_cur(t_ident, language_c ? symbol::s_ref : symbol::s_var, type);
     addr->attrib(ctx_value);
 }
 
@@ -4893,6 +4961,7 @@ void var_origin_decl_node::translate(int ctx)
 	}
     }
 }
+*/
 
 void proc_decl_part_node::attrib(int ctx)
 {
@@ -4975,8 +5044,7 @@ void param_list_node::translate(int)
 
 // Class proc_decl_node is used for procedure formal parameter declaration
 
-proc_decl_node::proc_decl_node(token* t_proc, token* t_ident,
-			       param_list_node* params, token* t_coln, tpd_node* ret_type)
+proc_decl_node::proc_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type)
 {
     CONS5(t_proc, t_ident, params, t_coln, ret_type);
 	var = NULL;
@@ -4987,12 +5055,13 @@ void proc_decl_node::attrib(int ctx)
 {
     if (ret_type) ret_type->attrib(ctx);
 
-    type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)NULL, (tpd_node*)this);
+    type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)NULL, (tpd_node*)this); //TODO this is not tpd_node here!!
     var = b_ring::add_cur(t_ident, symbol::s_var, type);
     type->proc_name = var->out_name->text;
     curr_proc->add_param(var);
     if (params) {
         proc_tp* save_proc = curr_proc;
+		assert(type);
         curr_proc = type;
         b_ring::push(type);
         params->attrib(ctx);
@@ -5070,6 +5139,7 @@ void proc_decl_node::insert_params()
     bool first = false;
     if (params) {
         proc_tp* save_proc = curr_proc;
+		assert(type);
 		curr_proc = type;
         params->translate(ctx_block);
 		curr_proc = save_proc;
@@ -5152,10 +5222,9 @@ void proc_decl_node::translate(int)
     }
 }
 
-proc_fwd_decl_node::proc_fwd_decl_node
-   (token* t_proc, token* t_ident, param_list_node* params, token* t_coln,
-    tpd_node* ret_type, token* t_semi1, token_list* qualifiers, token* t_semi2)
-		: proc_decl_node(t_proc, t_ident, params, t_coln, ret_type)
+proc_fwd_decl_node::proc_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln,
+               tpd_node* ret_type, token* t_semi1, token_list* qualifiers, token* t_semi2)
+		       : proc_decl_node(t_proc, t_ident, params, t_coln, ret_type)
 {
     CONS3(t_semi1, qualifiers, t_semi2);
 
@@ -5174,8 +5243,10 @@ proc_fwd_decl_node::proc_fwd_decl_node
 
 void proc_fwd_decl_node::attrib(int ctx)
 {
-    if (ret_type)
-		ret_type->attrib(ctx);
+	f_tkn = t_proc;
+	l_tkn = t_semi1;
+
+    if (ret_type) ret_type->attrib(ctx);
     
     type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)NULL);
     type->forward = this;
@@ -5260,6 +5331,7 @@ void proc_fwd_decl_node::attrib(int ctx)
 
     if (params) {
         proc_tp* save_proc = curr_proc;
+		assert(type);
         curr_proc = type;
         b_ring::push(type);
         params->attrib(ctx);
@@ -5270,9 +5342,6 @@ void proc_fwd_decl_node::attrib(int ctx)
 
 void proc_fwd_decl_node::translate(int)
 {
-    f_tkn = t_proc;
-    l_tkn = t_semi1;
-
     insert_return_type();
 
 	// convert 'constructor Create(...)' into C++ constructor 'MyClassName(...)'
@@ -5338,6 +5407,155 @@ void proc_fwd_decl_node::translate(int)
 		while (qual->next) qual = qual->next; // look for the first qualifier because "qualifiers" refers to the last one
 		token::remove(qual->ident, t_semi2);
     }
+}
+
+operator_fwd_decl_node::operator_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, token* t_semi) 
+	          : proc_fwd_decl_node(t_proc, t_ident, params, t_coln, ret_type, t_semi, nullptr, nullptr)
+	//: proc_decl_node(t_proc, t_ident, params, t_coln, ret_type)
+{
+	//this->t_semi = t_semi;
+}
+
+/*
+void operator_fwd_decl_node::attrib(int ctx)
+{
+	//proc_fwd_decl_node::attrib(ctx);
+
+	assert(ret_type); // operators must always have ret_type
+	
+	f_tkn = t_proc;
+	l_tkn - t_semi;
+
+	ret_type->attrib(ctx);
+
+	type = new proc_tp(ret_type->type);
+	//var = b_ring::add_cur(t_ident, symbol::s_var, type);
+	type->proc_name = var->out_name->text;
+	//curr_proc->add_param(var);
+	if (params) {
+		proc_tp* save_proc = curr_proc;
+		curr_proc = type;
+		b_ring::push(type);
+		params->attrib(ctx);
+		b_ring::pop(type);
+		curr_proc = save_proc;
+	}
+}
+*/
+void operator_fwd_decl_node::translate(int ctx)
+{
+	proc_fwd_decl_node::translate(ctx);
+
+	l_tkn = l_tkn->append("\n");
+	l_tkn = l_tkn->append(" "); // do NOT merge with previous statement
+	l_tkn->copy(ret_type->f_tkn, ret_type->l_tkn)->set_pos(f_tkn);
+
+
+	switch (t_ident->tag) {
+	case TKN_EQUAL:
+	case TKN_NOTEQUAL:
+	case TKN_LESSTHAN:
+	case TKN_GREATERTHAN:
+	case TKN_GREATERTHANOREQUAL:
+	case TKN_LESSTHANOREQUAL:
+	case TKN_ADD:
+	case TKN_SUBSTRACT:
+	case TKN_MULTPILY:
+	case TKN_DIVIDE:
+	case TKN_INTDIVIDE:
+	case TKN_MODULUS:
+	case TKN_LEFTSHIFT:
+	case TKN_RIGHTSHIFT:
+	case TKN_BITWISEAND:
+	case TKN_BIWISEOR:
+	case TKN_BIWISEXOR:
+	case TKN_LOGICALAND:
+	case TKN_LOGICALOR:
+	case TKN_LOGICALXOR:
+	{
+		switch (t_ident->tag)
+		{
+		case TKN_EQUAL:       l_tkn = l_tkn->append("operator == ("); break;
+		case TKN_NOTEQUAL:    l_tkn = l_tkn->append("operator != ("); break;
+		case TKN_LESSTHAN:    l_tkn = l_tkn->append("operator < ("); break;
+		case TKN_GREATERTHAN: l_tkn = l_tkn->append("operator > ("); break;
+		case TKN_GREATERTHANOREQUAL: l_tkn = l_tkn->append("operator >= ("); break;
+		case TKN_LESSTHANOREQUAL: l_tkn = l_tkn->append("operator <= ("); break;
+		case TKN_ADD:         l_tkn = l_tkn->append("operator + ("); break;
+		case TKN_SUBSTRACT:   l_tkn = l_tkn->append("operator - ("); break;
+		case TKN_MULTPILY:    l_tkn = l_tkn->append("operator * ("); break;
+		case TKN_DIVIDE:      l_tkn = l_tkn->append("operator / ("); break;//TODO - how to distinguish these two operators in C++?
+		case TKN_INTDIVIDE:   l_tkn = l_tkn->append("operator / ("); break;
+		case TKN_MODULUS:     l_tkn = l_tkn->append("operator % ("); break;
+		case TKN_LEFTSHIFT:   l_tkn = l_tkn->append("operator << ("); break;
+		case TKN_RIGHTSHIFT:  l_tkn = l_tkn->append("operator >> ("); break;
+		case TKN_BITWISEAND:  l_tkn = l_tkn->append("operator & ("); break;
+		case TKN_BIWISEOR:    l_tkn = l_tkn->append("operator | ("); break;
+		case TKN_BIWISEXOR:   l_tkn = l_tkn->append("operator ^ ("); break;
+		case TKN_LOGICALAND:  l_tkn = l_tkn->append("operator && ("); break;
+		case TKN_LOGICALOR:   l_tkn = l_tkn->append("operator || ("); break;
+		case TKN_LOGICALXOR:  l_tkn = l_tkn->append("operator ^^ ("); break;
+
+		default: 
+			l_tkn = l_tkn->append("operator UNKNOWN (");
+			warning("incorrect overloaded operator name: %s", t_ident->in_text);
+		}
+
+		char* var_name = nullptr;
+
+		// take second parameter name and type
+		auto vdn = dynamic_cast<var_decl_node*>(params->params);
+		if (vdn->next)
+		{
+			vdn = dynamic_cast<var_decl_node*>(vdn->next);
+			l_tkn = l_tkn->append(vdn->vars->var->type->name);
+			l_tkn = l_tkn->append(" ");
+			var_name = vdn->vars->var->out_name->text;
+			l_tkn = l_tkn->append(var_name);
+		}
+		else
+		{
+			assert(vdn->vars->next);
+			l_tkn = l_tkn->append(vdn->vars->next->var->type->name);
+			l_tkn = l_tkn->append(" ");
+			var_name = vdn->vars->next->var->out_name->text;
+			l_tkn = l_tkn->append(var_name);
+		}
+
+		l_tkn = l_tkn->append(") const ");
+		l_tkn = l_tkn->append(dprintf("{ return %s(*this, %s); }", t_ident->out_text, var_name));
+
+		break;
+	}
+
+	case TKN_NEGATIVE:
+	case TKN_POSITIVE:
+	case TKN_IMPLICIT:
+	case TKN_EXPLICIT:
+	case TKN_LOGICALNOT:
+	{
+		switch (t_ident->tag)
+		{
+		case TKN_NEGATIVE:   l_tkn = l_tkn->append("operator - ("); break;
+		case TKN_POSITIVE:   l_tkn = l_tkn->append("operator + ("); break;//TODO find proper operator for +
+		case TKN_IMPLICIT:   l_tkn = l_tkn->append("operator () ("); break;
+		case TKN_EXPLICIT:   l_tkn = l_tkn->append("operator () ("); break;//TODO how to distinguish between implicit and explicit
+		case TKN_LOGICALNOT: l_tkn = l_tkn->append("operator ! ("); break;
+		
+		default: 
+			l_tkn = l_tkn->append("operator UNKNOWN (");
+			warning("incorrect overloaded operator name: %s", t_ident->in_text);
+		}
+
+		l_tkn = l_tkn->append(") const ");
+		l_tkn = l_tkn->append(dprintf("{ return %s(*this); }", t_ident->out_text));
+
+		break;
+	}//case
+
+	default: warning("incorrect overloaded operator name: %s", t_ident->in_text);
+	
+    }// main switch
 }
 
 
@@ -5425,6 +5643,7 @@ void proc_def_node::attrib(int ctx)
 
     b_ring::push(type);
     proc_tp* save_proc = curr_proc;
+	assert(type);
     curr_proc = type;
     if (params) 
 		params->attrib(ctx);
@@ -5449,6 +5668,7 @@ void proc_def_node::translate(int ctx)
     int is_recursive = var->out_name->flags & nm_entry::recursive;
 
     proc_tp* save_proc = curr_proc;
+	assert(type);
     curr_proc = type;
 
     //if (t_attrib != NULL) token::remove(t_attrib, t_semi2);
@@ -5641,6 +5861,39 @@ void simple_tpd_node::translate(int)
 	if(t_dot) t_dot->set_trans("::");
 }
 
+simple_templ_tpd_node::simple_templ_tpd_node(token* t_ident, token* t_lbr, tpd_node* base_type, token* t_rbr) : tpd_node(tpd_simple)
+{
+	CONS4(t_ident, t_lbr, base_type, t_rbr);
+	sym =  NULL;
+}
+
+void simple_templ_tpd_node::attrib(int ctx)
+{
+	base_type->attrib(ctx);
+	sym = b_ring::search_cur(t_ident);
+	if (sym == NULL) {
+		assert(base_type->f_tkn);
+		warning(t_ident, "unknown type '%s<%s>'", t_ident->in_text, base_type->f_tkn->in_text);//TODO take into account base_type->t_ident1
+		// tp_last because we do not know its type yet
+		//TODO understand better whether it is good solution. it creates new tpexpr node for each TBytes unknown type
+		type = &any_type; //new tpexpr(tp_last, this, t_ident->in_text); //&void_type;
+	}
+	else
+	{
+		type = sym->type;
+	}
+
+	f_tkn = t_ident;
+	l_tkn = t_rbr;
+}
+
+void simple_templ_tpd_node::translate(int ctx)
+{
+	base_type->translate(ctx);
+	if (sym) sym->translate(t_ident); // does actually the following: tkn->set_trans(out_name->text);
+}
+
+
 fptr_tpd_node::fptr_tpd_node(token* t_proc, param_list_node* params, token* t_coln, 
 	                         tpd_node* ret_type, token* t_of, token* t_object) : tpd_node(tpd_proc)
 {
@@ -5650,12 +5903,12 @@ fptr_tpd_node::fptr_tpd_node(token* t_proc, param_list_node* params, token* t_co
 
 void fptr_tpd_node::attrib(int ctx)
 {
-    if (ret_type) {
-        ret_type->attrib(ctx);
-    }
+    if (ret_type) ret_type->attrib(ctx);
+   
     type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)NULL);
 	if (params) {
 		proc_tp* save_proc = curr_proc;
+		assert(type);
 		curr_proc = (proc_tp*)type;
 		b_ring::push(curr_proc);
 		params->attrib(ctx);
@@ -5682,6 +5935,7 @@ void fptr_tpd_node::translate(int)
     }
     if (params) {
         proc_tp* save_proc = curr_proc;
+		assert(type);
 		curr_proc = (proc_tp*)type;
         params->translate(ctx_block);
 		curr_proc = save_proc;
@@ -6238,9 +6492,7 @@ void variant_part_node::attrib(int ctx)
 {
     selector->tag_type->attrib(ctx);
     if (selector->tag_field != NULL) {
-	selector->var = b_ring::add_cur(selector->tag_field,
-					symbol::s_var,
-					selector->tag_type->type);
+	selector->var = b_ring::add_cur(selector->tag_field, symbol::s_var,	selector->tag_type->type);
 	if (*struct_path) {
 	    selector->var->path = struct_path;
 	}
@@ -6999,7 +7251,7 @@ void property_decl_part_node::translate(int ctx)
 		p->translate(ctx);
 }
 
-asm_line_node::asm_line_node(token_list* t_list, token* comma) 
+asm_line_node::asm_line_node(token* t_list, token* comma) 
 { 
 	CONS2(t_list, comma); 
 }

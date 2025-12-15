@@ -1053,11 +1053,22 @@ class type_def_node : public decl_node {
     virtual void translate(int ctx);
 };
 
+class simple_templ_tpd_node;
+
+class type_def_templ_node : public type_def_node {
+public:
+    simple_templ_tpd_node* ident;
+
+    type_def_templ_node(tpd_node* ident, token* t_equal, tpd_node* tpd);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
 
 class type_def_part_node : public decl_node { 
 public: 
-    token*          t_type; 
-    type_def_node*  types; 
+    token*         t_type; 
+    type_def_node* types; 
 
     type_def_part_node(token* t_type, type_def_node* types); 
 
@@ -1093,7 +1104,7 @@ class var_decl_part_node : public decl_node {
   public: 
     token*           t_classvar;
     token*           t_var; 
-    var_decl_node*   vars; 
+    var_decl_node*   vars;
     bool             is_const;
 
     var_decl_part_node(token* t_classvar, token* t_var, var_decl_node* vars);
@@ -1115,7 +1126,7 @@ public:
     void translate(int ctx) override;
 };
 
-
+/*
 class var_origin_decl_node : public decl_node { 
   public: 
     token     *t_ident;
@@ -1133,6 +1144,7 @@ class var_origin_decl_node : public decl_node {
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
+*/
 
 class proc_decl_part_node : public decl_node {
 public:
@@ -1191,7 +1203,7 @@ class proc_decl_node : public decl_node {
     proc_tp*            type;
 
     proc_decl_node(token* t_proc, token* t_ident,  param_list_node* params,
-                   token* t_coln = NULL, tpd_node* ret_type = NULL); 
+                   token* t_coln = nullptr, tpd_node* ret_type = nullptr); 
   
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1215,22 +1227,31 @@ class proc_fwd_decl_node : public proc_decl_node {
     bool                is_override;
    // bool                is_dynamic;
 
-    proc_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, 
-		       token* t_coln, tpd_node* ret_type, 
-                       token* t_semi1, token_list* qualifiers = NULL, 
-		       token* t_semi2 = NULL); 
+    proc_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, 
+                       token* t_semi1, token_list* qualifiers = NULL, token* t_semi2 = NULL); 
   
-    virtual void attrib(int ctx);
-    virtual void translate(int ctx);
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
+class operator_fwd_decl_node : public proc_fwd_decl_node {
+public:
+    //token* t_semi;  // semicolon
+
+    operator_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, token* t_semi);
+   
+     //void attrib(int ctx) override;
+     void translate(int ctx) override;
+};
+
+// works with both proc_fwd_decl_node and operator_fwd_decl_node
 class method_decl_node : public decl_node
 {
 public:
-    token* t_class; // for static methods ('class methods')
+    token* t_class; // for static methods ('class method_name')
     proc_decl_node* proc;
 
-    method_decl_node(token* t_cls, decl_node* prc) { t_class = t_cls; proc = (proc_decl_node*)prc; }
+    method_decl_node(token* t_cls, decl_node* prc) { t_class = t_cls; proc = dynamic_cast<proc_decl_node*>(prc); assert(proc); }
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
@@ -1254,8 +1275,8 @@ class proc_def_node : public proc_decl_node {
     symbol*             s_self;
 
     proc_def_node(token* t_static, token* t_proc, token* t_class, token* t_dot, token* t_ident, param_list_node* params,
-		  token* t_coln, tpd_node* ret_type, 
-		  token* t_semi1, /*token* t_attrib, token* t_semi2,*/ block_node* block, token* t_semi3); 
+		  token* t_coln, tpd_node* ret_type, token* t_semi1, 
+        /*token* t_attrib, token* t_semi2,*/ block_node* block, token* t_semi3); 
   
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1271,7 +1292,7 @@ class tpd_node : public node {
     tpexpr*  type; // Type which is designated by this typenode 
      
     enum tpd_type { tpd_simple, tpd_set, tpd_enum, tpd_range, tpd_proc, //TODO what is the difference from enum type_tag{} ? 
-           tpd_array, tpd_string, tpd_ref, tpd_object, tpd_record, tpd_file };  
+                    tpd_array, tpd_string, tpd_ref, tpd_object, tpd_record, tpd_file };  
     
     int  tag;  
 
@@ -1298,6 +1319,47 @@ class simple_tpd_node: public tpd_node {
             fprintf(stderr, "%s.%s", t_ident1->in_text, t_ident2->in_text);  
         else 
             fprintf(stderr, "%s", t_ident2->in_text); 
+    };
+};
+
+class string_tpd_node : public tpd_node {
+public:
+    token* t_string;	   // 'String'
+
+    string_tpd_node(token* t_string);
+
+    virtual void attrib(int ctx);
+    virtual void translate(int ctx);
+};
+
+// simple tepmplate node like: TDynArray = TArray<Integer>
+class simple_templ_tpd_node : public tpd_node {
+public:
+    //token* t_ident1; // always class/record name or null
+    //token* t_dot;
+    token* t_ident; // name of template type 
+    token* t_lbr;
+    tpd_node* base_type; // may be simple_tpd_node* and string_tpd_node*
+    token* t_rbr;
+    
+    //symbol* sym1;
+    symbol* sym;
+
+    simple_templ_tpd_node(token* t_ident, token* t_lbr, tpd_node* base_type, token* t_rbr);
+
+    virtual void attrib(int ctx);
+    virtual void translate(int ctx);
+
+    
+    void print_debug() override
+    {
+        //TODO take into account base_type->t_ident1
+        
+        char* ttype = base_type->tag == tpd_node::tpd_simple ? ((simple_tpd_node*)base_type)->t_ident2->in_text
+            : base_type->tag == tpd_node::tpd_string ? ((string_tpd_node*)base_type)->t_string->in_text
+            : "unknown type";
+
+        fprintf(stderr, "%s<%s>", t_ident->in_text, ttype);
     };
 };
 
@@ -1438,16 +1500,6 @@ class varying_tpd_node: public tpd_node {
 
     varying_tpd_node(token *t_string, token* t_lbr, expr_node *size, 
 		     token* t_rbr);
-
-    virtual void attrib(int ctx);
-    virtual void translate(int ctx);
-};
-
-class string_tpd_node: public tpd_node {
-  public:
-    token*      t_string;	   // 'String'
-
-    string_tpd_node(token *t_string);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1808,10 +1860,10 @@ public:
 
 class asm_line_node : public decl_node {
 public:
-    token_list* t_list;
+    token* t_list;
     token* comma;
  
-    asm_line_node(token_list* t_list, token* comma);
+    asm_line_node(token* t_list, token* comma);
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
