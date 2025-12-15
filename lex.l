@@ -87,7 +87,7 @@ static use_ctx* use_chain;
 
 // Token generator function
 
-static int tkn (int tag) {
+static int tkn(int tag) {
    curr_token = new token(text ? text : mystrdup(yytext), tag, line, pos, nm);
    nm = NULL; text = NULL;
    for (char *c = yytext; *c != 0; c++) {
@@ -131,8 +131,7 @@ static char *include_name (char *src) {
         }
     }
     bool suffix = false;
-    while(*src && !isspace(*src) && *src != ';' && *src != '\''
-          && *src!='\n' && *src != '}')
+    while(*src && !isspace(*src) && *src != ';' && *src != '\'' && *src!='\n' && *src != '}')
     {
         if (*src == '.') suffix = true;
 	    *dst++ = (char)tolower(*(unsigned char*)src++);
@@ -265,7 +264,7 @@ static int process_comments() {
 %}
 
 ID           [_\$A-Z][_\$A-Z0-9]*
-
+UNITNAME     [_a-zA-Z][_a-z0-9A-Z\.]* 
 DIGIT        [0-9]
 DIGIT_       [0-9_]
 BINDIGIT     [0-1]
@@ -281,17 +280,64 @@ ROOT         {DIGIT}\#|{DIGIT}{DIGIT}\#
 
 INTEGER      {DIGIT}{DIGIT_}*|\${HEXDIGIT}{HEXDIGIT_}*|{ROOT}{HEXDIGIT}{HEXDIGIT_}*|{BINDIGIT}+B|0x{HEXDIGIT}+|0X{HEXDIGIT}+|{DIGIT}{HEXDIGIT}*H|{DIGIT}{HEXDIGIT}*h|%{BINDIGIT}+
 
-/* the "incl" state is used for picking up the name
- * of an include file
+/* 
+ the "incl" state is used for picking up the name of an include file 
+ the "unit" state used for proper parsing name of unit that contains one or more dots ('.'). Because IDENT cannot contain dots.
+ the "use" state used to go and parse other units which current unit includes by "uses" directive. 
  */
+
 %x incl
 %x use
+%x unit
 
 %%
 
 \%include     BEGIN(incl);
 \#include     BEGIN(incl);
-uses          BEGIN(use); /* go to the 'uses' section mode, Turbo Pascal */
+uses          BEGIN(use);  // go to the 'uses' section mode, Turbo Pascal
+
+unit     { 
+     BEGIN(unit); // go to the special processing of 'unit' name which can contain several dots.
+     char lc_buf[MAX_ID_LENGTH];
+	 char *src = yytext, *dst = lc_buf;
+	         
+	 do {
+	    *dst++ = tolower(*(unsigned char*)src);
+	 } while (*src++);
+
+	 nm = nm_entry::add(lc_buf, TKN_UNIT); // important to initialize nm before tkn()
+     return tkn(TKN_UNIT);
+}
+
+<unit>"//"        { return process_end_of_line_comment(); }
+<unit>"(*"        { return process_comments(); }
+<unit>"{*"        { return process_comments(); }
+<unit>"{"         { return process_comments(); }
+
+<unit>[_a-z0-9A-Z\.]+ { // unit name can contain dots ('.') 
+     char lc_buf[MAX_ID_LENGTH];
+	 char *src = yytext, *dst = lc_buf;
+	         
+	 do {
+	    *dst++ = tolower(*(unsigned char*)src);
+	 } while (*src++);
+
+	nm = nm_entry::add(lc_buf, TKN_IDENT); // important to initialize nm before tkn()
+    return tkn(TKN_IDENT);
+}
+
+<unit>; {
+    BEGIN(INITIAL);  // To leave unit state
+    return tkn(TKN_SEMICOLON);
+}
+
+<unit>[ \t\f]+     { return tkn(TKN_SPACE); }
+<unit>[\n]         { return tkn(TKN_LN); }
+
+<unit>.  {
+    error(line, pos, file_name, "unrecognized token: %s\n",	yytext);
+}
+
 
 <use>[ \t\n\,]* {  // skip whitespaces and commas in list of unit names from 'uses' section
     char* p = yytext;
@@ -308,7 +354,7 @@ uses          BEGIN(use); /* go to the 'uses' section mode, Turbo Pascal */
 }
 
 <use>[_a-z0-9A-Z\.]+ { // file name can contain dot ('.') in its name
-                  /* got the include file name */
+                       /* got the include file name */
     char *fname = dprintf("%s.pas", yytext);
     for (char* p = fname; *p != '\0'; p++) *p = tolower(*p);
 
@@ -323,32 +369,33 @@ uses          BEGIN(use); /* go to the 'uses' section mode, Turbo Pascal */
         char *try_dir, *next_dir;
         int dir_length;
 
-	for (try_dir = i_path; try_dir != NULL; try_dir = next_dir) {
-	    if ((next_dir = strchr (try_dir, path_sep)) != NULL ) {
-		dir_length = next_dir - try_dir;
-		next_dir++;
-	    } else {
-		dir_length = strlen (try_dir);
-	    }
-	    xname = dprintf ("%.*s" FILE_SEP "%s", dir_length, try_dir, fname);
-	    if ((in = fopen(xname, "r")) != NULL) {
-		use_chain = new use_ctx(fname, use_chain);
-		curr_token = new token(xname, TKN_PUSH_UNIT);
-		curr_token->out_text = fname;
-		include_level += 1;
-		BEGIN(INITIAL);     // To leave include state
-		scanner.push();
-		scanner.attach(xname, in);
-		return 1;
-	    }
-	} // for
+	    for (try_dir = i_path; try_dir != NULL; try_dir = next_dir) {
+	        if ((next_dir = strchr (try_dir, path_sep)) != NULL ) {
+		        dir_length = next_dir - try_dir;
+		        next_dir++;
+	        } else {
+		        dir_length = strlen(try_dir);
+	        }
 
-	warning(line, pos, file_name, "can't include file %s", fname);
-        curr_token = new token(dprintf("/*#include \"%s.h\"*/\n", yytext),
-	                       TKN_CMNT, line, pos);
+            // dir_length below specifies prescision for try_dir argument (how many characters from try_dir are printed)
+	        xname = dprintf("%.*s" FILE_SEP "%s", dir_length, try_dir, fname);
+	        if ((in = fopen(xname, "r")) != NULL) {
+		        use_chain = new use_ctx(fname, use_chain);
+		        curr_token = new token(xname, TKN_PUSH_UNIT);
+		        curr_token->out_text = fname;
+		        include_level += 1;
+		        BEGIN(INITIAL);     // To leave include state
+		        scanner.push();
+		        scanner.attach(xname, in);
+		        return 1;
+	        }
+	    } // for
+
+	    warning(line, pos, file_name, "can't include file %s", fname);
+        curr_token = new token(dprintf("/*#include \"%s.h\"*/\n", yytext), TKN_CMNT, line, pos);
+
     } else { // the file has been processed earlier
-        curr_token = new token(dprintf("#include \"%s.h\"\n", yytext),
-	                       TKN_CMNT, line, pos);
+        curr_token = new token(dprintf("#include \"%s.h\"\n", yytext), TKN_CMNT, line, pos);
     }
     return 1;
 }
@@ -358,8 +405,7 @@ uses          BEGIN(use); /* go to the 'uses' section mode, Turbo Pascal */
 
 
 <use>.  {
-    error(line, pos, file_name, "unrecognized token: %s\n",
-		yytext);
+    error(line, pos, file_name, "unrecognized token: %s\n",	yytext);
 }
 
 
@@ -375,7 +421,7 @@ uses          BEGIN(use); /* go to the 'uses' section mode, Turbo Pascal */
                   /* got the include file name */
     BEGIN(INITIAL);     // To leave include state
 
-    char *fname = include_name (yytext);
+    char *fname = include_name(yytext);
     char *xname;
     FILE *in = NULL;
     char *try_dir, *next_dir;
@@ -399,54 +445,51 @@ uses          BEGIN(use); /* go to the 'uses' section mode, Turbo Pascal */
 	}
     }
     warning(line, pos, file_name, "can't include file %s", fname);
-    curr_token = new token(dprintf("/*#include \"%s\"*/", fname),
-	                   TKN_CMNT, line, pos);
+    curr_token = new token(dprintf("/*#include \"%s\"*/", fname), TKN_CMNT, line, pos);
     return 1;
 }
 
 <incl>.  {
-    error(line, pos, file_name, "unrecognized token: %s\n",
-		yytext);
+    error(line, pos, file_name, "unrecognized token: %s\n",	yytext);
 }
 
-\{\$I[ \t]*[a-zA-Z0-9\.]+[ \t]*\} {
-    char *fname = include_name (yytext+3);
+\{\$I[ \t]*[a-zA-Z0-9\.]+[ \t]*\} {  // {$I ...} - include directive
+    char *fname = include_name(yytext+3);
     char *xname;
     FILE *in = NULL;
     char *try_dir, *next_dir;
     int dir_length;
 
     for (try_dir = i_path; try_dir != NULL; try_dir = next_dir) {
-	if ((next_dir = strchr (try_dir, path_sep)) != NULL ) {
-	    dir_length = next_dir - try_dir;
-	    next_dir++;
-	} else {
-	    dir_length = strlen (try_dir);
-	}
-	xname = dprintf ("%.*s" FILE_SEP "%s", dir_length, try_dir, fname);
-	if ((in = fopen(xname, "r")) != NULL) {
-	    include_level += 1;
-	    scanner.push();
-	    scanner.attach(xname, in);
-	    curr_token = new token(xname, TKN_PUSH_FILE);
-	    curr_token->out_text = fname;
-	    return 1;
-	}
+	    if ((next_dir = strchr (try_dir, path_sep)) != NULL ) {
+	        dir_length = next_dir - try_dir;
+	        next_dir++;
+	    } else {
+	        dir_length = strlen (try_dir);
+	    }
+	    xname = dprintf ("%.*s" FILE_SEP "%s", dir_length, try_dir, fname);
+	    if ((in = fopen(xname, "r")) != NULL) {
+	        include_level += 1;
+	        scanner.push();
+	        scanner.attach(xname, in);
+	        curr_token = new token(xname, TKN_PUSH_FILE);
+	        curr_token->out_text = fname;
+	        return 1;
+	    }
     }
     warning(line, pos, file_name, "can't include file %s", fname);
-    curr_token = new token(dprintf("/*#include \"%s\"*/", fname),
-	                   TKN_CMNT, line, pos);
+    curr_token = new token(dprintf("/*#include \"%s\"*/", fname), TKN_CMNT, line, pos);
     return 1;
 }
 
 <<EOF>>      {
     if (scanner.empty()) {
-	return -1;  // MAGIC ! (< 0 means end of files)
+	    return -1;  // MAGIC ! (< 0 means end of files)
     } else {
-	scanner.pop();
-	include_level -= 1;
-	curr_token =  new token((char*)NULL, TKN_POP_FILE);
-	return 1;
+	    scanner.pop();
+	    include_level -= 1;
+	    curr_token = new token((char*)NULL, TKN_POP_FILE);
+	    return 1;
     }
 }
 
@@ -509,71 +552,72 @@ uses          BEGIN(use); /* go to the 'uses' section mode, Turbo Pascal */
 {INTEGER}    { return tkn(TKN_ICONST);  }
 
 {ID}         {
-               char lc_buf[MAX_ID_LENGTH];
-	       char *src = yytext, *dst = lc_buf;
-	       if (*yytext == '$') {
-                   if (turbo_pascal) { /* hexademical number */
-  	               return tkn(TKN_ICONST);
-                   } else if (ignore_preprocessor_directives) {
-                       int c;
-                       char cmt_buffer[1024];
-                       int i = sprintf(cmt_buffer, "/*%s", yytext);
-                       curr_token = new token(NULL, TKN_CMNT, line, pos);
-                       pos += strlen(yytext);
- 	               while((c = yyinput_file()) != EOF && c != '\n') {
-                             if (i == (int)sizeof(cmt_buffer)-4) {
-                                 error(line, pos, file_name, "Preprocessor directive too long\n");
-                             } else {
-                                 cmt_buffer[i++] = (char)c;
-                             }
-                        }
-                        cmt_buffer[i++] = '*';
-                        cmt_buffer[i++] = '/';
-                        cmt_buffer[i++] = '\n';
-                        cmt_buffer[i++] = '\0';
-               		char* cmt_text = new char[i];
-		        memcpy(cmt_text, cmt_buffer, i);
-                        curr_token->in_text = curr_token->out_text = cmt_text;
-                        return 1;
+             char lc_buf[MAX_ID_LENGTH];
+	         char *src = yytext, *dst = lc_buf;
+	         if (*yytext == '$') {
+                 if (turbo_pascal) { /* hexademical number */
+  	                 return tkn(TKN_ICONST);
+                 } else if (ignore_preprocessor_directives) {
+                     int c;
+                     char cmt_buffer[1024];
+                     int i = sprintf(cmt_buffer, "/*%s", yytext);
+                     curr_token = new token(NULL, TKN_CMNT, line, pos);
+                     pos += strlen(yytext);
+ 	                 while((c = yyinput_file()) != EOF && c != '\n') {
+                         if (i == (int)sizeof(cmt_buffer)-4) {
+                             error(line, pos, file_name, "Preprocessor directive too long\n");
+                         } else {
+                             cmt_buffer[i++] = (char)c;
+                         }
+                     }
+                     cmt_buffer[i++] = '*';
+                     cmt_buffer[i++] = '/';
+                     cmt_buffer[i++] = '\n';
+                     cmt_buffer[i++] = '\0';
+                     char* cmt_text = new char[i];
+		             memcpy(cmt_text, cmt_buffer, i);
+                     curr_token->in_text = curr_token->out_text = cmt_text;
+                     return 1;
                    }
- 	       }
-	       do {
-	           *dst++ = tolower(*(unsigned char*)src);
-	       } while (*src++);
-	       nm = nm_entry::add(lc_buf, TKN_IDENT);
-	       int tag = nm->tag;
+ 	         }
+	         do {
+	             *dst++ = tolower(*(unsigned char*)src);
+	         } while (*src++);
 
-	       if (turbo_pascal) {
-	           if (tag == TKN_TYPE || tag == TKN_VAR) {
-		       type_or_var_context = true;
-	           } else if (tag == TKN_BEGIN || tag == TKN_CONST) {
-		       type_or_var_context = false;
-		   } else if (tag == TKN_IMPLEMENTATION) {
-		       if (include_level > 0)  {
-		           scanner.pop();
-		           include_level -= 1;
-			   BEGIN(use);
-			   curr_token = new token((char*)NULL, TKN_UNIT_END);
-                           return 1;
-                       } else {
-		           return tkn(TKN_IMPLEMENTATION);
-                       }
-		   } else if (tag == TKN_INTERFACE) {
-                       if (use_chain == NULL) {
-                           use_chain = new use_ctx(file_name, NULL);
-                       }
-		       tkn(TKN_INTERFACE);
-		       return 1;
-		   }
-               }
-	       if (tag == TKN_RESERVED) {
-	           text = dprintf("%s_", lc_buf);
-	           nm = nm_entry::add(text, TKN_IDENT);
-	           tag = TKN_IDENT;
-	       } else if (!preserve_case || tag != TKN_IDENT) {
-	           text = mystrdup(lc_buf);
-	       }
-	       return tkn(tag);
+	         nm = nm_entry::add(lc_buf, TKN_IDENT);
+	         int tag = nm->tag;
+
+	         if (turbo_pascal) {
+	             if (tag == TKN_TYPE || tag == TKN_VAR) {
+		             type_or_var_context = true;
+	             } else if (tag == TKN_BEGIN || tag == TKN_CONST) {
+		             type_or_var_context = false;
+		         } else if (tag == TKN_IMPLEMENTATION) {
+		             if (include_level > 0)  {
+		                 scanner.pop();
+		                 include_level -= 1;
+			             BEGIN(use);
+			             curr_token = new token((char*)NULL, TKN_UNIT_END);
+                         return 1;
+                     } else {
+		                 return tkn(TKN_IMPLEMENTATION);
+                     }
+		         } else if (tag == TKN_INTERFACE) {
+                     if (use_chain == NULL) {
+                         use_chain = new use_ctx(file_name, NULL);
+                     }
+		             tkn(TKN_INTERFACE);
+		             return 1;
+		         }
+             }
+	         if (tag == TKN_RESERVED) {
+	             text = dprintf("%s_", lc_buf);
+	             nm = nm_entry::add(text, TKN_IDENT);
+	             tag = TKN_IDENT;
+	         } else if (!preserve_case || tag != TKN_IDENT) {
+	             text = mystrdup(lc_buf);
+	         }
+	         return tkn(tag);
              }
 
 
