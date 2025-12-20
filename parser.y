@@ -79,6 +79,7 @@ void zzerror(const char* text)
              CLASS  
              CONST
              DEFAULT
+             DEPRECATED
              DO
              DOTS
              DYNAMIC
@@ -625,16 +626,16 @@ case_list: case_items
 otherwise: OTHERWISE | ELSE /* Turbo Pascal */
 
 case_items: { $$ = NULL; } 
-         | case_item 
-         | case_item ';' case_items { $1->next = $3; $$ = $1; }
+    | case_item 
+    | case_item ';' case_items { $1->next = $3; $$ = $1; }
 
 case_item: case_elem_list ':' statement { $$ = new case_node($1, $2, $3); }
 
 case_elem_list: case_elem 
-        | case_elem ',' case_elem_list { $1->next = $3; $$ = $1; }
+    | case_elem ',' case_elem_list { $1->next = $3; $$ = $1; }
 
 case_elem: expr { $$ = $1; }
-        | expr DOTS expr { $$ = new case_range_node($1, $2, $3); }
+    | expr DOTS expr { $$ = new case_range_node($1, $2, $3); }
 
 /*
 //=============================================================================
@@ -659,77 +660,76 @@ case_elem: expr { $$ = $1; }
 */
 
 expr: simple_expr
-   | expr PLUS expr { $$ = new op_node(tn_add, $1, $2, $3); } 
-   | expr MINUS expr { $$ = new op_node(tn_sub, $1, $2, $3); } 
-   | expr MOD expr { $$ = new op_node(tn_mod, $1, $2, $3); } 
-   | expr MUL expr { $$ = new op_node(tn_mul, $1, $2, $3); } 
-   | expr DIV expr { $$ = new op_node(tn_div, $1, $2, $3); } 
-   | expr DIVR expr { $$ = new op_node(tn_divr, $1, $2, $3); } 
+    | expr PLUS expr { $$ = new op_node(tn_add, $1, $2, $3); } 
+    | expr MINUS expr { $$ = new op_node(tn_sub, $1, $2, $3); } 
+    | expr MOD expr { $$ = new op_node(tn_mod, $1, $2, $3); } 
+    | expr MUL expr { $$ = new op_node(tn_mul, $1, $2, $3); } 
+    | expr DIV expr { $$ = new op_node(tn_div, $1, $2, $3); } 
+    | expr DIVR expr { $$ = new op_node(tn_divr, $1, $2, $3); } 
+ 
+    | primary LET expr { $$ = new op_node(tn_let, $1, $2, $3); }
+    | primary LETADD expr { $$ = new op_node(tn_letadd, $1, $2, $3); }
+    | primary LETSUB expr { $$ = new op_node(tn_letsub, $1, $2, $3); }
+    | primary LETDIV expr { $$ = new op_node(tn_letdiv, $1, $2, $3); }
+    | primary LETMUL expr { $$ = new op_node(tn_letmul, $1, $2, $3); }
+    | primary LETSHL expr { $$ = new op_node(tn_letshl, $1, $2, $3); }
+    | primary LETSHR expr { $$ = new op_node(tn_letshr, $1, $2, $3); }
+    | primary LETAND expr { $$ = new op_node(tn_letand, $1, $2, $3); }
+    | primary LETOR  expr { $$ = new op_node(tn_letor,  $1, $2, $3); }
 
-   | primary LET expr { $$ = new op_node(tn_let, $1, $2, $3); }
-   | primary LETADD expr { $$ = new op_node(tn_letadd, $1, $2, $3); }
-   | primary LETSUB expr { $$ = new op_node(tn_letsub, $1, $2, $3); }
-   | primary LETDIV expr { $$ = new op_node(tn_letdiv, $1, $2, $3); }
-   | primary LETMUL expr { $$ = new op_node(tn_letmul, $1, $2, $3); }
-   | primary LETSHL expr { $$ = new op_node(tn_letshl, $1, $2, $3); }
-   | primary LETSHR expr { $$ = new op_node(tn_letshr, $1, $2, $3); }
-   | primary LETAND expr { $$ = new op_node(tn_letand, $1, $2, $3); }
-   | primary LETOR  expr { $$ = new op_node(tn_letor,  $1, $2, $3); }
+    | expr AND expr { $$ = new op_node(tn_and, $1, $2, $3); } 
+    | expr BINAND expr { $$ = new op_node(tn_binand, $1, $2, $3); } 
+    | expr SHL expr { $$ = new op_node(tn_shl, $1, $2, $3); } 
+    | expr SHR expr { $$ = new op_node(tn_shr, $1, $2, $3); } 
+    | expr OR expr  { $$ = new op_node(tn_or, $1, $2, $3); } 
+    | expr BINOR expr  { $$ = new op_node(tn_binor, $1, $2, $3); } 
+    | expr XOR expr { $$ = new op_node(tn_xor, $1, $2, $3); } 
 
-
-   | expr AND expr { $$ = new op_node(tn_and, $1, $2, $3); } 
-   | expr BINAND expr { $$ = new op_node(tn_binand, $1, $2, $3); } 
-   | expr SHL expr { $$ = new op_node(tn_shl, $1, $2, $3); } 
-   | expr SHR expr { $$ = new op_node(tn_shr, $1, $2, $3); } 
-   | expr OR expr  { $$ = new op_node(tn_or, $1, $2, $3); } 
-   | expr BINOR expr  { $$ = new op_node(tn_binor, $1, $2, $3); } 
-   | expr XOR expr { $$ = new op_node(tn_xor, $1, $2, $3); } 
-
-   | expr GT expr { $$ = new op_node(tn_gt, $1, $2, $3); } 
-   | expr LT expr { $$ = new op_node(tn_lt, $1, $2, $3); } 
-   | expr LE expr { $$ = new op_node(tn_le, $1, $2, $3); } 
-   | expr GE expr { $$ = new op_node(tn_ge, $1, $2, $3); } 
-   | expr EQ expr { $$ = new op_node(tn_eq, $1, $2, $3); } 
-   | expr NE expr { $$ = new op_node(tn_ne, $1, $2, $3); } 
-   | expr IN expr { $$ = new op_node(tn_in, $1, $2, $3); } 
-   | expr IS expr { $$ = new op_node(tn_is, $1, $2, $3); } 
-   | expr AS expr { $$ = new op_node(tn_as, $1, $2, $3); } 
+    | expr GT expr { $$ = new op_node(tn_gt, $1, $2, $3); } 
+    | expr LT expr { $$ = new op_node(tn_lt, $1, $2, $3); } 
+    | expr LE expr { $$ = new op_node(tn_le, $1, $2, $3); } 
+    | expr GE expr { $$ = new op_node(tn_ge, $1, $2, $3); } 
+    | expr EQ expr { $$ = new op_node(tn_eq, $1, $2, $3); } 
+    | expr NE expr { $$ = new op_node(tn_ne, $1, $2, $3); } 
+    | expr IN expr { $$ = new op_node(tn_in, $1, $2, $3); } 
+    | expr IS expr { $$ = new op_node(tn_is, $1, $2, $3); } 
+    | expr AS expr { $$ = new op_node(tn_as, $1, $2, $3); } 
 
 simple_expr: primary
-   | PLUS simple_expr %prec UPLUS {
-     $$ = new op_node(tn_plus, NULL, $1, $2); }
-   | MINUS simple_expr %prec UMINUS 
-     { $$ = new op_node(tn_minus, NULL, $1, $2); }
-   | NOT simple_expr 
-     { $$ = new op_node(tn_not, NULL, $1, $2); }
-   | BINNOT simple_expr 
-     { $$ = new op_node(tn_binnot, NULL, $1, $2); }
-   | '@' primary { $$ = new address_node($1, $2); }
-   | AND primary %prec ADDRESS { $$ = new address_node($1, $2); }
+    | PLUS simple_expr %prec UPLUS 
+        { $$ = new op_node(tn_plus, NULL, $1, $2); }
+    | MINUS simple_expr %prec UMINUS 
+        { $$ = new op_node(tn_minus, NULL, $1, $2); }
+    | NOT simple_expr 
+        { $$ = new op_node(tn_not, NULL, $1, $2); }
+    | BINNOT simple_expr 
+        { $$ = new op_node(tn_binnot, NULL, $1, $2); }
+    | '@' primary { $$ = new address_node($1, $2); }
+    | AND primary %prec ADDRESS { $$ = new address_node($1, $2); }
  
 primary: constant 
-   | '(' expr_list ')' { $$ = new expr_group_node($1, $2, $3); }
-   | primary '(' act_param_list ')' { $$ = new fcall_node($1, $2, $3, $4); }
-   | primary '.' ident_ext { $$ = new access_expr_node($1, $2, $3); }
-   | primary '^' { $$ = new deref_expr_node($1, $2); }
-   | primary '[' expr_list ']' { $$ = new idx_expr_node($1, $2, $3, $4); }
-   | inherited
+    | '(' expr_list ')' { $$ = new expr_group_node($1, $2, $3); }
+    | primary '(' act_param_list ')' { $$ = new fcall_node($1, $2, $3, $4); }
+    | primary '.' ident_ext { $$ = new access_expr_node($1, $2, $3); }
+    | primary '^' { $$ = new deref_expr_node($1, $2); }
+    | primary '[' expr_list ']' { $$ = new idx_expr_node($1, $2, $3, $4); }
+    | inherited
 //   | LOOPHOLE '(' type ',' expr ')' { $$ = new loophole_node($1, $2, $3, $4, $5, $6); }
 
 constant: record_constant
-        | ICONST { $$ = new integer_node($1); }
-        | RCONST { $$ = new real_node($1); } 
-        | SCONST { $$ = new string_node($1); }
-        | '[' set_elem_list ']' { $$ = new set_node($1, $2, $3); }
-        | IDENT { $$ = new atom_expr_node($1); }
-        | INDEX { $$ = new atom_expr_node($1); }
+    | ICONST { $$ = new integer_node($1); }
+    | RCONST { $$ = new double_node($1); } 
+    | SCONST { $$ = new string_node($1); }
+    | '[' set_elem_list ']' { $$ = new set_node($1, $2, $3); }
+    | IDENT { $$ = new atom_expr_node($1); }
+    | INDEX { $$ = new atom_expr_node($1); }
 
 set_elem_list: { $$ = NULL; } 
-             | set_elem 
-             | set_elem ',' set_elem_list { $1->next = $3; $$ = $1; }
+    | set_elem 
+    | set_elem ',' set_elem_list { $1->next = $3; $$ = $1; }
 
 set_elem: expr { $$ = new set_elem_node($1); }
-        | expr DOTS expr { $$ = new set_range_node($1, $2, $3); }
+    | expr DOTS expr { $$ = new set_range_node($1, $2, $3); }
 
 expr_list: expr | expr ',' expr_list { $1->next = $3; $$ = $1; }
 
@@ -796,12 +796,12 @@ field_init_item: IDENT ':' expr { $$ = new field_init_node($1, $2, $3); }
 */
 
 label_decl_part: LABEL label_list ';' 
-    { $$ = new label_decl_part_node($1, $2, $3); }
+        { $$ = new label_decl_part_node($1, $2, $3); }
 
 label_list: ICONST { $$ = new token_list($1); } 
-          | ICONST ',' label_list { $$ = new token_list($1, $3); }
-          | IDENT { $$ = new token_list($1); } 
-          | IDENT ',' label_list { $$ = new token_list($1, $3); }
+    | ICONST ',' label_list { $$ = new token_list($1, $3); }
+    | IDENT { $$ = new token_list($1); } 
+    | IDENT ',' label_list { $$ = new token_list($1, $3); }
 
 const: CONST | RESOURCESTRING
 
@@ -811,9 +811,17 @@ const_def_list: { $$ = NULL; }
     | const_def ';' const_def_list { $1->next = $3; $$ = $1; }
 
 const_def: IDENT EQ expr 
-        { $$ = new const_def_node($1, $2, $3); }
+        { $$ = new const_def_node($1, $2, $3, NULL, NULL); }
+    | IDENT EQ expr DEPRECATED 
+        { $$ = new const_def_node($1, $2, $3, $4, NULL); }
+    | IDENT EQ expr DEPRECATED SCONST 
+        { $$ = new const_def_node($1, $2, $3, $4, $5); }
     | IDENT ':' const_type EQ expr 
-        { $$ = new typed_const_def_node($1, $2, $3, $4, $5); }
+        { $$ = new typed_const_def_node($1, $2, $3, $4, $5, NULL, NULL); }
+    | IDENT ':' const_type EQ expr DEPRECATED
+        { $$ = new typed_const_def_node($1, $2, $3, $4, $5, $6, NULL); }
+    | IDENT ':' const_type EQ expr DEPRECATED SCONST
+        { $$ = new typed_const_def_node($1, $2, $3, $4, $5, $6, $7); }
 
 type_def_part: TYPE type_def_list  
         { $$ = new type_def_part_node($1, $2); }
@@ -822,6 +830,7 @@ type_def_list: { $$ = NULL; }
     | type_def ';' type_def_list { $1->next = $3; $$ = $1; }
 
 type_def: IDENT EQ type { $$ = new type_def_node($1, $2, $3); }
+    | IDENT EQ TYPE type { $$ = new type_def_node($1, $2, $4); }  // this is so called 'strong type alias' in Delphi, example: type CppLongInt = type LongInt;
     | simple_templ_type EQ type { $$ = new type_def_templ_node($1, $2, $3); }
 
 var_decl_part: VAR var_decl_list { $$ = new var_decl_part_node(NULL, $1, $2); }
@@ -842,7 +851,13 @@ var_decl_list: { $$ = NULL; }
 //	 $1->next = $5; $$ = $1; 
 //       }
 
-var_decl: ident_list ':' type { $$ = new var_decl_node($1, $2, $3); }
+var_decl: ident_list ':' type { $$ = new var_decl_node($1, $2, $3, NULL, NULL, NULL, NULL); }
+   // | ident_list ':' type EQ expr { $$ = new var_decl_node($1, $2, $3, $4, $5, NULL, NULL); }
+    | ident_list ':' type DEPRECATED { $$ = new var_decl_node($1, $2, $3, NULL, NULL, $4, NULL); }
+    | ident_list ':' type DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, NULL, NULL, $4, $5); }
+   // | ident_list ':' type EQ expr DEPRECATED { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, NULL); }
+   // | ident_list ':' type EQ expr DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, $7); }
+    
    // temporarity commented out since it generates too many bison warnings (ambiguities)
    //  | IDENT ORIGIN expr ':' simple_type 
    //    { $$ = (var_decl_node*)new var_origin_decl_node($1, $2, $3, $4, $5); }
@@ -911,33 +926,33 @@ property_decl_list: property_decl
 
 prop_array: { $$ = NULL; }
     | '[' prop_param_list ']'
-       { $$ = new prop_array_node($1, $2, $3); }
+        { $$ = new prop_array_node($1, $2, $3); }
 prop_index: { $$ = NULL; } 
     | INDEX constant     //TODO we may need expr type here instead of 'constant' to be able to handle 'property ... index IND+3 ...' statements 
-       { $$ = new prop_index_node($1, $2); }
+        { $$ = new prop_index_node($1, $2); }
 prop_type_def: { $$ = NULL; }
     | ':' type 
-       { $$ = new prop_type_def_node($1, $2); }
+        { $$ = new prop_type_def_node($1, $2); }
 prop_read: { $$ = NULL; }
     | READ IDENT
-       { $$ = new prop_read_node($1, $2); }
+        { $$ = new prop_read_node($1, $2); }
 prop_write: { $$ = NULL; }
     | WRITE IDENT
-       { $$ = new prop_write_node($1, $2); }
+        { $$ = new prop_write_node($1, $2); }
 prop_stored: { $$ = NULL; }
     | STORED IDENT
-       { $$ = new prop_stored_node($1, $2); }
+        { $$ = new prop_stored_node($1, $2); }
 prop_default:  { $$ = NULL; }
     | DEFAULT constant
-       { $$ = new prop_default_node($1, $2); }
+        { $$ = new prop_default_node($1, $2); }
 prop_default_directive:  { $$ = NULL; }
     | DEFAULT ';'
-       { $$ = new prop_default_directive_node($1, $2); }
+        { $$ = new prop_default_directive_node($1, $2); }
 
 prop_param_list: prop_param_decl 
     | prop_param_decl ';' prop_param_list { $1->next = $3; $$ = $1; }
 
-prop_param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3); }
+prop_param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3, NULL, NULL, NULL, NULL); }
 
 
 proc_def: 
@@ -990,9 +1005,9 @@ formal_param: VAR param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
     | param_decl { $$ = $1; } 
     //| proc_decl - see comment to proc_decl definition
 
-param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3); }
-    |  ident_list ':' param_type EQ expr { $$ = new var_decl_node($1, $2, $3, $4, $5); }
-    | ident_list { $$ = new var_decl_node($1, NULL, NULL); }
+param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3, NULL, NULL, NULL, NULL); }
+    | ident_list ':' param_type EQ expr { $$ = new var_decl_node($1, $2, $3, $4, $5, NULL, NULL); }
+    | ident_list { $$ = new var_decl_node($1, NULL, NULL, NULL, NULL, NULL, NULL); }
 
 param_type: simple_type | conformant_array_type
 
@@ -1006,13 +1021,13 @@ type: simple_type | array_type | record_type | class_type | interface_type | set
 const_type: simple_type | const_array_type | record_type | const_set_type | string_type
 
 fptr_type: FUNCTION formal_params ':' type
-       { $$ = new fptr_tpd_node($1, $2, $3, $4); }
+        { $$ = new fptr_tpd_node($1, $2, $3, $4); }
     | FUNCTION formal_params ':' type OF OBJECT
-       { $$ = new fptr_tpd_node($1, $2, $3, $4, $5, $6); }
+        { $$ = new fptr_tpd_node($1, $2, $3, $4, $5, $6); }
     | PROCEDURE formal_params 
-       { $$ = new fptr_tpd_node($1, $2); }
+        { $$ = new fptr_tpd_node($1, $2); }
     | PROCEDURE formal_params OF OBJECT 
-       { $$ = new fptr_tpd_node($1, $2, NULL, NULL, $3, $4); }
+        { $$ = new fptr_tpd_node($1, $2, NULL, NULL, $3, $4); }
 
 string_type: STRING '[' expr ']' { $$ = new varying_tpd_node($1, $2, $3, $4); }
 
@@ -1023,12 +1038,12 @@ simple_type: IDENT { $$ = new simple_tpd_node(NULL, NULL, $1); }
     | STRING { $$ = new string_tpd_node($1); }
 
 array_type: packed ARRAY '[' indices ']' OF type 
-       { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
+        { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
     | packed ARRAY OF type 
-       { $$ = new array_tpd_node($1, $2, NULL, NULL, NULL, $3, $4); }
+        { $$ = new array_tpd_node($1, $2, NULL, NULL, NULL, $3, $4); }
 
 const_array_type: packed ARRAY '[' indices ']' OF const_type 
-       { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
+        { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
 
 conformant_array_type: packed ARRAY '[' conformant_indices ']' OF simple_type 
         { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
@@ -1038,7 +1053,7 @@ conformant_array_type: packed ARRAY '[' conformant_indices ']' OF simple_type
 enum_type: '(' ident_list ')' { $$ = new enum_tpd_node($1, $2, $3); }
 
 range_type: expr DOTS expr 
-    { $$ = new range_tpd_node($1, $2, $3); } 
+        { $$ = new range_tpd_node($1, $2, $3); } 
 
 pointer_type: '^' type { $$ = new ptr_tpd_node($1, $2); }
 
@@ -1055,33 +1070,33 @@ const_set_type: packed SET OF const_type { $$ = new set_tpd_node($1, $2, $3, $4)
 // **** NOTE: record can contain variant part declared in field_list nonterminal while class cannot
 
 record_type: packed RECORD record_body END 
-       { $$ = new record_tpd_node($1, $2, $3, $4); }
+        { $$ = new record_tpd_node($1, $2, $3, $4); }
     | packed RECORD END 
-       { $$ = new record_tpd_node($1, $2, NULL, $3); }
+        { $$ = new record_tpd_node($1, $2, NULL, $3); }
 
 record_body: record_field_list record_components 
-       { 
-         decl_node** cpp;   
-         for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
-	 *cpp = $2;
-         $$ = $1; 
-       }
+        { 
+          decl_node** cpp;   
+          for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
+	  *cpp = $2;
+          $$ = $1; 
+        }
     | record_components
     | record_field_list
 
 record_components: record_component record_components
-       { 
-         decl_node** cpp;   
-         for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
-	 *cpp = $2;
-         $$ = $1; }
+        { 
+          decl_node** cpp;   
+          for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
+	  *cpp = $2;
+          $$ = $1; }
     | record_component
 
 record_component: record_access_spec_decl
     | record_access_spec_decl record_field_list
-       { $1->next = $2; $$ = $1; }
+        { $1->next = $2; $$ = $1; }
     | VAR field_list
-       { $$ = new record_field_part_node($1, $2); } 
+        { $$ = new record_field_part_node($1, $2); } 
     | record_methods
     | object_properties
     | const_def_part 
@@ -1092,40 +1107,40 @@ record_methods: record_method_decl
 
 record_method_decl: 
       proc_fwd_decl 
-       { $$ = new method_decl_node(NULL, $1); }
+        { $$ = new method_decl_node(NULL, $1); }
     | proc_spec 
-       { $$ = new method_decl_node(NULL, $1); }
+        { $$ = new method_decl_node(NULL, $1); }
     | CLASS proc_fwd_decl  
-       { $$ = new method_decl_node($1, $2); }
+        { $$ = new method_decl_node($1, $2); }
     | CLASS proc_spec  
-       { $$ = new method_decl_node($1, $2); }
+        { $$ = new method_decl_node($1, $2); }
     | CLASS operator_fwd_decl  
-       { $$ = new method_decl_node($1, $2); }
+        { $$ = new method_decl_node($1, $2); }
 
 record_field_list: field_list
-       { $$ = new record_field_part_node(NULL, $1); }
+        { $$ = new record_field_part_node(NULL, $1); }
 
 
 interface_type: INTERFACE guid interface_components END
-       { $$ = new interface_tpd_node($1, NULL, NULL, NULL, $2, $3, $4); }  
+        { $$ = new interface_tpd_node($1, NULL, NULL, NULL, $2, $3, $4); }  
     | INTERFACE '(' IDENT ')' guid interface_components END
-       { $$ = new interface_tpd_node($1, $2, $3, $4, $5, $6, $7); }
+        { $$ = new interface_tpd_node($1, $2, $3, $4, $5, $6, $7); }
     | INTERFACE '(' IDENT ')' END
-       { $$ = new interface_tpd_node($1, $2, $3, $4, NULL, NULL, $5); }
+        { $$ = new interface_tpd_node($1, $2, $3, $4, NULL, NULL, $5); }
     | INTERFACE END
-       { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, NULL, $2); }
+        { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, NULL, $2); }
 //  | INTERFACE
  //      { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL, NULL); }
 
 interface_components: interface_component interface_components
-       { 
-         // special case when two lists under one roof. 
-         // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
-         decl_node** cpp;   
-         for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
-	 *cpp = $2;
-          $$ = $1; 
-       }
+        { 
+          // special case when two lists under one roof. 
+          // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
+          decl_node** cpp;   
+          for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
+     	  *cpp = $2;
+           $$ = $1; 
+        }
     | interface_component
 
 interface_component: object_methods
@@ -1133,35 +1148,35 @@ interface_component: object_methods
 
 guid: { $$ = NULL; }
     | '[' SCONST ']' 
-       { $$ = new guid_node($1, $2, $3); }
+        { $$ = new guid_node($1, $2, $3); }
 
 
 class_or_object: OBJECT | CLASS
  
 class_type: class_or_object object_body END
-       { $$ = new object_tpd_node($1, NULL, NULL, NULL, $2, $3); }  
+        { $$ = new object_tpd_node($1, NULL, NULL, NULL, $2, $3); }  
     | class_or_object '(' ident_list ')' object_body END
-       { $$ = new object_tpd_node($1, $2, $3, $4, $5, $6); }
+        { $$ = new object_tpd_node($1, $2, $3, $4, $5, $6); }
     | class_or_object '(' ident_list ')' END
-       { $$ = new object_tpd_node($1, $2, $3, $4, NULL, $5); }
+        { $$ = new object_tpd_node($1, $2, $3, $4, NULL, $5); }
     | class_or_object END
-       { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2); }
+        { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2); }
     | class_or_object
-       { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
+        { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
 
 
 object_body: field_decl_list object_components
-       { 
-         // rare case when two lists under one roof. 
-         // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
-         decl_node** cpp;   
-         for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
-	 *cpp = $2;
-         $$ = $1; 
-       }
+        { 
+          // rare case when two lists under one roof. 
+          // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
+          decl_node** cpp;   
+          for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
+	  *cpp = $2;
+          $$ = $1; 
+        }
     | object_components
     | field_decl_list    //<n_vdcl>
-       { $$ = new var_decl_part_node(NULL, NULL, $1); }
+        { $$ = new var_decl_part_node(NULL, NULL, $1); }
 
 record_access_spec_tok: PRIVATE | PUBLIC 
 
@@ -1187,7 +1202,7 @@ object_components: object_component object_components
 
 object_component: class_access_spec_decl 
     | class_access_spec_decl field_decl_list
-       { $1->next = $2; $$ = $1; } 
+        { $1->next = $2; $$ = $1; } 
     | field_decl_part 
     | object_methods
     | object_properties
@@ -1196,9 +1211,9 @@ object_component: class_access_spec_decl
 
 
 field_decl_part: VAR field_decl_list 
-       { $$ = new var_decl_part_node(NULL, $1, $2); }
+        { $$ = new var_decl_part_node(NULL, $1, $2); }
     | CLASS VAR field_decl_list 
-       { $$ = new var_decl_part_node($1, $2, $3); }
+        { $$ = new var_decl_part_node($1, $2, $3); }
 
 field_decl_list: var_decl ';' { $$ = $1; }
     | var_decl ';' field_decl_list { $1->next = $3; $$ = $1; }
@@ -1206,20 +1221,20 @@ field_decl_list: var_decl ';' { $$ = $1; }
 object_methods: method_decl_list
 
 object_properties: property_decl_list
-       { $$ = new property_decl_part_node($1); }
+        { $$ = new property_decl_part_node($1); }
 
 method_decl_list: method_decl
     | method_decl method_decl_list { $1->next = $2; $$ = $1; }
   //  | proc_spec     proc_fwd_decl_list { $1->next = $2; $$ = $1; }
 
 method_decl: proc_fwd_decl 
-       { $$ = new method_decl_node(NULL, $1); }
+        { $$ = new method_decl_node(NULL, $1); }
     | proc_spec 
-       { $$ = new method_decl_node(NULL, $1); }
+        { $$ = new method_decl_node(NULL, $1); }
     | CLASS proc_fwd_decl  
-       { $$ = new method_decl_node($1, $2); }
+        { $$ = new method_decl_node($1, $2); }
     | CLASS proc_spec  
-       { $$ = new method_decl_node($1, $2); }
+        { $$ = new method_decl_node($1, $2); }
   
 
 file_type: packed FIL OF type { $$ = new file_tpd_node($1, $2, $3, $4); }
