@@ -2,11 +2,11 @@
 
 // DESCRIPTION
 // Mnemonics (or 'token names') are put into: char* token::token_name[TKN_*] array.TKN_* used as an index in this array.
-// Token Categories are put into: int token::token_cat[TKN_*] array with prefix CAT_ (e.g. CAT_KWD, CAT_ID, ...). TKN_* used as an index in this array.
+// Token Categories are put into array: int token::token_cat[TKN_*] with prefix CAT_ (e.g. CAT_KWD, CAT_ID, ...). TKN_* used as an index in this array.
 // Token Class/Tag represented by enum (must not contain repeating values): enum lex_token {...,TKN_LPAR, ...TKN_CLASS, TKN_END_SHIFT,... TKN_LAST}    
 // Yacc Token Value is put into array: int zzcnv_table[TKN_*] {...ICONST, ...'[',...INHERITED,...AND,... }. TKN_* used as an index in this array.
 // All terminal tokens (yacc token values) are defined in parser.y file and put into enum: enum yytokentype {...ABSTRACT=258,... PROCEDURE=297,...AND=357...}
-// Also there is a table with tag names: char* token_tag_name[] = {..."TKN_LPAR" , ..."TKN_CLASS", "TKN_END_SHIFT",... "TKN_LAST"}
+// Also there is a table with tag names: char* token_tag_name[] = {..."TKN_LPAR" , ..."TKN_CLASS", "TKN_END_SHIFT",... "TKN_LAST"}, used for showing error messages
 // All available token categories defined in: enum category {CAT_ID,CAT_STR,CAT_NUM,CAT_KWD,CAT_WSPC,CAT_PUT,CAT_SPEC,CAT_GEN}
 
 // Separators
@@ -17,7 +17,7 @@ DEF_TOKEN(NULL,  WSPC, TKN_CMNT, 0)
 
 // Numbers (3...)
 DEF_TOKEN(NULL, NUM, TKN_ICONST, ICONST) // integer
-DEF_TOKEN(NULL, NUM, TKN_RCONST, RCONST) // real
+DEF_TOKEN(NULL, NUM, TKN_RCONST, RCONST) // double
 DEF_TOKEN(NULL, STR, TKN_SCONST, SCONST) // string
 
 // special symbols (6...)
@@ -72,6 +72,7 @@ DEF_TOKEN("class", KWD, TKN_CLASS, CLASS)
 DEF_TOKEN("const", KWD, TKN_CONST, CONST)
 DEF_TOKEN("constructor", KWD, TKN_CONSTRUCTOR, IDENT)
 DEF_TOKEN("default", KWD, TKN_DEFAULT, DEFAULT)
+DEF_TOKEN("deprecated", KWD, TKN_DEPRECATED, DEPRECATED)
 DEF_TOKEN("destructor", KWD, TKN_DESTRUCTOR, IDENT)
 DEF_TOKEN("div", KWD, TKN_DIV, DIV)
 DEF_TOKEN("do", KWD, TKN_DO, DO)
@@ -122,7 +123,7 @@ DEF_TOKEN("procedure", KWD, TKN_PROCEDURE, PROCEDURE)
 DEF_TOKEN("program", KWD, TKN_PROGRAM, PROGRAM)
 DEF_TOKEN("private", KWD, TKN_PRIVATE, PRIVATE)
 
-//102...
+//103...
 DEF_TOKEN("property", KWD, TKN_PROPERTY, PROPERTY)
 DEF_TOKEN("protected", KWD, TKN_PROTECTED, PROTECTED)
 DEF_TOKEN("public", KWD, TKN_PUBLIC, PUBLIC)
@@ -152,13 +153,13 @@ DEF_TOKEN("until", KWD, TKN_UNTIL, UNTIL)
 DEF_TOKEN("unit", KWD, TKN_UNIT, IDENT)
 DEF_TOKEN("var", KWD, TKN_VAR, VAR)
 DEF_TOKEN("varargs", ID, TKN_VARARGS, VARARGS)
-DEF_TOKEN("virtual", ID, TKN_VIRTUAL, VIRTUAL)
+DEF_TOKEN("virtual", KWD, TKN_VIRTUAL, VIRTUAL)
 DEF_TOKEN("while", KWD, TKN_WHILE, WHILE)
 DEF_TOKEN("winapi", ID, TKN_WINAPI, WINAPI) //130
 DEF_TOKEN("with", KWD, TKN_WITH, WITH)
 DEF_TOKEN("xor", KWD, TKN_XOR, IDENT)
 
-//135...
+//136...
 DEF_TOKEN("index",	   ID, TKN_INDEX, INDEX)
 DEF_TOKEN("succ",      ID, TKN_SUCC, IDENT)
 DEF_TOKEN("pred",      ID, TKN_PRED, IDENT)
@@ -176,7 +177,7 @@ DEF_TOKEN("length",    ID, TKN_LENGTH, IDENT)
 DEF_TOKEN("move",	   ID, TKN_MOVE, IDENT)
 DEF_TOKEN("assert",	   ID, TKN_ASSERT, IDENT)
 
-//151... operators(26)
+//152... operators(26)
 DEF_TOKEN("equal",	        ID, TKN_EQUAL, IDENT)
 DEF_TOKEN("notequal",       ID, TKN_NOTEQUAL, IDENT)
 DEF_TOKEN("lessthan"  ,     ID, TKN_LESSTHAN, IDENT)
@@ -184,11 +185,11 @@ DEF_TOKEN("greaterthan",    ID, TKN_GREATERTHAN, IDENT)
 DEF_TOKEN("greaterthanorequal", ID, TKN_GREATERTHANOREQUAL, IDENT)
 DEF_TOKEN("lessthanorequal",ID, TKN_LESSTHANOREQUAL, IDENT)
 DEF_TOKEN("add",            ID, TKN_ADD, IDENT)
-DEF_TOKEN("substract",      ID, TKN_SUBSTRACT, IDENT)
+DEF_TOKEN("subtract",       ID, TKN_SUBTRACT, IDENT)
 DEF_TOKEN("multiply",	    ID, TKN_MULTPILY, IDENT)
 DEF_TOKEN("divide",         ID, TKN_DIVIDE, IDENT)
 DEF_TOKEN("intdivide",      ID, TKN_INTDIVIDE, IDENT)
-DEF_TOKEN("modulues",	    ID, TKN_MODULUS, IDENT)
+DEF_TOKEN("modulus",	    ID, TKN_MODULUS, IDENT)
 DEF_TOKEN("leftshift",      ID, TKN_LEFTSHIFT, IDENT)
 DEF_TOKEN("rightshift",     ID, TKN_RIGHTSHIFT, IDENT)
 DEF_TOKEN("logicaland",	    ID, TKN_LOGICALAND, IDENT)
@@ -204,7 +205,7 @@ DEF_TOKEN("implicit",       ID, TKN_IMPLICIT, IDENT)
 DEF_TOKEN("explicit",       ID, TKN_EXPLICIT, IDENT)
 DEF_TOKEN("assign",	        ID, TKN_ASSIGN, IDENT)
 
-//177...
+//178...
 DEF_TOKEN(NULL,      SPEC, TKN_GEN, 0)
 DEF_TOKEN(NULL,      WSPC, TKN_PUSH_FILE,  0)
 DEF_TOKEN(NULL,      WSPC, TKN_PUSH_UNIT,  0)
