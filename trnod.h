@@ -346,7 +346,7 @@ class on_except_node : public stmt_node {
 public:
     token*          t_on;
     token*          t_ident;
-    token*          t_coln;
+    token*          t_coln;  // ':'
     token*          t_do;
     tpd_node*       ex_type;
     //compound_node*  body;
@@ -633,12 +633,12 @@ class integer_node : public literal_node {
 };
 
 
-class real_node : public literal_node {
+class double_node : public literal_node {
   public:
-    real_node(token* value_str); 
+    double_node(token* value_str); 
 
-    virtual void attrib(int ctx);
-    virtual void translate(int ctx);
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
 
@@ -829,7 +829,7 @@ class field_init_node : public node {
   public:
     field_init_node* next;
     token*           t_field;
-    token*           t_coln;
+    token*           t_coln;  // ':'
     expr_node*       value;
 
     field_init_node(token* t_field, token* t_coln, expr_node* value);
@@ -984,8 +984,7 @@ class label_decl_part_node : public decl_node {
     token*      t_semi;           // ';' 
     token_list* labels; 
 
-    label_decl_part_node(token* t_label, token_list* label_list, 
-                         token* t_semi); 
+    label_decl_part_node(token* t_label, token_list* label_list, token* t_semi); 
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -998,13 +997,15 @@ class label_decl_part_node : public decl_node {
 
 class const_def_node : public decl_node { 
   public: 
-    token*           t_ident; 
-    token*           t_equal;
-    expr_node*       constant; 
-    symbol*          sym;
+    token*       t_ident; 
+    token*       t_equal;
+    expr_node*   constant;
+    token*       t_depr;
+    token*       t_mess;
+    symbol*      sym;
     static const_def_node* enumeration;
 
-    const_def_node(token* t_ident, token* t_equal, expr_node* value); 
+    const_def_node(token* t_ident, token* t_equal, expr_node* value, token* t_depr, token* t_mess);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1013,11 +1014,11 @@ class const_def_node : public decl_node {
 
 class typed_const_def_node : public const_def_node { 
   public: 
-    token*           coln;
+    token*           t_coln; // ':'
     tpd_node*        tpd; 
   
-    typed_const_def_node(token* ident, token* coln, tpd_node* tpd, 
-			 token* equal, expr_node* constant); 
+    typed_const_def_node(token* t_ident, token* t_coln, tpd_node* tpd, token* t_equal, 
+                         expr_node* constant, token* t_depr, token* t_mess);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1083,14 +1084,16 @@ public:
 
 class var_decl_node : public decl_node { 
   public: 
-    token_list*      vars; 
-    token*           coln;   // ':'
-    tpd_node*        tpd; 
-    token*           scope;
-    token*           eq;
-    expr_node*       def_value;
+    token_list*   vars; 
+    token*        t_coln;   // ':'
+    tpd_node*     tpd; 
+    token*        scope;
+    token*        t_eq;
+    expr_node*    def_value;
+    token*        t_depr;
+    token*        t_mess;
 
-    var_decl_node(token_list* vars, token* coln, tpd_node* tpd, token* eq = NULL, expr_node* def_value = NULL);
+    var_decl_node(token_list* vars, token* coln, tpd_node* tpd, token* eq, expr_node* def_value, token* t_depr, token* t_mess);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1197,7 +1200,7 @@ class proc_decl_node : public decl_node {
     token*              t_proc;
     token*              t_ident; 
     param_list_node*    params;  
-    token*              t_coln; 
+    token*              t_coln;  // ':' 
     tpd_node*           ret_type; 
     symbol*             var;
     proc_tp*            type;
@@ -1228,7 +1231,7 @@ class proc_fwd_decl_node : public proc_decl_node {
    // bool                is_dynamic;
 
     proc_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, 
-                       token* t_semi1, token_list* qualifiers = NULL, token* t_semi2 = NULL); 
+                       token* t_semi1, token_list* qualifiers = nullptr, token* t_semi2 = nullptr); 
   
     void attrib(int ctx) override;
     void translate(int ctx) override;
@@ -1370,7 +1373,7 @@ public:
 class fptr_tpd_node : public tpd_node { 
   public: 
     token*           t_proc;    
-    token*           t_coln;  
+    token*           t_coln;  // ':'  
     token*           t_params;
     param_list_node* params;
     tpd_node*        ret_type;
@@ -1539,8 +1542,7 @@ class variant_node : public node {
     char*               struct_name;
     field_list_node*    fields; 
 
-    variant_node(expr_node* tag_list, token* t_coln, 
-                 token* t_lpar, field_list_node* fields, token* t_rpar); 
+    variant_node(expr_node* tag_list, token* t_coln, token* t_lpar, field_list_node* fields, token* t_rpar); 
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1725,7 +1727,7 @@ public:
 class prop_type_def_node : public decl_node
 {
 public:
-    token* t_coln;
+    token* t_coln; // ':'
     tpd_node* tpd;
 
     char* val_type = NULL;
