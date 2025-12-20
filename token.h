@@ -25,13 +25,13 @@ enum lex_token {
 
 enum category {
     CAT_ID,
-    CAT_STR,
-    CAT_NUM,
+    CAT_STR,  // string literal
+    CAT_NUM,  // numeric literal (either int or double)
     CAT_KWD,
     CAT_WSPC, // white space and \n
     CAT_PUT,
-    CAT_SPEC, // special?
-    CAT_GEN
+    CAT_SPEC, // used for only one token dummy (see below) which is begin of MAIN token list
+    CAT_GEN  // 'generated', means that for this token set_trans() was called.
 };
 
 class token : public heap_object {
@@ -66,7 +66,7 @@ class token : public heap_object {
     static char* resolve_name_conflict(char* str);
 
     token(int v_cat, int v_tag);
-    token(char const* v_text, int v_tag = TKN_GEN, int v_line = 0, int v_pos = 0, nm_entry* nm = NULL);
+    token(char const* v_text, int v_tag = TKN_GEN, int v_line = 0, int v_pos = 0, nm_entry* nm = nullptr);
     token(token& t);
 
     // insert token this before t (returns this)
@@ -100,7 +100,9 @@ class token : public heap_object {
     }
     void   disable() { 
 	    if (cat != CAT_WSPC || tag < TKN_GEN) { 
-	        cat = CAT_WSPC; tag = TKN_GEN; out_text = nullptr; 
+	        cat = CAT_WSPC; 
+            tag = TKN_GEN; 
+            out_text = nullptr; 
 	    }
     }
 
@@ -128,17 +130,14 @@ class token : public heap_object {
     static token* first_relevant() { return dummy.next_relevant(); }
     static token* last_relevant() { return dummy.prev_relevant(); }
 
-    void   set_trans (char const* str) {
-        cat = CAT_GEN;
-        out_text = (char*)str;
-    }    
+    void set_trans (char const* str) { cat = CAT_GEN; out_text = (char*)str; }    
 
     virtual void print_debug() { fprintf(stderr, "%s, cat=%d, tag=%d", in_text, cat, tag); }
 
     static void input(char *file);
     static void output(char *file);
 
-    static void reset() { dummy.next = dummy.prev = &dummy; curr_token = NULL; }
+    static void reset() { dummy.next = dummy.prev = &dummy; curr_token = nullptr; }
 };
 
 class output_context { 
