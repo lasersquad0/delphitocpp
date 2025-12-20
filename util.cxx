@@ -51,11 +51,10 @@ void error(token* tkn, const char* fmt, ...)
 
     while(tkn->tag == TKN_GEN) tkn = tkn->next;
 
-    fprintf(stderr, "%s:%d %d (token %s) error: ", 
-	    tkn->fname, tkn->line, tkn->pos, token_tag_name[tkn->tag]);
+    fprintf(stderr, "%s:%d %d (token %s) error: ", tkn->fname, tkn->line, tkn->pos, token_tag_name[tkn->tag]);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
-    putc('\n',stderr);
+    putc('\n', stderr);
     exit (EXIT_FAILURE);
 }
 
@@ -67,7 +66,7 @@ void warning(const char* fmt, ...)
     fprintf(stderr, "warning: ");
     vfprintf(stderr, fmt, ap);
     va_end(ap);
-    putc('\n',stderr);
+    putc('\n', stderr);
 }
 
 void warning(int line, int pos, const char* file, const char* fmt, ...)
@@ -78,7 +77,7 @@ void warning(int line, int pos, const char* file, const char* fmt, ...)
     fprintf(stderr, "%s:%d %d warning: ", file, line, pos);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
-    putc('\n',stderr);
+    putc('\n', stderr);
 }
 
 void warning(token* tkn, const char* fmt, ...)
@@ -88,10 +87,10 @@ void warning(token* tkn, const char* fmt, ...)
     while(tkn->tag == TKN_GEN) tkn = tkn->next;
 
     va_start(ap, fmt);
-    fprintf(stderr, "%s:%d %d warning: ", tkn->fname, tkn->line, tkn->pos );
+    fprintf(stderr, "%s:%d %d warning: ", tkn->fname, tkn->line, tkn->pos);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
-    putc('\n',stderr);
+    putc('\n', stderr);
 }
 
 extern "C" char* mystrdup(const char* s) 
