@@ -23,14 +23,14 @@ token::token(int v_cat, int v_tag)
     next = prev = this;
     cat = (unsigned char)v_cat;
     tag = (unsigned short)v_tag;
-    fname = NULL;
-    clone = bind = NULL;
+    fname = nullptr;
+    clone = bind = nullptr;
 
     line = 0;
     attr = 0;
     pos = 0;
-    name = NULL;
-    out_text = in_text = NULL;
+    name = nullptr;
+    out_text = in_text = nullptr;
 }
 
 token::token(char const* v_text, int v_tag, int v_line, int v_pos, nm_entry* nm)
@@ -41,19 +41,19 @@ token::token(char const* v_text, int v_tag, int v_line, int v_pos, nm_entry* nm)
     tag = (unsigned short)v_tag;
     cat = (unsigned char)token_cat[v_tag]; //TODO shall we change stored type in token_cat?
     out_text = in_text = (char*)v_text;
-    fname = NULL;
+    fname = nullptr;
     name = nm;
-    clone = bind = NULL;
+    clone = bind = nullptr;
 
-    next = prev = NULL;
+    next = prev = nullptr;
 }
 
 token::token(token& t) 
 { 
     *this = t;
-    clone = NULL; 
+    clone = nullptr;
     t.clone = this;
-    if (bind != NULL) bind = bind->clone; 
+    if (bind != nullptr) bind = bind->clone;
 }
 
 void token::remove() 
@@ -221,8 +221,7 @@ void output_context::output(token* t)
 	    return; 
     }
     if (t_pos > pos && t->tag != TKN_LN &&
-        ((t->attr & token::fix_pos) || t->tag == TKN_CMNT ||
-            prev_tag == TKN_LN))
+        ((t->attr & token::fix_pos) || t->tag == TKN_CMNT || prev_tag == TKN_LN))
     {
         //
         // Set token to specified position
@@ -266,19 +265,19 @@ void output_context::output(token* t)
 	    pos = 0;
 	    line += 1;
 	    prev_tag = TKN_LN;
-            break;
-          case '\t':
+        break;
+      case '\t':
 	    pos += TAB_WIDTH - (pos % TAB_WIDTH);
 	    prev_tag = TKN_SPACE;
 	    break;
-          case ' ':
+      case ' ':
 	    prev_tag = TKN_SPACE;
 	    pos += 1;
 	    break;
 	  case '>':
 	    prev_tag = TKN_GT;
 	    pos += 1;
-            break;
+        break;
 	  default:
 	    pos += 1;
 	    prev_tag = t->tag;
@@ -305,7 +304,7 @@ static char* normalize_file_name(char* file)
     return nfile;
 }
 
-static token* print_rec (char *file, token *t, bool unit_spec) {
+static token* print_rec(char *file, token *t, bool unit_spec) {
     output_context ctx(file);	
     char *ip1, *ip2;
     char *inc_file = NULL;
