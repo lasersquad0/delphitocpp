@@ -14,6 +14,24 @@ static proc_tp* curr_proc = NULL;
 static char*    struct_path = "";
 static token*   global_func_decl_level;
 
+static void insert_depr(token* t_depr, token* t_mess, token* f_tkn)
+{
+	assert(f_tkn);
+	if (t_depr)
+	{
+		if (t_mess)
+		{
+			f_tkn->prepend(dprintf("[[deprecated(\"%s\")]]\n", t_mess->in_text));
+			token::disable(t_depr->prev, t_mess);
+		}
+		else
+		{
+			f_tkn->prepend("[[deprecated]]\n");
+			t_depr->disable();
+		}
+	}
+}
+
 //-----------------------------------------------------------------------------
 
 void node::force_semicolon()
@@ -666,6 +684,7 @@ void read_node::translate(int)
 						->insert_dimensions(prm);
 					break;
 				case tp_real:
+				case tp_double:
 					fmt = 'f';
 					break;
 				case tp_integer:
@@ -1821,6 +1840,8 @@ static char* normalize_int_const(char* val)
 	return nval;
 }
 
+#define check_error(b_expr) if(!(b_expr)) warning(value_tkn, "cannot parse integer value.")
+
 void integer_node::attrib(int)
 {
     type = &integer_type;
@@ -1829,10 +1850,10 @@ void integer_node::attrib(int)
 	// Value field has long long type which is 64bit to cover all possible integer values in Delphi code
     if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
     {
-		assert(sscanf(p + 2, "%llx", &value) > 0);
+		check_error(sscanf(p + 2, "%llx", &value) > 0);
 		radix = 16;
     } else if (turbo_pascal && *p == '$') { //hex
-		assert(sscanf(p + 1, "%llx", &value) > 0);
+		check_error(sscanf(p + 1, "%llx", &value) > 0);
 		radix = 16;
     } else if(*p == '%') { // binary 
 		value = btoi(p + 1);
@@ -1841,18 +1862,18 @@ void integer_node::attrib(int)
 		value = btoi(p + 2); 
 		radix = 2;
     } else if(strncmp(p, "8#", 2) == 0) {
-		assert(sscanf(p + 2, "%llo", &value) > 0);
+		check_error(sscanf(p + 2, "%llo", &value) > 0);
 		radix = 8;
     } else if(strncmp(p, "16#", 3) == 0) {
-		assert(sscanf(p + 3, "%llx", &value) > 0);
+		check_error(sscanf(p + 3, "%llx", &value) > 0);
 		radix = 16;
     } else if(strncmp(p, "10#", 3) == 0) {
-		assert(sscanf(p + 3, "%lld", &value) > 0);
+		check_error(sscanf(p + 3, "%lld", &value) > 0);
 		radix = 10;
 	} else {
 		int len = (int)strlen(p) - 1;
 		if (p[len] == 'h' || p[len] == 'H') {
-			assert(sscanf(p, "%llx", &value) > 0);
+			check_error(sscanf(p, "%llx", &value) > 0);
 			radix = 16;
 		}
 		else if (p[len] == 'b' || p[len] == 'B') { // binary
@@ -1860,7 +1881,7 @@ void integer_node::attrib(int)
 			radix = 2;
 		}
 		else {
-			assert(sscanf(p, "%lld", &value) > 0);
+			check_error(sscanf(p, "%lld", &value) > 0);
 			radix = 10;
 		}
 	}
@@ -1891,14 +1912,14 @@ void integer_node::translate(int)
 }
 
 
-real_node::real_node(token* value_tkn) : literal_node(value_tkn, tn_realnum) {}
+double_node::double_node(token* value_tkn) : literal_node(value_tkn, tn_realnum) {}
 
-void real_node::attrib(int)
+void double_node::attrib(int)
 {
-    type = &real_type;
+    type = &double_type;
 }
 
-void real_node::translate(int)
+void double_node::translate(int)
 {
     f_tkn = l_tkn = value_tkn;
 }
@@ -2637,7 +2658,7 @@ void op_node::attrib(int)
 	}
 
     if (tag == tn_divr) {
-        type = &real_type;
+        type = &double_type; //&real_type
     } else if (tag >= tn_in && tag <= tn_le) {
         type = &bool_type;
     } else if (left && right && right->type && right->type->tag == tp_set
@@ -2647,11 +2668,16 @@ void op_node::attrib(int)
 		set_tp* rtype = (set_tp*)right->type->get_typedef();
 		type = (ltype->card() < rtype->card()) ? ltype : rtype;
     } else if (left && right && left->type && right->type &&
-	       (left->type->tag == tp_real || right->type->tag == tp_real))
+	          (left->type->tag == tp_double || right->type->tag == tp_double))
     {
-        type = &real_type;
+        type = &double_type;
     } else if (left && right && left->type && right->type &&
-	       (right->type->tag == tp_string || right->type->tag == tp_char))
+		      (left->type->tag == tp_real || right->type->tag == tp_real))
+	{
+		type = &real_type;
+	}
+	else if (left && right && left->type && right->type &&
+	        (right->type->tag == tp_string || right->type->tag == tp_char))
     {
         type = &varying_string_type;
 	} else if (tag == tn_is) {
@@ -2701,11 +2727,18 @@ void op_node::translate(int)
 		op->set_trans("/");
 		break;
 	case tn_divr:
-		op->set_trans("/");
-		if (left->type && left->type->tag != tp_real &&
-			right->type && right->type->tag != tp_real)
+		op->set_trans("/"); // result of this op is double by default, unless....
+		
+		if ( left->type && left->type->tag != tp_double && right->type && right->type->tag != tp_double)
 		{
-			f_tkn = left->f_tkn->prepend("(real)(");
+			// if one side is real than expr type is real
+			
+			if ( ((left->type && right->type && left->type->tag == tp_real && right->type->tag != tp_double) || (right->type == nullptr))
+			  || ((left->type && right->type && right->type->tag == tp_real && left->type->tag != tp_double) || (left->type  == nullptr)) )
+				f_tkn = left->f_tkn->prepend("(real)(");
+			else
+				f_tkn = left->f_tkn->prepend("(double)(");
+			
 			left->l_tkn->append(")");
 		}
 		break;
@@ -4031,8 +4064,7 @@ void write_param_node::translate(int ctx)
 		switch (val->type->tag) {
 		case tp_string:
 			if (width == NULL && val->tag == tn_string) {
-				write_format = dprintf("%s%s", write_format,
-					make_fmt_string(((string_node*)val)->value_tkn->out_text));
+				write_format = dprintf("%s%s", write_format, make_fmt_string(((string_node*)val)->value_tkn->out_text));
 				token* prev = f_tkn->prev_relevant();
 				if (prev->tag == TKN_COMMA) {
 					prev = prev->prev_relevant();
@@ -4061,8 +4093,7 @@ void write_param_node::translate(int ctx)
 			break;
 		case tp_char:
 			if (width == NULL && val->tag == tn_char) {
-				write_format = dprintf("%s%s", write_format,
-					make_fmt_string(((string_node*)val)->value_tkn->out_text));
+				write_format = dprintf("%s%s", write_format, make_fmt_string(((string_node*)val)->value_tkn->out_text));
 				token* prev = f_tkn->prev_relevant();
 				if (prev->tag == TKN_COMMA) {
 					prev = prev->prev_relevant();
@@ -4087,6 +4118,7 @@ void write_param_node::translate(int ctx)
 			fmt = 'i';
 			break;
 		case tp_real:
+		case tp_double:
 			fmt = 'f';
 			break;
 		default:
@@ -4173,12 +4205,11 @@ void label_decl_part_node::translate(int)
 
 const_def_node* const_def_node::enumeration;
 
-const_def_node::const_def_node(token* t_ident, token* t_equal, expr_node* constant)
+const_def_node::const_def_node(token* t_ident, token* t_equal, expr_node* constant, token* t_depr, token* t_mess)
 {
-    CONS3(t_ident, t_equal, constant);
+    CONS5(t_ident, t_equal, constant, t_depr, t_mess);
 	sym = NULL;
 }
-
 
 void const_def_node::attrib(int)
 {
@@ -4201,13 +4232,18 @@ void const_def_node::attrib(int)
 void const_def_node::translate(int)
 {
     constant->translate(ctx_constant);
-    if (curr_proc && curr_proc->make_all_constants_global && !(sym->flags & symbol::f_static))
+    
+	if (curr_proc && curr_proc->make_all_constants_global && !(sym->flags & symbol::f_static))
     {
 		curr_proc->make_unique(sym);
     }
-    sym->translate(t_ident);
-    l_tkn = constant->l_tkn;
-    token::disable(t_ident->next, constant->f_tkn->prev);
+    
+	sym->translate(t_ident);
+ 
+	l_tkn = t_mess ? t_mess : t_depr ? t_depr : constant->l_tkn;
+    
+	token::disable(t_ident->next, constant->f_tkn->prev);
+
 	if (language_c && (sym->type->tag == tp_integer
 		|| sym->type->tag == tp_bool
 		|| sym->type->tag == tp_char
@@ -4250,7 +4286,7 @@ void const_def_node::translate(int)
 				t->tag = TKN_LN;
 			}
 		}
-	} else {
+	} else { // C++ or complex types
 		f_tkn = t_ident->prepend(language_c ? "static const " : "const ");
 		enumeration = NULL;
 		if (constant->type->tag == tp_string) {
@@ -4264,6 +4300,9 @@ void const_def_node::translate(int)
 		t_equal->set_trans(" = ");
 		force_semicolon();
 	}
+
+	insert_depr(t_depr, t_mess, f_tkn);
+
 	if (sym->flags & symbol::f_static) {
 		assert(global_func_decl_level != NULL);
 		global_func_decl_level->move_region(f_tkn, l_tkn);
@@ -4273,11 +4312,11 @@ void const_def_node::translate(int)
 	}
 }
 
-typed_const_def_node::typed_const_def_node(token* ident, token* coln,
-					   tpd_node* tpd, token* equal, expr_node* constant)
-				: const_def_node(ident, equal, constant)
+typed_const_def_node::typed_const_def_node(token* t_ident, token* t_coln, tpd_node* tpd, 
+	                    token* t_equal, expr_node* constant, token* t_depr, token* t_mess)
+				: const_def_node(t_ident, t_equal, constant, t_depr, t_mess)
 {
-    CONS2(coln, tpd);
+    CONS2(t_coln, tpd);
 }
 
 void typed_const_def_node::attrib(int)
@@ -4290,8 +4329,8 @@ void typed_const_def_node::attrib(int)
 
     sym = b_ring::add_cur(t_ident, symbol::s_const, constant->type);
     if (constant->flags & tn_is_const) {
-	sym->flags |= symbol::f_const;
-	sym->value = constant->value;
+		sym->flags |= symbol::f_const;
+		sym->value = constant->value;
     }
 }
 
@@ -4299,10 +4338,9 @@ void typed_const_def_node::translate(int)
 {
     constant->translate(ctx_constant);
     tpd->translate(ctx_constant);
-    if (curr_proc && curr_proc->make_all_constants_global
-	&& !(sym->flags & symbol::f_static))
+    if (curr_proc && curr_proc->make_all_constants_global && !(sym->flags & symbol::f_static))
     {
-	curr_proc->make_unique(sym);
+		curr_proc->make_unique(sym);
     }
     sym->translate(t_ident);
     l_tkn = constant->l_tkn;
@@ -4311,14 +4349,15 @@ void typed_const_def_node::translate(int)
     t_equal->set_trans(" = ");
     force_semicolon();
 
-    if (sym->flags & symbol::f_static) {
-	assert(global_func_decl_level != NULL);
-	global_func_decl_level->move_region(f_tkn, l_tkn);
-	global_func_decl_level->prepend("\n");
-	(new token(NULL, TKN_BEG_SHIFT, f_tkn->line, f_tkn->pos))
-	    ->insert_b(f_tkn);
-	(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
-    }
+	insert_depr(t_depr, t_mess, f_tkn);
+
+	if (sym->flags & symbol::f_static) {
+		assert(global_func_decl_level != NULL);
+		global_func_decl_level->move_region(f_tkn, l_tkn);
+		global_func_decl_level->prepend("\n");
+		(new token(NULL, TKN_BEG_SHIFT, f_tkn->line, f_tkn->pos))->insert_b(f_tkn);
+		(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
+	}
 }
 
 const_def_part_node::const_def_part_node(token* t_const, const_def_node* list)
@@ -4584,9 +4623,9 @@ void unit_spec_node::translate(int ctx)
 }
 
 
-var_decl_node::var_decl_node(token_list* vars, token* coln, tpd_node* tpd, token* eq, expr_node* def_value)
+var_decl_node::var_decl_node(token_list* vars, token* t_coln, tpd_node* tpd, token* t_eq, expr_node* def_value, token* t_depr, token* t_mess)
 {
-    CONS5(vars, coln, tpd, eq, def_value);
+    CONS7(vars, t_coln, tpd, t_eq, def_value, t_depr, t_mess);
     scope = NULL;
 }
 
@@ -4600,9 +4639,9 @@ void var_decl_node::attrib(int ctx)
 		if (tp == NULL)
 		{
 			if (/*tpd &&*/ tpd->f_tkn)
-				warning(coln, "type is unknown '%s'", tpd->f_tkn->in_text);
+				warning(t_coln, "type is unknown '%s'", tpd->f_tkn->in_text);
 			else 
-				warning(coln, "type is unknown for variable '%s'", vars->ident->in_text);
+				warning(t_coln, "type is unknown for variable '%s'", vars->ident->in_text);
 
 			tpd->type = tp = &any_type;
 		}
@@ -4656,7 +4695,7 @@ void var_decl_node::attrib(int ctx)
 
 static token* var_decl_coln; // align formal parameters of procedures
 
-void  var_decl_node::translate(int ctx)
+void var_decl_node::translate(int ctx)
 {
     tpexpr* tp;
     if (tpd != NULL) {
@@ -4669,13 +4708,15 @@ void  var_decl_node::translate(int ctx)
 	if (def_value) def_value->translate(ctx); // need to be here to initialize def_value->l_tkn
 
     f_tkn = vars->ident;
-    l_tkn = def_value ? def_value->l_tkn: coln ? coln : f_tkn;
+    l_tkn = t_mess ? t_mess : t_depr ? t_depr: def_value ? def_value->l_tkn: t_coln ? t_coln : f_tkn; //TODO shall we use tpd->l_tkn instead of t_coln here?
 
-    if (coln != NULL) {
-		token::disable(coln->prev_relevant()->next, tpd->f_tkn->prev); // disables two tokens: ":" and "PascalType" in variable decl
+    if (t_coln != NULL) {
+		token::disable(t_coln->prev_relevant()->next, tpd->f_tkn->prev); // disables two tokens: ":" and "PascalType" in variable decl
     }
 
 	if (ctx == ctx_valpar || ctx == ctx_varpar || ctx == ctx_constpar) {  // working with fun/method parameters here
+		assert(!t_depr); //no deprecated in parameters
+		assert(!t_mess);
 		if (language_c && tp->tag == tp_dynarray) {
 			token* t = vars->ident->prev;
 			((array_tp*)tp->get_typedef())->insert_bound_params(vars->ident);
@@ -4810,14 +4851,12 @@ void  var_decl_node::translate(int ctx)
 			f_tkn = f_tkn->move(tpd->f_tkn, tpd->l_tkn);
 			if (attr & decl_flags::is_static) f_tkn = f_tkn->prepend("static inline ");  // variable with static modificator
 		}
-		if (ctx != ctx_record && ctx != ctx_object
-			&& (unit_node::interface_part
-				|| (extern_vars && coln != NULL && (coln->attr & token::from_include_file))))
+		if (ctx != ctx_record && ctx != ctx_object && (unit_node::interface_part
+				|| (extern_vars && t_coln != NULL && (t_coln->attr & token::from_include_file))))
 		{
 			f_tkn = f_tkn->prepend("EXTERN ");
 		} else if (scope != NULL) {
-			f_tkn = f_tkn->prepend(scope->tag == TKN_EXTERNAL ? "extern " :
-				scope->tag == TKN_STATIC ? "static " : "");
+			f_tkn = f_tkn->prepend(scope->tag == TKN_EXTERNAL ? "extern " :	scope->tag == TKN_STATIC ? "static " : "");
 		}
 		force_semicolon();
 		if (is_static) {
@@ -4832,10 +4871,11 @@ void  var_decl_node::translate(int ctx)
 			f_tkn = f_tkn->prepend("static ");
 			global_func_decl_level->move_region(f_tkn, l_tkn);
 			global_func_decl_level->prepend("\n");
-			(new token(NULL, TKN_BEG_SHIFT, f_tkn->line, f_tkn->pos))
-				->insert_b(f_tkn);
+			(new token(NULL, TKN_BEG_SHIFT, f_tkn->line, f_tkn->pos))->insert_b(f_tkn);
 			(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
 		}
+
+		insert_depr(t_depr, t_mess, f_tkn);
 	}
 }
 
@@ -5342,7 +5382,7 @@ void proc_fwd_decl_node::attrib(int ctx)
 
 void proc_fwd_decl_node::translate(int)
 {
-    insert_return_type();
+	insert_return_type();
 
 	// convert 'constructor Create(...)' into C++ constructor 'MyClassName(...)'
 	if (type->is_constructor) {
@@ -5362,51 +5402,55 @@ void proc_fwd_decl_node::translate(int)
 		t_proc->set_trans(dprintf("~%s", var ? ((object_tp*)var->ring)->class_name->out_name->text : "<UNKNOWN CLASS>"));
 	}
 
-//	if (qualifiers)
-//	{
-		if (is_external) {
-			f_tkn = f_tkn->prepend(type->is_extern_c && !language_c ? "extern \"C\" " : "extern ");
-		}
-		// 'static' directive is not translated into C++ keyword 'static' because keyword 'class' tells us that method is static
-		// e.g. 'class procedure AAAA;'. Compare to - 'class procedure AAAA; static;'
-		//if (is_static)
-		//	f_tkn = f_tkn->prepend("static ");
 
-		if (is_virtual)
-			f_tkn = f_tkn->prepend("virtual ");
-		
-		if (is_override)
-			l_tkn = l_tkn->prepend(" override"); 
-		
-		if (is_stdcall)
-			f_tkn = f_tkn->append(" __stdcall");
-		
-		if (is_pascal)
-			f_tkn = f_tkn->append(" __pascal");
-		
-		if (is_cdecl)
-			f_tkn = f_tkn->append(" __cdecl");
-		
-		if (is_register)
-			f_tkn = f_tkn->append(" __fastcall");
+	if (is_external)
+		f_tkn = f_tkn->prepend(type->is_extern_c && !language_c ? "extern \"C\" " : "extern ");
 
-		if (is_final)
-			l_tkn = l_tkn->prepend(" final");
-		
-		// interfaces are translated as abstract classes. it means that methods of interface may not contain qualifiers but be abstract
-		if (is_abstract)
-			l_tkn = l_tkn->prepend(" = 0");
-//	}
+	// 'static' directive is not translated into C++ keyword 'static' because keyword 'class' tells us that method is static
+	// e.g. 'class procedure AAAA;'. Compare to - 'class procedure AAAA; static;'
+	//if (is_static)
+	//	f_tkn = f_tkn->prepend("static ");
 
+	if (is_virtual)
+		f_tkn = f_tkn->prepend("virtual ");
 
-    //var->translate(t_ident); //TODO commented it out. Not sure what other places this can break 
-    insert_params();
-    if (qualifiers) 
+	if (is_override)
+		l_tkn = l_tkn->prepend(" override");
+
+	if (is_stdcall)
+		f_tkn = f_tkn->append(" __stdcall");
+
+	if (is_pascal)
+		f_tkn = f_tkn->append(" __pascal");
+
+	if (is_cdecl)
+		f_tkn = f_tkn->append(" __cdecl");
+
+	if (is_register)
+		f_tkn = f_tkn->append(" __fastcall");
+
+	if (is_final)
+		l_tkn = l_tkn->prepend(" final");
+
+	// interfaces are translated as abstract classes. it means that methods of interface may not contain qualifiers but be abstract
+	if (is_abstract)
+		l_tkn = l_tkn->prepend(" = 0");
+
+	// explicit and implicit are C++ keywords. they are not translated by regular mechanism (via ptoc.cfg file) because  
+	// they are Delphi tokens defined in token.dpp file. Tokens from token.dpp file are not tranlated using ptoc.cfg file.
+	// So we need to translate those tokens manually here
+	//if (t_ident->tag == TKN_EXPLICIT || t_ident->tag == TKN_IMPLICIT)
+	//	t_ident->set_trans(dprintf("%s_", t_ident->in_text));
+
+	//var->translate(t_ident); //TODO commented it out. Not sure what other places this can break 
+	insert_params();
+
+	if (qualifiers)
 	{
 		auto qual = qualifiers;
 		while (qual->next) qual = qual->next; // look for the first qualifier because "qualifiers" refers to the last one
 		token::remove(qual->ident, t_semi2);
-    }
+	}
 }
 
 operator_fwd_decl_node::operator_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, token* t_semi) 
@@ -5446,10 +5490,16 @@ void operator_fwd_decl_node::translate(int ctx)
 {
 	proc_fwd_decl_node::translate(ctx);
 
+	// do not do extra tranlation for two operators TKN_IMPLICIT and TKN_EXPLICIT, no equivalent in C++
+	// they have intentionally ovewritten token tags to TKN_RESERVED because implicit and explicit are reserved words in C++.
+	if (t_ident->tag == TKN_IMPLICIT || t_ident->tag == TKN_EXPLICIT) return;
+
+	// no equivalent in C++ operators for these two ones
+	if (t_ident->tag == TKN_INTDIVIDE || t_ident->tag == TKN_LOGICALXOR) return;
+
 	l_tkn = l_tkn->append("\n");
 	l_tkn = l_tkn->append(" "); // do NOT merge with previous statement
 	l_tkn->copy(ret_type->f_tkn, ret_type->l_tkn)->set_pos(f_tkn);
-
 
 	switch (t_ident->tag) {
 	case TKN_EQUAL:
@@ -5459,10 +5509,9 @@ void operator_fwd_decl_node::translate(int ctx)
 	case TKN_GREATERTHANOREQUAL:
 	case TKN_LESSTHANOREQUAL:
 	case TKN_ADD:
-	case TKN_SUBSTRACT:
+	case TKN_SUBTRACT:
 	case TKN_MULTPILY:
 	case TKN_DIVIDE:
-	case TKN_INTDIVIDE:
 	case TKN_MODULUS:
 	case TKN_LEFTSHIFT:
 	case TKN_RIGHTSHIFT:
@@ -5471,21 +5520,19 @@ void operator_fwd_decl_node::translate(int ctx)
 	case TKN_BIWISEXOR:
 	case TKN_LOGICALAND:
 	case TKN_LOGICALOR:
-	case TKN_LOGICALXOR:
 	{
 		switch (t_ident->tag)
 		{
 		case TKN_EQUAL:       l_tkn = l_tkn->append("operator == ("); break;
-		case TKN_NOTEQUAL:    l_tkn = l_tkn->append("operator != ("); break;
+		case TKN_NOTEQUAL:    l_tkn = l_tkn->append("operator != ("); break;//TODO think how to implement LogicalXor which is equivalent to !=
 		case TKN_LESSTHAN:    l_tkn = l_tkn->append("operator < ("); break;
 		case TKN_GREATERTHAN: l_tkn = l_tkn->append("operator > ("); break;
-		case TKN_GREATERTHANOREQUAL: l_tkn = l_tkn->append("operator >= ("); break;
-		case TKN_LESSTHANOREQUAL: l_tkn = l_tkn->append("operator <= ("); break;
+		case TKN_GREATERTHANOREQUAL:l_tkn = l_tkn->append("operator >= ("); break;
+		case TKN_LESSTHANOREQUAL:   l_tkn = l_tkn->append("operator <= ("); break;
 		case TKN_ADD:         l_tkn = l_tkn->append("operator + ("); break;
-		case TKN_SUBSTRACT:   l_tkn = l_tkn->append("operator - ("); break;
+		case TKN_SUBTRACT:    l_tkn = l_tkn->append("operator - ("); break;
 		case TKN_MULTPILY:    l_tkn = l_tkn->append("operator * ("); break;
-		case TKN_DIVIDE:      l_tkn = l_tkn->append("operator / ("); break;//TODO - how to distinguish these two operators in C++?
-		case TKN_INTDIVIDE:   l_tkn = l_tkn->append("operator / ("); break;
+		case TKN_DIVIDE:      l_tkn = l_tkn->append("operator / ("); break;//TODO think how to implement opertor IntDivide
 		case TKN_MODULUS:     l_tkn = l_tkn->append("operator % ("); break;
 		case TKN_LEFTSHIFT:   l_tkn = l_tkn->append("operator << ("); break;
 		case TKN_RIGHTSHIFT:  l_tkn = l_tkn->append("operator >> ("); break;
@@ -5494,7 +5541,6 @@ void operator_fwd_decl_node::translate(int ctx)
 		case TKN_BIWISEXOR:   l_tkn = l_tkn->append("operator ^ ("); break;
 		case TKN_LOGICALAND:  l_tkn = l_tkn->append("operator && ("); break;
 		case TKN_LOGICALOR:   l_tkn = l_tkn->append("operator || ("); break;
-		case TKN_LOGICALXOR:  l_tkn = l_tkn->append("operator ^^ ("); break;
 
 		default: 
 			l_tkn = l_tkn->append("operator UNKNOWN (");
