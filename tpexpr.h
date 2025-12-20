@@ -20,7 +20,7 @@ enum type_flags {
 
 class param_spec : public heap_object { 
   public: 
-    param_spec *next; 
+    param_spec *next;
     symbol     *var;
 
     param_spec(symbol* variable) { 
@@ -39,9 +39,9 @@ class tpexpr : public heap_object {
     char     *name;
     tpd_node *tpd; 
 
-    bool is_scalar() const { //TODO shall we add here tp_longint, tp_double and tp_bool?
-        return tag == tp_char || tag == tp_integer 
-	    || tag == tp_real || tag == tp_range || tag == tp_enum; 
+    bool is_scalar() const {
+        return tag == tp_char || tag == tp_integer || tag == tp_long || tag == tp_real
+           || tag == tp_double || tag == tp_range || tag == tp_enum || tag == tp_bool;
     }
 
     token*  insert_before(token *t);     
