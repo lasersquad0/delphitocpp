@@ -1645,12 +1645,9 @@ void atom_expr_node::attrib(int ctx)
 			}
 		} else {
 			// Let converter work well even with incorrect code
-			// tp_last because we do not know its type yet
-			//TODO understand better whether it is good solution. it creates new tpexpr node for each unknown type
 			warning(t_tkn, "undefined identifier '%s'", t_tkn->in_text);
-			//type = new tpexpr(tp_last, NULL, tkn->in_text);
 			type = &any_type; //&void_type;
-			with = NULL;
+			with = nullptr;
 		}
 	}
 }
@@ -4376,22 +4373,20 @@ void const_def_part_node::translate(int ctx)
 {
     f_tkn = l_tkn = t_const;
     const_def_node::enumeration = NULL;
-    for (decl_node* def = list; def != NULL; def = def->next) {
-        def->translate(ctx);
-	l_tkn = def->l_tkn;
-    }
+	for (decl_node* def = list; def != NULL; def = def->next) {
+		def->translate(ctx);
+		l_tkn = def->l_tkn;
+	}
     t_const->disappear();
-    if (ctx == ctx_block && curr_proc->make_all_constants_global) {
-	// make type definition global
-        global_func_decl_level->move_region(f_tkn, l_tkn);
-	global_func_decl_level->prepend("\n\n");
-        (new token(NULL, TKN_BEG_SHIFT, f_tkn->line,
-		   f_tkn->next_relevant()->pos))->insert_b(f_tkn);
-	(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
-    }
+	if (ctx == ctx_block && curr_proc->make_all_constants_global) {
+		// make type definition global
+		global_func_decl_level->move_region(f_tkn, l_tkn);
+		global_func_decl_level->prepend("\n\n");
+		(new token(NULL, TKN_BEG_SHIFT, f_tkn->line, f_tkn->next_relevant()->pos))->insert_b(f_tkn);
+		(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
+	}
     if (ctx == ctx_module || ctx == ctx_program) {
-        (new token((char*)0, TKN_BEG_SHIFT, f_tkn->line,
-		   f_tkn->next_relevant()->pos))->insert_b(f_tkn);
+        (new token((char*)0, TKN_BEG_SHIFT, f_tkn->line, f_tkn->next_relevant()->pos))->insert_b(f_tkn);
         (new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
     }
 }
@@ -4404,19 +4399,62 @@ type_def_node::type_def_node(token* t_ident, token* t_equal, tpd_node* tpd)
 
 void type_def_node::attrib(int ctx)
 {
-    tpd->attrib(ctx);
-    tpexpr* type = new simple_tp(tpd->type);
-	// we create simple_tp on top of tpd->type (which can be array type or any other complex type)
-	// because on left side we have 'alias' for complex type from right side. alias is just simple name for the complex type.
-	// this alias can be further used in code to represent complex type 
-    
-	// we add this complex type to b_ring under simple name t_ident  
-	sym = b_ring::add_cur(t_ident, symbol::s_type, type); 
-    type->name = sym->out_name->text;
+	tpexpr* type;
 
+	// special handling of record and object types because their methods' parameters can contain refs to current class/records
+	// ex: procedure AAA(a: TMyClass) - method inside TMyClass
+	// it means that current class/record type should exist in b_ring already (on the time of tpd->attrib() call)
+	// that is why attrib() is divided into attrib1() and attrib2() for classes adn records
+	// by default adding tpd into b_ring is done after tpd->attrib() which does work for all other types but does not work for classes and records.
+	if (tpd->tag == tpd_node::tpd_object)
+	{
+		// attrib1() initializes tpd->type which is required for 'new simple_tp(tpd->type)';
+		// which is further required for b_ring::add_cur()
+		auto obj_tpd = (object_tpd_node*)tpd;
+		obj_tpd->attrib1(ctx); 
+
+		type = new simple_tp(tpd->type);
+
+		// we add this complex type to b_ring under simple name t_ident  
+		sym = b_ring::add_cur(t_ident, symbol::s_type, type); 
+
+		// attrib2() does rest of work required for attrib()
+		obj_tpd->attrib2(ctx); 
+	} 
+	else if (tpd->tag == tpd_node::tpd_record)
+	{
+		// attrib1() initializes tpd->type which is required for 'new simple_tp(tpd->type)';
+		// which is further required for b_ring::add_cur()
+		auto rec_tpd = (record_tpd_node*)tpd;
+		rec_tpd->attrib1(ctx); 
+
+		type = new simple_tp(tpd->type);
+
+		// we add this complex type to b_ring under simple name t_ident  
+		sym = b_ring::add_cur(t_ident, symbol::s_type, type); 
+
+		// attrib2() does rest of work required for attrib()
+		rec_tpd->attrib2(ctx); 
+	}
+	else
+	{
+		tpd->attrib(ctx);
+
+		type = new simple_tp(tpd->type);
+		// we create simple_tp on top of tpd->type (which can be array type or any other complex type)
+		// because on left side we have 'alias' for complex type from right side. alias is just simple name for the complex type.
+		// this alias can be further used in code to represent complex type 
+
+		// we add this complex type to b_ring under simple name t_ident  
+		sym = b_ring::add_cur(t_ident, symbol::s_type, type); 
+	}
+
+	type->name = sym->out_name->text;
+	sym->type = type;
+	
 	//TODO not sure about this change
 	// for classes and records we do not have built-in name of type, that is why assign name here 
-	if(tpd->type->name == NULL)
+	if(tpd->type->name == nullptr)
 		tpd->type->name = sym->out_name->text;
 
     switch (tpd->tag) {
@@ -5486,6 +5524,7 @@ void operator_fwd_decl_node::attrib(int ctx)
 	}
 }
 */
+
 void operator_fwd_decl_node::translate(int ctx)
 {
 	proc_fwd_decl_node::translate(ctx);
@@ -5872,7 +5911,7 @@ void simple_tpd_node::attrib(int ctx)
 				warning(t_ident2, "unknown type '%s'", full_name);
 				// tp_last because we do not know its type yet
 				//TODO understand better whether it is good solution. it creates new tpexpr node for each TBytes unknown type
-				type = new tpexpr(tp_last, this, full_name); //&void_type; //TODO Or shall we use any_type here?
+				type = &any_type; // new tpexpr(tp_last, this, full_name); //&void_type; //TODO Or shall we use any_type here?
 			}
 		}
 	} else {
@@ -5887,7 +5926,7 @@ void simple_tpd_node::attrib(int ctx)
 				warning(t_ident2, "unknown type '%s'", t_ident2->in_text);
 				// tp_last because we do not know its type yet
 				//TODO understand better whether it is good solution. it creates new tpexpr node for each TBytes unknown type
-				type = new tpexpr(tp_last, this, t_ident2->in_text); //&void_type;
+				type = &any_type; // new tpexpr(tp_last, this, t_ident2->in_text); //&void_type;
 			}
 		}
 	}
@@ -5920,9 +5959,7 @@ void simple_templ_tpd_node::attrib(int ctx)
 	if (sym == NULL) {
 		assert(base_type->f_tkn);
 		warning(t_ident, "unknown type '%s<%s>'", t_ident->in_text, base_type->f_tkn->in_text);//TODO take into account base_type->t_ident1
-		// tp_last because we do not know its type yet
-		//TODO understand better whether it is good solution. it creates new tpexpr node for each TBytes unknown type
-		type = &any_type; //new tpexpr(tp_last, this, t_ident->in_text); //&void_type;
+		type = &any_type; //&void_type;
 	}
 	else
 	{
@@ -6725,26 +6762,40 @@ object_tpd_node::object_tpd_node(token* t_class, token* t_lbr, token_list* t_anc
 	super = NULL;
 }
 
-void object_tpd_node::attrib(int)
+void object_tpd_node::attrib1(int)
 {
-	if (t_ancestorlist != NULL) {
+	if (t_ancestorlist) {
 		//TODO shall we check full ancestor list for existence in b_ring?
 		super = b_ring::search_cur(t_ancestorlist->ident); // first item in ancestor list is always superclass, all the others are interfaces
-		if (super == NULL) {
+		if (super) {
+			auto otp = dynamic_cast<object_tp*>(super->type->get_typedef());
+			assert(otp);
+			type = new object_tp(this, otp);
+		}
+		else {
 			warning(t_class, "Base class %s not defined.", t_ancestorlist->ident->out_text);
 			type = new object_tp(this);
-		} else {
-			type = new object_tp(this, (object_tp*)super->type->get_typedef());
 		}
-	} else {
+	}
+	else 
+	{
 		type = new object_tp(this);
-    }
-    
+	}
+}
+
+void object_tpd_node::attrib2(int)
+{
 	b_ring::push((object_tp*)type);
-    for (decl_node* dcl = parts; dcl != NULL; dcl = dcl->next) {
+    for (decl_node* dcl = parts; dcl != nullptr; dcl = dcl->next) {
 		dcl->attrib(ctx_object);
     }
     b_ring::pop((object_tp*)type);
+}
+
+void object_tpd_node::attrib(int ctx)
+{
+	attrib1(ctx);
+	attrib2(ctx);
 }
 
 void object_tpd_node::translate(int)
@@ -6807,18 +6858,20 @@ void access_specifier_node::translate(int)
 //	}
 }
 
-
 record_tpd_node::record_tpd_node(token* t_packed, token* t_record, decl_node* parts, token* t_end)
-: tpd_node(tpd_record)
+           : tpd_node(tpd_record)
 {
     CONS4(t_packed, t_record, parts, t_end);
 	outer = NULL;
 }
 
-void record_tpd_node::attrib(int ctx)
+void record_tpd_node::attrib1(int)
 {
 	type = new record_tp(this);
-	
+}
+
+void record_tpd_node::attrib2(int ctx)
+{
 	static record_tpd_node* cur_outer;
 	outer = cur_outer;
     cur_outer = this;
@@ -6835,6 +6888,12 @@ void record_tpd_node::attrib(int ctx)
 
     struct_path = save_path;
     cur_outer = outer;
+}
+
+void record_tpd_node::attrib(int ctx)
+{
+	attrib1(ctx);
+	attrib2(ctx);
 }
 
 void record_tpd_node::translate(int ctx)
@@ -6932,9 +6991,7 @@ void file_tpd_node::translate(int ctx)
 }
 
 
-set_tpd_node::set_tpd_node(token* t_packed, token* t_set, token* t_of,
-			   tpd_node* elemtp)
-: tpd_node(tpd_set)
+set_tpd_node::set_tpd_node(token* t_packed, token* t_set, token* t_of, tpd_node* elemtp): tpd_node(tpd_set)
 {
     CONS4(t_packed, t_set, t_of, elemtp);
 }

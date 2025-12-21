@@ -1293,7 +1293,7 @@ class proc_def_node : public proc_decl_node {
 class tpd_node : public node {
   public:
     tpexpr*  type; // Type which is designated by this typenode 
-     
+
     enum tpd_type { tpd_simple, tpd_set, tpd_enum, tpd_range, tpd_proc, //TODO what is the difference from enum type_tag{} ? 
                     tpd_array, tpd_string, tpd_ref, tpd_object, tpd_record, tpd_file };  
     
@@ -1601,6 +1601,8 @@ class record_tpd_node : public tpd_node {
 
     void assign_name();
 
+    void attrib1(int ctx);
+    void attrib2(int ctx);
     void attrib(int ctx) override;
     void translate(int ctx) override;
 };
@@ -1633,6 +1635,8 @@ class object_tpd_node : public tpd_node {
     
     object_tpd_node(token* t_class, token* t_lbr, token_list* t_ancestorlist, token* t_rbr, decl_node* parts, token* t_end);  
 
+    void attrib1(int ctx);
+    void attrib2(int ctx);
     void attrib(int ctx) override;
     void translate(int ctx) override;
 };
