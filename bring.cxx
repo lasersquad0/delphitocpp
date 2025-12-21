@@ -117,7 +117,7 @@ symbol* b_ring::add(nm_entry* in_name, nm_entry* out_name, int tag, tpexpr* type
     sym->flags = 0;
     sym->tag   = tag; 
     sym->type  = type; 
-    sym->path  = NULL; 
+    sym->path  = nullptr; 
     sym->ring  = this;
 
     if (compile_system_library) { //true only when we compile tptoc.pas
@@ -134,8 +134,7 @@ symbol* b_ring::add(nm_entry* in_name, nm_entry* out_name, int tag, tpexpr* type
     // if ring's scope=SCOPE::global then make_unique is called for all name entries 
     // if ring's scope=SCOPE::record then make_unique never called for such name entries
     // if ring's scope is SCOPE::proc or SCOPE::block name_unique is called for s_proc and s_const tags only 
-    if (scope != SCOPE::record && 
-	   (tag == symbol::s_proc || tag == symbol::s_const || scope == SCOPE::global))
+    if (scope != SCOPE::record && (tag == symbol::s_proc || tag == symbol::s_const || scope == SCOPE::global))
     { 
         make_unique(sym); 
     }

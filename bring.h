@@ -107,11 +107,8 @@ class b_ring {
   
     static symbol* search_cur(token* t) { return curr_b_ring->search(t); }
     static symbol* add_cur(token* t, int tag, tpexpr* type) {
-        return 
-          curr_b_ring->add(t->name, 
-			   (strcmp(t->name->text, t->out_text) == 0) 
-			    ? t->name : nm_entry::add(t->out_text, TKN_IDENT), 
-			   tag, type);
+        return curr_b_ring->add(t->name, (strcmp(t->name->text, t->out_text) == 0) 
+                     ? t->name : nm_entry::add(t->out_text, TKN_IDENT), tag, type);
     }
     static symbol* add_cur(nm_entry* in_nm, nm_entry* out_nm, int tag, tpexpr* type)
       { return curr_b_ring->add(in_nm, out_nm, tag, type); }
