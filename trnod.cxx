@@ -1576,23 +1576,22 @@ void atom_expr_node::attrib(int ctx)
 {
 	l_tkn = f_tkn = t_tkn;
 
-	if (turbo_pascal && t_tkn->name->tag == TKN_SELF) {
-		assert(proc_def_node::self != NULL);
+	if (turbo_pascal && t_tkn->name->tag == TKN_SELF) { //TODO can we replace t_tkn->name->tag to t_tkn->tag? 
+		assert(proc_def_node::self != nullptr);
 		type = proc_def_node::self;
 		with = proc_def_node::self->with;
 		tag = tn_self;
-		var = NULL;
-	} else if (turbo_pascal && t_tkn->name->tag == TKN_EXIT) {
-		type = &void_type; //TODO shall we replace to &any_type?
+		var = nullptr;
+	} else if (turbo_pascal && t_tkn->name->tag == TKN_EXIT) {  //TODO can we replace t_tkn->name->tag to t_tkn->tag?
+		type = &void_type; // do NOT replace to &any_type
 	}
-	// TKN_NIL implemented as built-in constant that is added to b_ring together with true/false contants and integer, cardinal etc. types
-//	else if (tkn->name->tag == TKN_NIL) {
-//		type = &any_type; // void*
-//	}
-	else if (!turbo_pascal || t_tkn->name->tag != TKN_ABSTRACT) {
-		var = b_ring::search_cur(t_tkn);
-		if (var != NULL) {
-			if (var->type == NULL) {
+	else if (t_tkn->tag == TKN_BREAK) {
+		type = &void_type; // do NOT replace to &any_type
+	}
+	else if (!turbo_pascal || t_tkn->name->tag != TKN_ABSTRACT) { //TODO can we replace t_tkn->name->tag to t_tkn->tag?
+ 		var = b_ring::search_cur(t_tkn);
+		if (var != nullptr) {
+			if (var->type == nullptr) {
 				warning(t_tkn, "type of variable '%s' is unknown", t_tkn->in_text);
 				var->type = &any_type; // &void_type
  			}
@@ -1654,7 +1653,7 @@ void atom_expr_node::attrib(int ctx)
 
 void atom_expr_node::translate(int ctx)
 {
-	if (turbo_pascal && t_tkn->name->tag == TKN_SELF) {
+	if (turbo_pascal && t_tkn->name->tag == TKN_SELF) {  //TODO can we replace t_tkn->name->tag to t_tkn->tag?
 		if (ctx == ctx_access) 
 			t_tkn->set_trans("this");
 		else 
@@ -1662,7 +1661,7 @@ void atom_expr_node::translate(int ctx)
 
 		return;
 	}
-	else if (turbo_pascal && t_tkn->name->tag == TKN_EXIT) {
+	else if (turbo_pascal && t_tkn->name->tag == TKN_EXIT) { //TODO can we replace t_tkn->name->tag to t_tkn->tag?
 		if (curr_proc && curr_proc->res_type) {
 			if (curr_proc->proc_name != NULL) 
 				t_tkn->set_trans(dprintf("return %s_result", curr_proc->proc_name));
@@ -1677,6 +1676,9 @@ void atom_expr_node::translate(int ctx)
 	else if (turbo_pascal && t_tkn->name->tag == TKN_ABSTRACT) {
 		t_tkn->set_trans("assert(\"abstract method is called\",false)");
 		return;
+	}
+	else if (t_tkn->tag == TKN_BREAK) {
+		return; // noting special to do
 	}
 
 	if (var != NULL) {
@@ -2474,7 +2476,7 @@ void access_expr_node::attrib(int)
 			assert(rec->type->name);
 			assert(rec->f_tkn);
 			warning(field, "unknown type '%s' for expression '%s.%s'", rec->type->name, rec->f_tkn->in_text, field->in_text);
-			recfld = NULL;
+			recfld = nullptr;
 		}
 	}
 	else 
@@ -2483,10 +2485,10 @@ void access_expr_node::attrib(int)
 		assert(rec->type->name);
 		assert(rec->f_tkn);
 		warning(field, "unknown type '%s' for expression '%s.%s'", rec->type->name, rec->f_tkn->in_text, field->in_text);
-		recfld = NULL;
+		recfld = nullptr;
 	}
 
-	if (recfld == NULL)
+	if (recfld == nullptr)
 		type = &any_type; //&void_type;
 	else
 		type = recfld->type;
