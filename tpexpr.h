@@ -173,16 +173,16 @@ class set_tp : public tpexpr {
 			  ? ((enum_tp*)elem_type->get_typedef())->n_elems
 			  : MAX_SET_CARD; 
     }
-    set_tp(tpexpr* etype = NULL) : tpexpr(tp_set, NULL, "set") {
-	elem_type = etype; 
-    }
+    set_tp(tpexpr* etype = NULL) : tpexpr(tp_set, NULL, "set") { elem_type = etype; }
 };
 
 class file_tp : public ref_tp { 
   public: 
-    file_tp(tpexpr* record_type = NULL, tpd_node* tpd = NULL) 
-    : ref_tp(record_type, tpd)
-      { tag = tp_file; flags |= tp_need_init; }
+    file_tp(tpexpr* record_type = NULL, tpd_node* tpd = NULL) : ref_tp(record_type, tpd)
+    { 
+        tag = tp_file; 
+        flags |= tp_need_init; 
+    }
 };
 
 class text_tp : public file_tp { 
