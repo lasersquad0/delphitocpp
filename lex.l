@@ -32,7 +32,7 @@ struct scan_state {
 };
 
 #define MAX_INCLUDE_DEPTH 256   // Include stack depth
-#define MAX_ID_LENGTH     256
+//#define MAX_ID_LENGTH     256
 
 class scan_ctx {
   protected:
@@ -584,6 +584,8 @@ unit     {
 	             *dst++ = tolower(*(unsigned char*)src);
 	         } while (*src++);
 
+             // all ID and KWD tokens from token.dpp have already added into nm_entry list
+             // so, if new token has the name from this list then 'old' mn_entry will be returned
 	         nm = nm_entry::add(lc_buf, TKN_IDENT);
 	         int tag = nm->tag;
 
@@ -610,11 +612,13 @@ unit     {
 		             return 1;
 		         }
              }
-	         if (tag == TKN_RESERVED) {
+
+             // reserved keywords are marked either by TKN_RESERVED tag or nm_entry::reserved bit in nm->flags
+	         if ( (tag == TKN_RESERVED) || (nm->flags & nm_entry::reserved) ) {
 	             text = dprintf("%s_", lc_buf);
 	             nm = nm_entry::add(text, TKN_IDENT);
 	             tag = TKN_IDENT;
-	         } else if (!preserve_case || tag != TKN_IDENT) {
+	         } else if (!preserve_case || tag != TKN_IDENT) { // do not preserve case of tokens from token.dpp list except for TKN_IDENT token
 	             text = mystrdup(lc_buf);
 	         }
 	         return tkn(tag);
@@ -627,9 +631,9 @@ unit     {
 
 [\n]         { return tkn(TKN_LN); }
 
+"\xEF\xBB\xBF" { return tkn(TKN_SPACE); } // this is UTF-8 BOM (Byte Order Mark) which present in some sources, treat it as space for simplicity
 .            {
-                error(line, pos, file_name, "unrecognized token: %s\n",
-		      yytext);
+                error(line, pos, file_name, "unrecognized token: %s\n", yytext);
              }
 
 %%
