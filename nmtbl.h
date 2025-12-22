@@ -5,10 +5,10 @@
 
 class nm_entry : public heap_object {
   public:
-    nm_entry*      next;
-    int            tag; // Exact token code from enum lex_token
+    nm_entry* next;
+    int       tag; // Exact token code from enum lex_token (TKN_*)
 
-    enum { recursive=1, macro=2 }; 
+    enum { recursive=1, macro=2, reserved=4 }; 
 
     unsigned char  flags; 
     char           text[1];    
