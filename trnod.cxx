@@ -60,11 +60,6 @@ void node::swallow_semicolon()
     }
 }
 
-
-void node::attrib(int) {}
-
-void node::translate(int) {}
-
 #define CONS1(a) this->a = a
 #define CONS2(a,b) CONS1(a), this->b = b
 #define CONS3(a,b,c) CONS2(a,b), this->c = c
@@ -2373,6 +2368,8 @@ void deref_expr_node::translate(int ctx)
 {
     ptr->translate(ctx_array);
 
+	f_tkn = ptr->f_tkn;
+
 	t_op->disable();
 	if (ptr->type != NULL && (ptr->type->tag == tp_file || ptr->type->tag == tp_text)) {
 		tag = tn_filevar;
@@ -3276,7 +3273,7 @@ void fcall_node::attrib(int ctx)
 	assert(fptr->type); // just in case to check that fptr always has type
 
     if (fptr->type != NULL) {
-		if (fptr->type->tag == tp_proc) { // procedure call
+		if (fptr->type->tag == tp_proc) { // procedure/func call
 			proc_tp* prc = (proc_tp*)fptr->type->get_typedef();
 			type = prc->res_type;
 			param_spec* p = prc->params;
@@ -3336,7 +3333,7 @@ void fcall_node::translate(int ctx)
 		// We come here for special Delphi function calls only. They are defined in token.dpp and which have unique ID - TKN_* .
 		// Like: New, Dispose, Pred, Succ, Inc, Dec, SetLength, Length, Move, etc. 
 
-      switch(/*((atom_expr_node*)fptr)->tkn*/f_tkn->tag) { //TODO replace by f_tkn->tag?
+      switch(f_tkn->tag) {
 	  case TKN_NEW: // procedure New(var P: Pointer);
 		  if (language_c) {
 			  args->translate(ctx_value);
@@ -3876,9 +3873,7 @@ void field_init_node::translate(int)
     }
 }
 
-record_constant_node::record_constant_node(token* lpar, field_init_node* flist,
-					   token* rpar)
-: expr_node(tn_record_const)
+record_constant_node::record_constant_node(token* lpar, field_init_node* flist, token* rpar) : expr_node(tn_record_const)
 {
     CONS3(lpar, flist, rpar);
 }
@@ -3887,10 +3882,10 @@ void record_constant_node::attrib(int)
 {
     tpexpr* record_type = type;
     if (record_type != NULL && (record_type->tag == tp_record || record_type->tag == tp_object)) {
-	record_type = record_type->get_typedef();
+		record_type = record_type->get_typedef();
     }
     for (field_init_node* val = flist; val != NULL; val = val->next) {
-	val->attrib(record_type);
+		val->attrib(record_type);
     }
 }
 
@@ -3904,7 +3899,6 @@ void record_constant_node::translate(int ctx)
 		val->translate(ctx);
     }
 }
-
 
 expr_group_node::expr_group_node(token* lpar, expr_node* expr, token* rpar) : expr_node(tn_group)
 {
@@ -4408,12 +4402,13 @@ void type_def_node::attrib(int ctx)
 	// it means that current class/record type should exist in b_ring already (on the time of tpd->attrib() call)
 	// that is why attrib() is divided into attrib1() and attrib2() for classes adn records
 	// by default adding tpd into b_ring is done after tpd->attrib() which does work for all other types but does not work for classes and records.
-	if (tpd->tag == tpd_node::tpd_object)
+	if (tpd->tag == tpd_node::tpd_object || tpd->tag == tpd_node::tpd_record)
 	{
 		// attrib1() initializes tpd->type which is required for 'new simple_tp(tpd->type)';
 		// which is further required for b_ring::add_cur()
-		auto obj_tpd = (object_tpd_node*)tpd;
-		obj_tpd->attrib1(ctx); 
+		auto obj_tpd = dynamic_cast<base_obj_tpd_node*>(tpd);
+		assert(obj_tpd);
+		obj_tpd->attrib1(ctx);
 
 		type = new simple_tp(tpd->type);
 
@@ -4423,11 +4418,13 @@ void type_def_node::attrib(int ctx)
 		// attrib2() does rest of work required for attrib()
 		obj_tpd->attrib2(ctx); 
 	} 
+	/*
 	else if (tpd->tag == tpd_node::tpd_record)
 	{
 		// attrib1() initializes tpd->type which is required for 'new simple_tp(tpd->type)';
 		// which is further required for b_ring::add_cur()
-		auto rec_tpd = (record_tpd_node*)tpd;
+		auto rec_tpd = dynamic_cast<record_tpd_node*>(tpd);
+		assert(rec_tpd);
 		rec_tpd->attrib1(ctx); 
 
 		type = new simple_tp(tpd->type);
@@ -4437,7 +4434,7 @@ void type_def_node::attrib(int ctx)
 
 		// attrib2() does rest of work required for attrib()
 		rec_tpd->attrib2(ctx); 
-	}
+	}*/
 	else
 	{
 		tpd->attrib(ctx);
@@ -6695,34 +6692,38 @@ void guid_node::translate(int)
 {
 }
 
-interface_tpd_node::interface_tpd_node(token* t_interface, token* t_lbr, token* t_superinterface, token* t_rbr,
-                       decl_node* guid, decl_node* components, token* t_end) : tpd_node(tpd_object) //TODO shall we introduce tpd_interface tag here?
+//TODO shall we introduce tpd_interface tag here?
+interface_tpd_node::interface_tpd_node(token* t_interface, token* t_lbr, token* t_superinterface, 
+	                token* t_rbr, decl_node* guid, decl_node* parts, token* t_end) 
+	: object_tpd_node(t_interface, t_lbr, nullptr, t_rbr, parts, t_end)
 {
-	CONS7(t_interface, t_lbr, t_superinterface, t_rbr, guid, components, t_end);
-	super = NULL;
+	CONS2(t_superinterface, guid);
+//	super = nullptr;
 }
 
-void interface_tpd_node::attrib(int)
+void interface_tpd_node::attrib1(int)
 {
-	if (t_superinterface != NULL) {
+	if (t_superinterface) {
 		super = b_ring::search_cur(t_superinterface);
-		if (super == NULL) { //		use first ancestor interface as a 'type'
-			warning(t_interface, "Base interface %s not defined.", t_superinterface->out_text);
-			type = new object_tp(this); // TODO object_tp class is very simple, not sure if we need another such class interface_tp
-		}
-		else {
+		if (super) {
 			auto sp = dynamic_cast<object_tp*>(super->type->get_typedef());
 			assert(sp);
 			type = new object_tp(this, sp);
+		} else {
+			warning(t_interface, "Base interface %s not defined.", t_superinterface->out_text);
+			type = new object_tp(this); // TODO object_tp class is very simple, not sure if we need another such class interface_tp
 		}
 	} else {
 		type = new object_tp(this);
 	}
-	
-	if (guid) guid->attrib(ctx_object);
 
+	if (guid) guid->attrib(ctx_object);
+}
+
+void interface_tpd_node::attrib2(int)
+{
 	b_ring::push((object_tp*)type);
-	for (decl_node* dcl = components; dcl != NULL; dcl = dcl->next) {
+	for (decl_node* dcl = parts; dcl != nullptr; dcl = dcl->next) {
 		dcl->attrib(ctx_object);
 	}
 	b_ring::pop((object_tp*)type);
@@ -6733,7 +6734,7 @@ void interface_tpd_node::translate(int)
 	f_tkn = t_interface;
 	l_tkn = t_end;
 
-	if (t_superinterface != NULL) {
+	if (t_superinterface) {
 		if (super)
 			super->translate(t_superinterface);
 	
@@ -6749,7 +6750,7 @@ void interface_tpd_node::translate(int)
 
 	if(guid) guid->f_tkn->prepend("//"); // comment out GUID for now
 	
-	for (decl_node* dcl = components; dcl != NULL; dcl = dcl->next) {
+	for (decl_node* dcl = parts; dcl != nullptr; dcl = dcl->next) {
 		dcl->translate(ctx_object);
 	}
 	t_interface->set_trans("class ");
@@ -6757,11 +6758,11 @@ void interface_tpd_node::translate(int)
 	t_end->set_bind(t_interface);
 }
 
-object_tpd_node::object_tpd_node(token* t_class, token* t_lbr, token_list* t_ancestorlist, 
-	                   token* t_rbr, decl_node* parts, token* t_end): tpd_node(tpd_object)
+object_tpd_node::object_tpd_node(token* t_class, token* t_lbr, token_list* t_ancestorlist, token* t_rbr, 
+	                 decl_node* parts, token* t_end): base_obj_tpd_node(tpd_object, t_class, parts, t_end)
 {
-    CONS6(t_class, t_lbr, t_ancestorlist, t_rbr, parts, t_end);
-	super = NULL;
+    CONS3(t_lbr, t_ancestorlist, t_rbr);
+	super = nullptr;
 }
 
 void object_tpd_node::attrib1(int)
@@ -6781,6 +6782,14 @@ void object_tpd_node::attrib1(int)
 	}
 	else 
 	{
+		// if no ancestor specified - assume that ancestor is TObject
+		auto nm = nm_entry::find("tobject");
+		assert(nm); // assume that TObject is in nm_entry already
+		token tok("tobject", TKN_IDENT, 0, 0, nm);
+		
+		super = b_ring::search_cur(&tok);
+		//assert(super);
+
 		type = new object_tp(this);
 	}
 }
@@ -6794,77 +6803,67 @@ void object_tpd_node::attrib2(int)
     b_ring::pop((object_tp*)type);
 }
 
-void object_tpd_node::attrib(int ctx)
+/*void object_tpd_node::attrib(int ctx)
 {
 	attrib1(ctx);
 	attrib2(ctx);
-}
+}*/
 
 void object_tpd_node::translate(int)
 {
     f_tkn = t_class;
     l_tkn = t_end? t_end: t_class;
 
-	if (t_ancestorlist != NULL) {
+	t_class->set_trans("class ");
+
+	if (t_ancestorlist) {
 		token_list* anc = t_ancestorlist;
-		anc->ident->set_trans(anc->ident->in_text);
-		anc = anc->next;
-		for (; anc != NULL; anc = anc->next) {
+		//anc->ident->set_trans(anc->ident->in_text);
+		//anc = anc->next;
+		for (; anc != nullptr; anc = anc->next) {
 			//anc->prepend(", public ");
 			//super->translate(anc);
 			anc->ident->set_trans(dprintf("public %s", anc->ident->in_text));
 		}
-		t_lbr->set_trans(" : public ");
-		t_rbr->set_trans(" {\n");
-		//t_rbr->append("public:")->set_bind(t_object);
-		t_rbr->set_bind(t_class);
+
+		t_lbr->set_trans(" : ");
+
+		if (t_end) {
+			l_tkn = t_end;
+			t_rbr->set_trans(" {\n");
+			t_rbr->set_bind(t_class);
+			t_end->set_trans("}");
+			t_end->set_bind(t_class);
+		} else {
+			l_tkn = t_rbr;
+			t_rbr->set_trans(" { }");
+			t_rbr->set_bind(t_class);
+		}
 	}
 	else {
-		//t_object->append(" {\n")->append("public:")->set_bind(t_object);
-		if (t_end) t_class->append(" {\n"); // ->set_bind(t_class);
+		if (t_end) {
+			l_tkn = t_end;
+			t_class->append(" {\n"); // ->set_bind(t_class);
+			t_end->set_trans("}");
+			t_end->set_bind(t_class);
+		}
     }
 
-    for (decl_node* dcl = parts; dcl != NULL; dcl = dcl->next) {
+    for (decl_node* dcl = parts; dcl != nullptr; dcl = dcl->next) {
 		dcl->translate(ctx_object);
     }
-
-    t_class->set_trans("class ");
-	
-	if (t_end) {
-		t_end->set_trans("}");
-		t_end->set_bind(t_class);
-	}
 }
 
-access_specifier_node::access_specifier_node(token* t_strict, token* t_access_lvl)
+base_obj_tpd_node::base_obj_tpd_node(tpd_type tp, token* t_record, decl_node* parts, token* t_end): tpd_node(tp)
 {
-	CONS2(t_strict, t_access_lvl);
-}
-
-void access_specifier_node::attrib(int)
-{
-//	for (decl_node* dcl = components; dcl != NULL; dcl = dcl->next) {
-//		dcl->attrib(ctx_object);
-//	}
-}
-
-void access_specifier_node::translate(int)
-{
-	//TODO add special processing for Published access level
-	if(t_strict) t_strict->set_trans("/*strict */");
-	t_access_lvl->set_trans(t_access_lvl->in_text);
-	t_access_lvl->append(":\n");
-
-//	for (decl_node* dcl = components; dcl != NULL; dcl = dcl->next) {
-//		dcl->translate(ctx_object);
-//	}
+	CONS3(t_record, parts, t_end);
 }
 
 record_tpd_node::record_tpd_node(token* t_packed, token* t_record, decl_node* parts, token* t_end)
-           : tpd_node(tpd_record)
+           : base_obj_tpd_node(tpd_record, t_record, parts, t_end)
 {
     CONS4(t_packed, t_record, parts, t_end);
-	outer = NULL;
+	outer = nullptr;
 }
 
 void record_tpd_node::attrib1(int)
@@ -6882,7 +6881,7 @@ void record_tpd_node::attrib2(int ctx)
     struct_path = "";
 
     b_ring::push((record_tp*)type);
-	for (decl_node* dcl = parts; dcl != NULL; dcl = dcl->next) {
+	for (decl_node* dcl = parts; dcl != nullptr; dcl = dcl->next) {
 		dcl->attrib(ctx);
 	}
 	((record_tp*)type)->calc_flags();
@@ -6892,11 +6891,11 @@ void record_tpd_node::attrib2(int ctx)
     cur_outer = outer;
 }
 
-void record_tpd_node::attrib(int ctx)
+/*void record_tpd_node::attrib(int ctx)
 {
 	attrib1(ctx);
 	attrib2(ctx);
-}
+}*/
 
 void record_tpd_node::translate(int ctx)
 {
@@ -6961,6 +6960,29 @@ void record_tpd_node::assign_name()
     }
 }
 
+access_specifier_node::access_specifier_node(token* t_strict, token* t_access_lvl)
+{
+	CONS2(t_strict, t_access_lvl);
+}
+
+void access_specifier_node::attrib(int)
+{
+	//	for (decl_node* dcl = components; dcl != NULL; dcl = dcl->next) {
+	//		dcl->attrib(ctx_object);
+	//	}
+}
+
+void access_specifier_node::translate(int)
+{
+	//TODO add special processing for Published access level
+	if (t_strict) t_strict->set_trans("/*strict */");
+	t_access_lvl->set_trans(t_access_lvl->in_text);
+	t_access_lvl->append(":\n");
+
+	//	for (decl_node* dcl = components; dcl != NULL; dcl = dcl->next) {
+	//		dcl->translate(ctx_object);
+	//	}
+}
 
 file_tpd_node::file_tpd_node(token* t_packed, token* t_file, token* t_of, tpd_node* recordtp)
 : tpd_node(tpd_file)
