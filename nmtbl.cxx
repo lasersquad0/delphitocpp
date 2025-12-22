@@ -22,10 +22,10 @@ inline unsigned nm_entry::hash(const char* name)
 nm_entry* nm_entry::find(const char* name)
 {
     unsigned h;
-    nm_entry* ne;
+    nm_entry* ne = nullptr;
     
     h = hash(name);
-    for (ne = nm_table[h]; ne != NULL; ne = ne->next)
+    for (ne = nm_table[h]; ne != nullptr; ne = ne->next)
     {
         if (strcmp(name, ne->text) == 0)
 	    break;
@@ -40,7 +40,7 @@ nm_entry* nm_entry::add(const char* name, int v_tag)
     nm_entry* ne;
 
     ne = find(name);
-    if (ne != NULL)
+    if (ne != nullptr)
         return ne;
 
     h = hash(name);
