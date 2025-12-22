@@ -6769,6 +6769,7 @@ void object_tpd_node::attrib1(int)
 {
 	if (t_ancestorlist) {
 		//TODO shall we check full ancestor list for existence in b_ring?
+		//TODO add TObject as parent even when it is not mentioned in ancestor list 
 		super = b_ring::search_cur(t_ancestorlist->ident); // first item in ancestor list is always superclass, all the others are interfaces
 		if (super) {
 			auto otp = dynamic_cast<object_tp*>(super->type->get_typedef());
@@ -6788,7 +6789,6 @@ void object_tpd_node::attrib1(int)
 		token tok("tobject", TKN_IDENT, 0, 0, nm);
 		
 		super = b_ring::search_cur(&tok);
-		//assert(super);
 
 		type = new object_tp(this);
 	}
@@ -6841,9 +6841,17 @@ void object_tpd_node::translate(int)
 		}
 	}
 	else {
+		// if t_end=NULL than it is forward class declaration
+
 		if (t_end) {
+			if (super) // all Delphi classes has parent TObject, if ancestor list is enpty it means that parent is TObject
+			{
+				t_class->append(dprintf(" : public %s {\n", super->out_name->text));
+			} else {
+				t_class->append(" {\n"); // ->set_bind(t_class);
+			}
+
 			l_tkn = t_end;
-			t_class->append(" {\n"); // ->set_bind(t_class);
 			t_end->set_trans("}");
 			t_end->set_bind(t_class);
 		}
