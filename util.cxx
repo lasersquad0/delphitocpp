@@ -27,8 +27,8 @@ void error(const char* fmt, ...)
     fprintf(stderr, "error: ");
     vfprintf(stderr, fmt, ap);
     va_end(ap);
-    putc('\n',stderr);
-    exit (EXIT_FAILURE);
+    putc('\n', stderr);
+    exit(EXIT_FAILURE);
 }
 
 void error(int line, int pos, const char* file, const char* fmt, ...)
@@ -39,8 +39,8 @@ void error(int line, int pos, const char* file, const char* fmt, ...)
     fprintf(stderr, "%s:%d %d error: ", file, line, pos);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
-    putc('\n',stderr);
-    exit (EXIT_FAILURE);
+    putc('\n', stderr);
+    exit(EXIT_FAILURE);
 }
 
 void error(token* tkn, const char* fmt, ...)
@@ -55,7 +55,7 @@ void error(token* tkn, const char* fmt, ...)
     vfprintf(stderr, fmt, ap);
     va_end(ap);
     putc('\n', stderr);
-    exit (EXIT_FAILURE);
+    exit(EXIT_FAILURE);
 }
 
 void warning(const char* fmt, ...)
@@ -104,7 +104,7 @@ extern "C" char* strupper(const char* s)
     char* dst = new_s;
     unsigned char* src = (unsigned char*)s;
     do { 
-	*dst++ = (char)toupper(*src);
+	    *dst++ = (char)toupper(*src);
     } while (*src++ != 0);
     return new_s;
 }
@@ -113,15 +113,15 @@ extern "C" int strincmp(char const* s1, char const* s2, int n)
 { 
     unsigned char* p = (unsigned char*)s1;    
     unsigned char* q = (unsigned char*)s2;
-    while (--n >= 0) { 
-	if (tolower(*p) != tolower(*q)) { 
-	    return tolower(*p) - tolower(*q);
-	}
-	if (*p == '\0') { 
-	    return 0;
-	}
-	p += 1;
-	q += 1;
+    while (--n >= 0) {
+        if (tolower(*p) != tolower(*q)) {
+            return tolower(*p) - tolower(*q);
+        }
+        if (*p == '\0') {
+            return 0;
+        }
+        p += 1;
+        q += 1;
     }
     return 0;
 }

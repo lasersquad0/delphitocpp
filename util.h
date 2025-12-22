@@ -2,6 +2,9 @@
 
 #define IS_POWER2(x)  (((x)&((x)-1)) == 0)
 
+// max ident name length, mostly C++ limitation than Delphi
+#define MAX_ID_LENGTH 1024
+
 extern void error(const char* fmt, ...);
 extern void error(token *tkn, const char* fmt, ...);
 extern void error(int line, int pos, const char* file, const char* fmt, ...);
