@@ -1121,10 +1121,15 @@ record_field_list: field_list
         { $$ = new record_field_part_node(NULL, $1); }
 
 
-interface_type: INTERFACE guid interface_components END
+interface_type: 
+      INTERFACE guid interface_components END
         { $$ = new interface_tpd_node($1, NULL, NULL, NULL, $2, $3, $4); }  
+    | INTERFACE guid END
+        { $$ = new interface_tpd_node($1, NULL, NULL, NULL, $2, NULL, $3); }      
     | INTERFACE '(' IDENT ')' guid interface_components END
         { $$ = new interface_tpd_node($1, $2, $3, $4, $5, $6, $7); }
+    | INTERFACE '(' IDENT ')' guid END
+        { $$ = new interface_tpd_node($1, $2, $3, $4, $5, NULL, $6); }
     | INTERFACE '(' IDENT ')' END
         { $$ = new interface_tpd_node($1, $2, $3, $4, NULL, NULL, $5); }
     | INTERFACE END
@@ -1159,6 +1164,8 @@ class_type: class_or_object object_body END
         { $$ = new object_tpd_node($1, $2, $3, $4, $5, $6); }
     | class_or_object '(' ident_list ')' END
         { $$ = new object_tpd_node($1, $2, $3, $4, NULL, $5); }
+    | class_or_object '(' ident_list ')'
+        { $$ = new object_tpd_node($1, $2, $3, $4, NULL, NULL); }
     | class_or_object END
         { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2); }
     | class_or_object
