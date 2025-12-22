@@ -49,22 +49,36 @@
 * DONE - implemented proper work when inherited call has no explicit parameters (single keyword 'inherited')- need to add there function name and params e.g. => TParentClass::ProcName(ProcName_params)
 * DONE - implemented conversion Delphi binary constants into C++ binary constants 
 * DONE - 64bit integer constants are translated correctly now. Delphi group digits separator '_' is supported as well.
-*
-*
+* DONE - unit names now support dots '.' in their nmames (usefull for compiling Delphi system .pas files)
+* DONE - parser recognises UTF-8 BOM (three bytes EFBBBF)in the beginning of file and processes it correctly. 
+* DONE - implemented 'deprecated message' directive for consts and vars
+
+деструктор почему то транслируется неверно в obj->Destroy() вместо delete obj;
+
+
+правильно парсить обьявление TMyMetaClass = class of TMyClass
+
+если у класса нету предка то добавлять наследование от TObject
+
+* finish implementation of 'strong type alias' 
+example: type CppLongInt = type LongInt;
+
+* 
+*методы и классы целиком (!) могут быть помечены директивой deprecated 'Use Free instead'. работает так же как virtual и др. 
+для класса вот так
+TMyClass = class
+....
+end deprecated;
+ 
+* 
+*в Delphi конструкторы наследуются в C++ нет
+*поэтому если в парент классе есть конструктор constructor Create(ui: integer);
+ то в Delphi его можно вызвать для child класса. В С++ это не сработает.
+ Подумать как быть с этим
+
 * implement function StrToInt, IntToStr,
 *
-* implement proper parsing integer constant that have format: 50_000_000
-* implement proper parting int64 constants
-*
-* investigate why break keyword is replaced by flush()
-* investigate why double1 happend instead double  
-* 
-* { result = ( (int)(index); ); return IndexOfFrom_result; }
-* 
-* if Result <> -1 then Result := Result + Integer(Start);
-* translated to
-*   if (result != -1)  result = result + ( (int)(Start); );
-  
+*   
   FAIndex: THArrayInteger;
   далее вызов i := FAIndex[5]; подразумевает вызов default property of FAIndex в Delphi
   он сейчас транслируется в i = FAIndex[5]; что в с++ подразумевает массив из THArrayInteger.
@@ -129,7 +143,7 @@ static void load_predefined()
 		b_ring::add_cur(nm_entry::add("int64",     TKN_IDENT),  nm_entry::add("int64_t", TKN_IDENT),	    symbol::s_type,	&int64_type);
 		b_ring::add_cur(nm_entry::add("nativeint", TKN_IDENT),  nm_entry::add("int ", TKN_IDENT),	        symbol::s_type,	&integer_type);
 		b_ring::add_cur(nm_entry::add("nativeuint",TKN_IDENT),  nm_entry::add("unsigned int ", TKN_IDENT),  symbol::s_type, &cardinal_type);
-		b_ring::add_cur(nm_entry::add("fixedint",  TKN_IDENT),  nm_entry::add("int", TKN_IDENT),            symbol::s_type, &integer_type);
+		b_ring::add_cur(nm_entry::add("fixedint",  TKN_IDENT),  nm_entry::add(" int", TKN_IDENT),            symbol::s_type, &integer_type);
 		b_ring::add_cur(nm_entry::add("fixeduint", TKN_IDENT),  nm_entry::add("unsigned  int ", TKN_IDENT), symbol::s_type, &cardinal_type);
 
 		b_ring::add_cur(nm_entry::add("single",    TKN_IDENT),  nm_entry::add("float", TKN_IDENT),          symbol::s_type, &real_type);
@@ -149,51 +163,59 @@ static void load_predefined()
 static void load_keywords() 
 { 
 	for (int tag = 0; tag < TKN_LAST; tag++) {
-		if (token::token_cat[tag] == CAT_ID ||
-			token::token_cat[tag] == CAT_KWD)
+		if (token::token_cat[tag] == CAT_ID || token::token_cat[tag] == CAT_KWD)
 		{
 			nm_entry::add(token::token_name[tag], tag);
 		}
 	}
 }
 
-#define MAX_NAME_LEN 1024
-
 static void load_configuration(char* name) { 
     FILE* cfg = fopen(name, "r");
 
-	if (cfg != NULL) {
+	if (cfg != nullptr) {
 
-		char buf[MAX_NAME_LEN]{0};
+		char buf[MAX_ID_LENGTH]{ 0 };
 
 		while (fscanf(cfg, "%s", buf) == 1) {
 			if (strcmp(buf, "#begin(reserved)") == 0) {
 				while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(reserved)") != 0)
 				{
-					nm_entry::add(buf, TKN_RESERVED);
+					auto nm = nm_entry::add(buf, TKN_RESERVED);
+
+					// If 'RESERVED' name has already added to nm_entry with other TKN_* id then nm will contain original nm with TKN_* <> TKN_RESERVED. 
+					// In this case we set additional flag in nm->flags to mark this nm as reserved
+					// for TKN_RESERVED names we set 'reserved' flag in flags too
+					//nm->flags |= nm_entry::reserved; 
 				}
-			} 
+			}
+			// Not fully understand how it works
+			// nm_entry::macro mentioned in two more places only 
+			// one place: b_ring::add() checks nm_entry::macro flag and adds '_' at the end of symbol->out_name->text .
 			else if (strcmp(buf, "#begin(macro)") == 0) {
 				while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(macro)") != 0)
 				{
 					nm_entry::add(buf, TKN_IDENT)->flags |= nm_entry::macro;
 				}
-				// #begin(library) - this is list of C and C++ standard identificators and keywords which cannot be used in C/C++ during translating from Pascal to C/C++
-				// We are adding then into global ring with s_dummy tag because they are actually C/C++ identificators. 
-				// When identificator with the same name has met in Pascal code, it will be automatically renamed to avoid conflicts.
 			}
+			// #begin(library) - this is list of C and C++ standard identificators and keywords which cannot be used in C/C++ during translating from Pascal to C/C++
+			// We are adding then into global ring with s_dummy tag because they are actually C/C++ identificators. 
+			// When identificator with the same name has met in Pascal code, it will be automatically renamed to avoid conflicts.
 			else if (strcmp(buf, "#begin(library)") == 0)
 			{
 				while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(library)") != 0)
 				{
-					b_ring::global_b_ring.add(nm_entry::add(buf, TKN_IDENT), symbol::s_dummy, NULL);
+					b_ring::global_b_ring.add(nm_entry::add(buf, TKN_IDENT), symbol::s_dummy, nullptr);
 				}
 			}
 			else if (strcmp(buf, "#begin(rename)") == 0) {
 				while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(rename)") != 0)
 				{
 					nm_entry* nm_old = nm_entry::add(buf, TKN_IDENT);
-					fscanf(cfg, "%s", buf);
+					
+					if (fscanf(cfg, "%s", buf) != 1)
+						fprintf(stderr, "Error reading rename section from configuration file '%s'\n", name);
+
 					nm_entry* nm_new = nm_entry::add(buf, TKN_IDENT);
 					rename_item::add(nm_new, nm_old);
 				}
@@ -207,8 +229,7 @@ static void load_configuration(char* name) {
 			}
 		}
 	} else {
-	fprintf(stderr, "Can't open configuration file '%s'\n", 
-		name);
+		fprintf(stderr, "Can't open configuration file '%s'\n", name);
     }
 }
 
@@ -332,55 +353,54 @@ static void scan_opt (int argc, char **argv) {
 	    *(opt[j].flag) = false; // Switch off flags
         }
     }
-    for (i = 1; i < argc; i++) { // Skipping program name
-	if (argv[i][0] != '-') { 
-	    if (input_file != NULL) { 
-		fprintf(stderr, "Only one input file name is accepted\n");
-		goto Help;
-	    }
-	    input_file = argv[i];
-	    continue;
-	}
-	found = false;
-	for (j = 0; j < (sizeof(opt)/sizeof(opt_str)); j++) {
-	    if (strcmp (opt[j].str, argv[i]) == 0) { 
-		if (opt[j].flag != NULL) { 
-	            *(opt[j].flag) = true;
-                } 
-		if (opt[j].value != NULL) { 
-		    i++; 
-		    if (i >= argc) {
-			fprintf(stderr, "Value for option '%s' is not specified\n", opt[j].str);
-			goto Help;
-		    }
-		    *opt[j].value = argv[i];
+	for (i = 1; i < argc; i++) { // Skipping program name
+		if (argv[i][0] != '-') {
+			if (input_file != NULL) {
+				fprintf(stderr, "Only one input file name is accepted\n");
+				goto Help;
+			}
+			input_file = argv[i];
+			continue;
 		}
-		found = true;
-		break;
-	    }
-	}
-	if (!found) { 
- 	  Help:
-	    fprintf (stderr, "Pascal to C/C++ converter. Version " VERSION "\n"
-			     "Available options are:\n");
+		found = false;
+		for (j = 0; j < (sizeof(opt) / sizeof(opt_str)); j++) {
+			if (strcmp(opt[j].str, argv[i]) == 0) {
+				if (opt[j].flag != NULL) {
+					*(opt[j].flag) = true;
+				}
+				if (opt[j].value != NULL) {
+					i++;
+					if (i >= argc) {
+						fprintf(stderr, "Value for option '%s' is not specified\n", opt[j].str);
+						goto Help;
+					}
+					*opt[j].value = argv[i];
+				}
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+		Help:
+			fprintf(stderr, "Pascal to C/C++ converter. Version " VERSION "\nAvailable options are:\n");
 
-	    for (j = 0; j < (sizeof(opt)/sizeof(opt_str)); j++ ) {
-		if (opt[j].defval != NULL) { 
-		    char buf[256];
-		    sprintf(buf, "%s [%s]", opt[j].str, opt[j].defval);
-            assert(strlen(buf) < sizeof(buf));
-		    fprintf(stderr, "\t%-12s", buf); 
- 		} else { 
-		    fprintf(stderr, "\t%-12s", opt[j].str); 
+			for (j = 0; j < (sizeof(opt) / sizeof(opt_str)); j++) {
+				if (opt[j].defval != NULL) {
+					char buf[256];
+					sprintf(buf, "%s [%s]", opt[j].str, opt[j].defval);
+					assert(strlen(buf) < sizeof(buf));
+					fprintf(stderr, "\t%-12s", buf);
+				} else {
+					fprintf(stderr, "\t%-12s", opt[j].str);
+				}
+				fprintf(stderr, "%s\n", opt[j].comment);
+			}
+			exit(1);
 		}
-	   	fprintf(stderr, "%s\n", opt[j].comment); 
-	    }
-	    exit (1);
+		pio_init = true;
 	}
-	pio_init = true;
-    }
     if (input_file == NULL) { 
-	goto Help;
+		goto Help;
     }
 #ifdef _WIN32
     char* p = strrchr(argv[0], '\\');
@@ -405,32 +425,34 @@ int main(int argc, char* argv[])
 { 
     scan_opt (argc, argv);
 
-    if (input_file == NULL) { 
-	fputs("Input file was not specified\n", stderr);
+    if (input_file == nullptr) {
+		fputs("Input file was not specified\n", stderr);
         exit(1); 
     }
 
-	if (output_file == NULL) {
+	if (output_file == nullptr) {
 		char* ext = strrchr(input_file, '.');
-		int file_name_len = ext ? ext - input_file : (int)strlen(input_file);
+		int file_name_len = ext ? (int)(ext - input_file) : (int)strlen(input_file);
 		if (language_c) output_suf = ".c";
 		output_file = dprintf("%.*s%s", file_name_len, input_file, output_suf);
 	}
 
     load_predefined(); 
-    load_keywords();
+	load_keywords(); // from token.dpp, only CAT_ID and CAT_KWD categories added to nm_entry
     load_configuration(dprintf("%s%s", prog_path, CONFIG_FILE));
+
 
     if (hp_pascal) { 
         nested_comments = 1;
         ignore_preprocessor_directives = 1;
     }
+
 	if (use_call_graph) {
 		call_graph_file = fopen(CALL_GRAPH_FILE, "a");
 		FILE* f = fopen(RECURSIVE_PROC_FILE, "r");
-		if (f != NULL) {
+		if (f != nullptr) {
 			char name[256]{ 0 };
-			while (fscanf(f, "%s", name) == 1) {
+			while(fscanf(f, "%s", name) == 1) {
 				assert(strlen(name) < sizeof(name));
 				nm_entry::add(name, TKN_IDENT)->flags |= nm_entry::recursive;
 			}
@@ -467,9 +489,39 @@ int main(int argc, char* argv[])
 	catch (...)
 	{
 		fprintf(stderr, "UNKNOWN ERROR CAUGHT!");
+		return EXIT_FAILURE;
 	}
 
-    return 0; 
+    return EXIT_SUCCESS; 
 }
 
+/*
+	const uint64_t WORD_2POWER = 6ULL; // 2^6==sizeof(uint64_t)*8 = 64;
+	const uint64_t BITS_IN_WORD = 1ULL << WORD_2POWER; //==sizeof(uint64_t)*8 = 64;
+	const uint64_t WORD_MASK = BITS_IN_WORD - 1ULL; // =63=0x3F
 
+	uint64_t* bits_arr; // [(Bits - 1ULL) / BITS_IN_WORD + 1ULL] ;
+
+	bitset_init(uint64_t BitsCount)
+	{
+		uint64_t wordsCnt = (BitsCount - 1ULL) / BITS_IN_WORD + 1ULL;
+		bits_arr = (uint64_t*)calloc(wordsCnt, sizeof(uint64_t)); // fills by zeroes
+	}
+
+	int get_bit(uint64_t bitIndex)
+	{
+		uint64_t index2 = bitIndex >> WORD_2POWER; // index/BITS_IN_WORD;
+		uint64_t offset = bitIndex & WORD_MASK; // index % BITS_IN_WORD;
+
+		return ((bits_arr[index2] >> offset) & 0x01);
+	}
+
+	void set_true(uint64_t bitTndex)
+	{
+		uint64_t index2 = bitTndex >> WORD_2POWER; // index/BITS_IN_WORD;
+		uint64_t offset = bitTndex & WORD_MASK; // index % BITS_IN_WORD;
+
+		bits_arr[index2] |= (1ull << offset); //TODO не сработает правильно если ранее туда записана 1 и мы сейчас хотим записать 0.
+	}
+
+	*/
