@@ -90,7 +90,7 @@ void b_ring::make_unique(symbol* sym)
     //    for (spp = &top_b_ring->syms; (sp = *spp) != NULL; spp = &sp->next) {
     for (spp = &global_b_ring.syms; (sp = *spp) != NULL; spp = &sp->next) {
         if (sp->out_name == sym->out_name) { // we check out_names because we try to avoid conflict in translated C++ text, in_name we leave untouched
-            char buf[256];
+            char buf[MAX_ID_LENGTH];
             sprintf(buf, "%s%d", sym->out_name->text, ++version); //TODO it was sym->in_name->text here instead of out_name
             assert(strlen(buf) < sizeof(buf));
             sym->out_name = nm_entry::add(buf, TKN_IDENT);
