@@ -245,7 +245,7 @@ text_tp::text_tp() : file_tp(&char_type) {
 void record_tp::calc_flags()
 {
     for (symbol *sym = syms; sym != NULL; sym = sym->next) {
-	flags |= sym->type->get_typedef()->flags;
+	    flags |= sym->type->get_typedef()->flags;
     }
 }
     
