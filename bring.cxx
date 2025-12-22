@@ -29,10 +29,10 @@ void symbol::translate(token* t) const
 // Constructor for ring
 b_ring::b_ring(int scope) { 
     b_ring::scope = scope;
-    outer = NULL;
-    inherite = NULL;
-    syms = NULL;
-    with = NULL; 
+    outer    = nullptr;
+    inherite = nullptr;
+    syms     = nullptr;
+    with     = nullptr;
 }
 
 // Search for an entry at one level of binding ring
@@ -88,7 +88,7 @@ void b_ring::make_unique(symbol* sym)
     
   check_loop:
     //    for (spp = &top_b_ring->syms; (sp = *spp) != NULL; spp = &sp->next) {
-    for (spp = &global_b_ring.syms; (sp = *spp) != NULL; spp = &sp->next) {
+    for (spp = &global_b_ring.syms; (sp = *spp) != nullptr; spp = &sp->next) {
         if (sp->out_name == sym->out_name) { // we check out_names because we try to avoid conflict in translated C++ text, in_name we leave untouched
             char buf[MAX_ID_LENGTH];
             sprintf(buf, "%s%d", sym->out_name->text, ++version); //TODO it was sym->in_name->text here instead of out_name
@@ -100,11 +100,14 @@ void b_ring::make_unique(symbol* sym)
     if (scope != SCOPE::global) {
         *spp = sp = new symbol; // this symbol will never be found
         sp->ring = top_b_ring;  //TODO may be use global_b_ring instead of top_b_ring? 
-        sp->next = NULL;
-        sp->type = NULL;
+        sp->next = nullptr;
+        sp->type = nullptr;
+        sp->path = nullptr;
         sp->in_name = sym->in_name;
         sp->out_name = sym->out_name;
         sp->tag = symbol::s_dummy;
+        sp->flags = 0;
+        sp->value = 0;
     }
 }
 
@@ -119,6 +122,8 @@ symbol* b_ring::add(nm_entry* in_name, nm_entry* out_name, int tag, tpexpr* type
     sym->type  = type; 
     sym->path  = nullptr; 
     sym->ring  = this;
+    sym->value = 0;
+    sym->next = nullptr;
 
     if (compile_system_library) { //true only when we compile tptoc.pas
         sym->out_name = rename_item::rename(sym->out_name);
@@ -147,7 +152,7 @@ symbol* b_ring::add(nm_entry* in_name, nm_entry* out_name, int tag, tpexpr* type
 
 void b_ring::make_vars_static() 
 { 
-    for (symbol* sym = syms; sym != NULL; sym = sym->next) {
+    for (symbol* sym = syms; sym != nullptr; sym = sym->next) {
         if ( (sym->flags & (symbol::f_exported | symbol::f_val_param | symbol::f_var_param)) == symbol::f_exported)
         {
             sym->flags |= symbol::f_static;
