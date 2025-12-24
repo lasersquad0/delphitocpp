@@ -1223,11 +1223,11 @@ class proc_fwd_decl_node : public proc_decl_node {
     bool                is_pascal;
     bool                is_cdecl;
     bool                is_register;
-    bool                is_overload;
+    //bool                is_overload;
     bool                is_abstract;
     bool                is_final;
     bool                is_override;
-   // bool                is_dynamic;
+    bool                is_inline;
 
     proc_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, 
                        token* t_semi1, token_list* qualifiers = nullptr, token* t_semi2 = nullptr); 
@@ -1240,7 +1240,8 @@ class operator_fwd_decl_node : public proc_fwd_decl_node {
 public:
     //token* t_semi;  // semicolon
 
-    operator_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, token* t_semi);
+    operator_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, 
+                            token* t_semi, token_list* qualifiers, token* t_semi2);
    
      //void attrib(int ctx) override;
      void translate(int ctx) override;
@@ -1294,9 +1295,10 @@ class tpd_node : public node {
     tpexpr*  type; // Type which is designated by this typenode 
 
     enum tpd_type { tpd_simple, tpd_set, tpd_enum, tpd_range, tpd_proc, //TODO what is the difference from enum type_tag{} ? 
-                    tpd_array, tpd_string, tpd_ref, tpd_object, tpd_record, tpd_file };  
+                    tpd_array, tpd_string, tpd_ref,
+                    tpd_object, tpd_record, tpd_metaclass, tpd_file };  
     
-    int  tag;  
+    int  tag;
 
     tpd_node(int tpd_tag) { type = nullptr; tag = tpd_tag; }
 };
@@ -1588,11 +1590,11 @@ class field_list_node : public decl_node {
 class base_obj_tpd_node : public tpd_node {
 public:
     using ptoken = token*;
-    token* t_record; // keyword 'record'
-    token* t_end;    
+    token*     t_startof; // keyword 'record'
+    token*     t_end;    
     decl_node* parts;
 
-    base_obj_tpd_node(tpd_type tp, token* t_record, decl_node* parts, token* t_end);
+    base_obj_tpd_node(tpd_type tp, token* t_startof, decl_node* parts, token* t_end);
 
     virtual void attrib1(int ctx) = 0;
     virtual void attrib2(int ctx) = 0;
@@ -1601,9 +1603,9 @@ public:
 
 class record_tpd_node : public base_obj_tpd_node { 
   public: 
-    token*           t_packed;
- //   token*           t_record;
- //   token*           t_end; 
+    ptoken&     t_record = t_startof;
+    token*      t_packed;
+    //   token*           t_end; 
  //   decl_node*       parts; 
 
     record_tpd_node* outer;
@@ -1620,7 +1622,7 @@ class record_tpd_node : public base_obj_tpd_node {
 
 class object_tpd_node : public base_obj_tpd_node { 
   public: 
-    ptoken&      t_class = t_record; // keyword 'class'
+    ptoken&      t_class = t_startof; // keyword 'class'
     token*       t_lbr;
     token_list*  t_ancestorlist;
     token*       t_rbr;
@@ -1651,6 +1653,19 @@ public:
 
     interface_tpd_node(token* t_interface, token* t_lbr, token* t_superinterface, token* t_rbr,
                        decl_node* guid, decl_node* parts, token* t_end);
+
+    void attrib1(int ctx) override;
+    void attrib2(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class metaclass_tpd_node : public base_obj_tpd_node {
+public:
+    ptoken&   t_class = t_startof;
+    ptoken&   t_of = t_end;
+    token*    t_ident;
+
+    metaclass_tpd_node(token* t_class, token* t_of, token* t_ident);
 
     void attrib1(int ctx) override;
     void attrib2(int ctx) override;

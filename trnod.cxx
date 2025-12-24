@@ -2742,6 +2742,7 @@ void op_node::translate(int)
 		op->set_trans((!force_logical && ((left->type && left->type->tag != tp_bool) ||
 			(right->type && right->type->tag != tp_bool) || nological)) ? "&" : "&&");
 		// no break
+		[[fallthrough]];
 	case tn_binand:
 		if (parent_tag != tn_group && parent_tag != tn_and) {
 			f_tkn = left->f_tkn->prepend("(");
@@ -2787,6 +2788,7 @@ void op_node::translate(int)
 			l_tkn = right->l_tkn->append(")");
 		}
 		// no break
+		[[fallthrough]];
 	case tn_binor:
 		op->set_trans((!force_logical && ((left->type && left->type->tag != tp_bool) ||
 			(right->type && right->type->tag != tp_bool) ||
@@ -4368,8 +4370,8 @@ void const_def_part_node::attrib(int ctx)
 void const_def_part_node::translate(int ctx)
 {
     f_tkn = l_tkn = t_const;
-    const_def_node::enumeration = NULL;
-	for (decl_node* def = list; def != NULL; def = def->next) {
+    const_def_node::enumeration = nullptr;
+	for (decl_node* def = list; def != nullptr; def = def->next) {
 		def->translate(ctx);
 		l_tkn = def->l_tkn;
 	}
@@ -4378,7 +4380,7 @@ void const_def_part_node::translate(int ctx)
 		// make type definition global
 		global_func_decl_level->move_region(f_tkn, l_tkn);
 		global_func_decl_level->prepend("\n\n");
-		(new token(NULL, TKN_BEG_SHIFT, f_tkn->line, f_tkn->next_relevant()->pos))->insert_b(f_tkn);
+		(new token(nullptr, TKN_BEG_SHIFT, f_tkn->line, f_tkn->next_relevant()->pos))->insert_b(f_tkn);
 		(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
 	}
     if (ctx == ctx_module || ctx == ctx_program) {
@@ -4456,17 +4458,17 @@ void type_def_node::attrib(int ctx)
 	if(tpd->type->name == nullptr)
 		tpd->type->name = sym->out_name->text;
 
-    switch (tpd->tag) {
-      case tpd_node::tpd_enum:
-        ((enum_tp*)tpd->type)->set_bounds(sym);
-        ((enum_tp*)tpd->type)->set_enumeration_name(type);
-	break;
-      case tpd_node::tpd_range:
-        ((range_tp*)tpd->type)->set_bounds(sym);
-	break;
-      case tpd_node::tpd_object:
-        ((object_tp*)tpd->type)->class_name = sym;
-    }
+	switch (tpd->tag) {
+	case tpd_node::tpd_enum:
+		((enum_tp*)tpd->type)->set_bounds(sym);
+		((enum_tp*)tpd->type)->set_enumeration_name(type);
+		break;
+	case tpd_node::tpd_range:
+		((range_tp*)tpd->type)->set_bounds(sym);
+		break;
+	case tpd_node::tpd_object:
+		((object_tp*)tpd->type)->class_name = sym;
+	}
 }
 
 void type_def_node::translate(int ctx)
@@ -4485,10 +4487,8 @@ void type_def_node::translate(int ctx)
 
 	} else if (small_enum && tpd->tag == tpd_node::tpd_enum) {
 		int n_elems = ((enum_tp*)tpd->type)->n_elems;
-		t_ident->set_trans(dprintf("typedef %s %s;\n",
-			n_elems < 0x100 ? "unsigned char" :
-			n_elems < 0x10000 ? "unsigned short" :
-			"unsigned", t_ident->out_text));
+		t_ident->set_trans(dprintf("typedef %s %s;\n", n_elems < 0x100 ? "unsigned char" :
+  				n_elems < 0x10000 ? "unsigned short" : "unsigned", t_ident->out_text));
 		((enum_tpd_node*)tpd)->f_tkn->set_bind(t_ident);
 
 	} else if (!language_c && tpd->tag == tpd_node::tpd_enum) {
@@ -4503,26 +4503,32 @@ void type_def_node::translate(int ctx)
 		t_ident->disappear();
 
 	} else if (tpd->tag == tpd_node::tpd_record) {
-		record_tpd_node* rec_tpd = (record_tpd_node*)tpd;
+		auto rec_tpd = dynamic_cast<record_tpd_node*>(tpd);
+		assert(rec_tpd);
 		if (language_c) {
 			rec_tpd->t_record->set_trans(dprintf("typedef %s%s ", rec_tpd->t_record->out_text, t_ident->out_text));
 			l_tkn = l_tkn->append(" ")->append(t_ident->out_text);
 		} else {
 			rec_tpd->t_record->set_trans(dprintf("%s%s ", rec_tpd->t_record->out_text, t_ident->out_text));
 		}
-
 		rec_tpd->t_record->set_pos(t_ident);
 		t_ident->disappear();
 
 	} else if (tpd->tag == tpd_node::tpd_proc) {
-		fptr_tpd_node* fptr = (fptr_tpd_node*)tpd;
+		auto fptr = dynamic_cast<fptr_tpd_node*>(tpd);
+		assert(fptr);
 		fptr->t_params->prepend(dprintf("(*%s)", t_ident->out_text));
 		t_ident->set_trans("typedef ");
+
+	} else if (tpd->tag == tpd_node::tpd_metaclass) {
+		t_ident->set_trans(dprintf("const type_info& %s = ", t_ident->out_text));
+
 	} else {
 		t_ident->append(" ");
 		l_tkn = l_tkn->append(" ")->append(t_ident->out_text);
         t_ident->set_trans("typedef");
     }
+
     force_semicolon();
 }
 
@@ -5309,13 +5315,14 @@ proc_fwd_decl_node::proc_fwd_decl_node(token* t_proc, token* t_ident, param_list
 	is_static = false;
 	is_virtual = false;
 	is_override = false;
-	is_overload = false;
+	//is_overload = false;
 	is_stdcall = false;
 	is_pascal = false;
 	is_cdecl = false;
 	is_register = false;
 	is_final = false;
 	is_abstract = false;
+	is_inline = false;
 }
 
 void proc_fwd_decl_node::attrib(int ctx)
@@ -5353,6 +5360,35 @@ void proc_fwd_decl_node::attrib(int ctx)
 
 	for (token_list* t = qualifiers; t != NULL; t = t->next)
 	{
+		switch (t->ident->tag) {
+		case TKN_VIRTUAL: 
+			is_virtual = type->is_constructor ? false : true; // in C++ constructors cannot be virtual unlike to Delphi
+			if (ctx != ctx_object) warning(t->ident, "method %s: virtual directive cannot be used here, only class methods can be marked virtual", t_ident->in_text);
+			break;
+		case TKN_DYNAMIC:
+			is_virtual = type->is_constructor ? false : true;
+			if (ctx != ctx_object) warning(t->ident, "method %s: dynamic directive cannot be used here, only class methods can be marked dynamic", t_ident->in_text);
+			break;
+		case TKN_OVERRIDE:
+			is_override = type->is_constructor ? false : true; // in C++ constructors cannot be marked override since they are NOT virtual
+			if (ctx != ctx_object) warning(t->ident, "method %s: override directive cannot be used here, only class methods can be marked override", t_ident->in_text);
+			break;
+		case TKN_EXTERNAL: is_external = true; break;
+		case TKN_STATIC:   is_static   = true; break;
+		//case TKN_OVERLOAD: is_overload = true; break;
+		case TKN_WINAPI:   is_stdcall  = true; break; // winapi qualifier is the same as stdcall on WIN32
+		case TKN_SAFECALL: is_stdcall  = true; break; // safecall qualifier is the same as stdcall in C++
+		case TKN_STDCALL:  is_stdcall  = true; break;
+		case TKN_PASCAL:   is_pascal   = true; break;
+		case TKN_CDECL:    is_cdecl    = true; break;
+		case TKN_REGISTER: is_register = true; break;
+		case TKN_FINAL:    is_final    = true; break;
+		case TKN_ABSTRACT: is_abstract = true; break;
+		case TKN_INLINE:   is_inline   = true; break;
+		case TKN_C: type->is_extern_c  = true; break;
+		}
+
+		/*
 		if (t->ident->tag == TKN_EXTERNAL) {
 			is_external = true;
 		}
@@ -5392,14 +5428,20 @@ void proc_fwd_decl_node::attrib(int ctx)
 		else if (t->ident->tag == TKN_ABSTRACT) {
 			is_abstract = true;
 		}
+		else if (t->ident->tag == TKN_INLINE) {
+			is_inline = true;
+		}
 		else if (t->ident->tag == TKN_C) {
 			type->is_extern_c = true;
-		}
+		}*/
 	}
 
 	if (is_static && (is_virtual || is_override || is_abstract))
 		warning(t_ident, "method '%s' marked as 'static' cannot be abstract, virtual or dynamic", t_ident->in_text);
-
+	
+	if (is_inline && (is_virtual || is_override || is_abstract))
+		warning(t_ident, "method '%s' marked as 'inline' cannot be abstract, virtual or dynamic", t_ident->in_text);
+	
 	if (is_abstract && !is_virtual)
 		warning(t_ident, "abstract method '%s' must be virtual or dynamic", t_ident->in_text);
 
@@ -5421,7 +5463,7 @@ void proc_fwd_decl_node::translate(int)
 {
 	insert_return_type();
 
-	// convert 'constructor Create(...)' into C++ constructor 'MyClassName(...)'
+	// convert 'constructor Create()' into C++ constructor 'MyClassName()'
 	if (type->is_constructor) {
 		assert(var);
 		token* tmp = t_proc->next_relevant();
@@ -5430,7 +5472,7 @@ void proc_fwd_decl_node::translate(int)
 		t_proc->set_trans(var ? ((object_tp*)var->ring)->class_name->out_name->text : "<UNKNOWN CLASS>");
 	}
 
-	// convert 'destructor Destroy(...)' into C++ destructor '~MyClassName(...)'
+	// convert 'destructor Destroy()' into C++ destructor '~MyClassName()'
 	if (type->is_destructor) {
 		assert(var);
 		token* tmp = t_proc->next_relevant();
@@ -5440,13 +5482,12 @@ void proc_fwd_decl_node::translate(int)
 	}
 
 
-	if (is_external)
-		f_tkn = f_tkn->prepend(type->is_extern_c && !language_c ? "extern \"C\" " : "extern ");
-
 	// 'static' directive is not translated into C++ keyword 'static' because keyword 'class' tells us that method is static
 	// e.g. 'class procedure AAAA;'. Compare to - 'class procedure AAAA; static;'
-	//if (is_static)
-	//	f_tkn = f_tkn->prepend("static ");
+	// 'reintroduce' directive is not translated into C++ keyword because this is C++ behavious by default
+
+	if (is_external)
+		f_tkn = f_tkn->prepend(type->is_extern_c && !language_c ? "extern \"C\" " : "extern ");
 
 	if (is_virtual)
 		f_tkn = f_tkn->prepend("virtual ");
@@ -5455,16 +5496,16 @@ void proc_fwd_decl_node::translate(int)
 		l_tkn = l_tkn->prepend(" override");
 
 	if (is_stdcall)
-		f_tkn = f_tkn->append(" __stdcall");
+		f_tkn->append(" __stdcall");
 
 	if (is_pascal)
-		f_tkn = f_tkn->append(" __pascal");
+		f_tkn->append(" __pascal");
 
 	if (is_cdecl)
-		f_tkn = f_tkn->append(" __cdecl");
+		f_tkn->append(" __cdecl");
 
 	if (is_register)
-		f_tkn = f_tkn->append(" __fastcall");
+		f_tkn->append(" __fastcall");
 
 	if (is_final)
 		l_tkn = l_tkn->prepend(" final");
@@ -5472,6 +5513,9 @@ void proc_fwd_decl_node::translate(int)
 	// interfaces are translated as abstract classes. it means that methods of interface may not contain qualifiers but be abstract
 	if (is_abstract)
 		l_tkn = l_tkn->prepend(" = 0");
+
+	if (is_inline)
+		f_tkn = f_tkn->prepend("inline ");
 
 	// explicit and implicit are C++ keywords. they are not translated by regular mechanism (via ptoc.cfg file) because  
 	// they are Delphi tokens defined in token.dpp file. Tokens from token.dpp file are not tranlated using ptoc.cfg file.
@@ -5486,13 +5530,13 @@ void proc_fwd_decl_node::translate(int)
 	{
 		auto qual = qualifiers;
 		while (qual->next) qual = qual->next; // look for the first qualifier because "qualifiers" refers to the last one
-		token::remove(qual->ident, t_semi2);
+		token::disable(qual->ident, t_semi2);
 	}
 }
 
-operator_fwd_decl_node::operator_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, token* t_semi) 
-	          : proc_fwd_decl_node(t_proc, t_ident, params, t_coln, ret_type, t_semi, nullptr, nullptr)
-	//: proc_decl_node(t_proc, t_ident, params, t_coln, ret_type)
+operator_fwd_decl_node::operator_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, 
+	       token* t_coln, tpd_node* ret_type, token* t_semi1, token_list* qualifiers, token* t_semi2)
+	          : proc_fwd_decl_node(t_proc, t_ident, params, t_coln, ret_type, t_semi1, qualifiers, t_semi2)
 {
 	//this->t_semi = t_semi;
 }
@@ -6789,8 +6833,13 @@ void object_tpd_node::attrib1(int)
 		token tok("tobject", TKN_IDENT, 0, 0, nm);
 		
 		super = b_ring::search_cur(&tok);
-
-		type = new object_tp(this);
+		if (super) {
+			auto otp = dynamic_cast<object_tp*>(super->type->get_typedef());
+			assert(otp);
+			type = new object_tp(this, otp);
+		} else {
+			type = new object_tp(this);
+		}
 	}
 }
 
@@ -6817,12 +6866,7 @@ void object_tpd_node::translate(int)
 	t_class->set_trans("class ");
 
 	if (t_ancestorlist) {
-		token_list* anc = t_ancestorlist;
-		//anc->ident->set_trans(anc->ident->in_text);
-		//anc = anc->next;
-		for (; anc != nullptr; anc = anc->next) {
-			//anc->prepend(", public ");
-			//super->translate(anc);
+		for (token_list* anc = t_ancestorlist; anc != nullptr; anc = anc->next) {
 			anc->ident->set_trans(dprintf("public %s", anc->ident->in_text));
 		}
 
@@ -6842,7 +6886,6 @@ void object_tpd_node::translate(int)
 	}
 	else {
 		// if t_end=NULL than it is forward class declaration
-
 		if (t_end) {
 			if (super) // all Delphi classes has parent TObject, if ancestor list is enpty it means that parent is TObject
 			{
@@ -6862,9 +6905,35 @@ void object_tpd_node::translate(int)
     }
 }
 
-base_obj_tpd_node::base_obj_tpd_node(tpd_type tp, token* t_record, decl_node* parts, token* t_end): tpd_node(tp)
+//TODO shall we have separate tpd_meta tag ?
+metaclass_tpd_node::metaclass_tpd_node(token* t_class, token* t_of, token* t_ident) : base_obj_tpd_node(tpd_metaclass, t_class, nullptr, t_of)
 {
-	CONS3(t_record, parts, t_end);
+	CONS1(t_ident);
+}
+
+void metaclass_tpd_node::attrib1(int)
+{
+	f_tkn = t_class;
+	l_tkn = t_ident;
+	type = new object_tp(this);
+}
+
+void metaclass_tpd_node::attrib2(int)
+{
+	// nothing to do
+}
+
+void metaclass_tpd_node::translate(int)
+{
+	t_class->disappear();
+	t_of->disappear();
+	t_ident->set_trans(dprintf("typeid(%s)", t_ident->out_text));
+}
+
+
+base_obj_tpd_node::base_obj_tpd_node(tpd_type tp, token* t_startof, decl_node* parts, token* t_end): tpd_node(tp)
+{
+	CONS3(t_startof, parts, t_end);
 }
 
 record_tpd_node::record_tpd_node(token* t_packed, token* t_record, decl_node* parts, token* t_end)
