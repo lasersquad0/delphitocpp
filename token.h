@@ -65,9 +65,9 @@ class token : public heap_object {
     
     static char* resolve_name_conflict(char* str);
 
+    token(token& t);
     token(int v_cat, int v_tag);
     token(char const* v_text, int v_tag = TKN_GEN, int v_line = 0, int v_pos = 0, nm_entry* nm = nullptr);
-    token(token& t);
 
     // insert token this before t (returns this)
     token* insert_b(token* t) { 

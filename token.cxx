@@ -77,7 +77,7 @@ token* token::prev_relevant() const
     return t;
 }
 
-void   token::remove(token* head, token* tail)
+void token::remove(token* head, token* tail)
 { 
     head->prev->next = tail->next; 
     tail->next->prev = head->prev; 
