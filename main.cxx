@@ -52,13 +52,24 @@
 * DONE - unit names now support dots '.' in their nmames (usefull for compiling Delphi system .pas files)
 * DONE - parser recognises UTF-8 BOM (three bytes EFBBBF)in the beginning of file and processes it correctly. 
 * DONE - implemented 'deprecated message' directive for consts and vars
+* DONE - if class does not have parent in its ancestor list then add TObject as parent explicitly: TMyClass = class end; ==> class TMyClass : public TObject {};
+* DONE - now functions like 'function fun1();' and 'function fun2;' are both parsed correctly as functions and as methods
+* 
 
+how to properly work with such stements?
+procedure DDelete;  overload; {comment1} virtual; {comment2}
+shall it be translated into this?
+virtual void DDelete();      {comment1}  {comment2}
+
+how to deal with this declarations
+* procedure DDelete(num: Cardinal; ss: string); overload; {$IFDEF CPU64} virtual; {$ENDIF}
+shall it be translated into this?    
+ virtual void DDelete(unsigned int num, string ss);      #ifdef CPU64            #endif
+* 
 деструктор почему то транслируется неверно в obj->Destroy() вместо delete obj;
 
 
 правильно парсить обьявление TMyMetaClass = class of TMyClass
-
-если у класса нету предка то добавлять наследование от TObject
 
 * finish implementation of 'strong type alias' 
 example: type CppLongInt = type LongInt;
@@ -97,11 +108,10 @@ end deprecated;
 * 
 * how to translate this: if Supports(Allocator, IMalloc) then ...
 * добавить проверку на правильность структуры guid (строки)
-* не понимает определение ф-ции с пустыми скобками (function Fun():Integer;), без скобок совсем - понимает
+
 * check if var1.var2.funcall() works properly
 * System.exit() - does not recognize System as namespace/unit
 * TArr = array of Integer - is not supported (dynamic arrays). Also requires changes in SetLength() and Length()
-* RECORDS cannot contain published and protected sections
 * 
 *////////////////////////////////////
 
