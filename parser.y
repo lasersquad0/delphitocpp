@@ -103,6 +103,7 @@ void zzerror(const char* text)
              INDEX
              INHERITED
              INITIALIZATION
+             INLINE 
              INTERFACE
              LABEL
 //             LOOPHOLE
@@ -330,8 +331,8 @@ void zzerror(const char* text)
 %type <n_tpd>   file_type
 
 %type <n_idx>   indices
-%type <n_idx>   conformant_indices
-%type <n_idx>   conformant_index
+//%type <n_idx>   conformant_indices
+//%type <n_idx>   conformant_index
 %type <n_idx>   index_spec
 
 %type <n_fldls> field_list
@@ -362,7 +363,7 @@ void zzerror(const char* text)
 %no-lines
 %define parse.trace
 
-%printer { auto obj = (object_tpd_node*)$$; fprintf (yyo, "%s", obj->t_class->in_text); } class_type
+%printer { auto obj = dynamic_cast<base_obj_tpd_node*>($$); assert(obj); fprintf(yyo, "%s", obj->t_startof->in_text); } class_type
 %printer { if($$) $$->print_debug(); } <tok> 
 %printer { $$->print_debug(); } <toks> 
 %printer { fprintf (yyo, "%s", $$? ((literal_node*)$$)->value_tkn->in_text: "NULL"); } constant 
@@ -913,10 +914,11 @@ proc_spec:
     | FUNCTION INDEX formal_params ':' type ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
 
-operator_fwd_decl: 
+operator_fwd_decl:     
        OPERATOR IDENT formal_params ':' type ';'
-        { $$ = new operator_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
-  
+        { $$ = new operator_fwd_decl_node($1, $2, $3, $4, $5, $6, NULL, NULL); } 
+    | OPERATOR IDENT formal_params ':' type ';' qualifiers ';' // here should be fun_qualifierS however we use qualifiers for simplicity.
+        { $$ = new operator_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
 
 property_decl: PROPERTY IDENT prop_array prop_type_def prop_index prop_read prop_write prop_stored prop_default ';' prop_default_directive
         { $$ = new property_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); } 
@@ -983,7 +985,7 @@ proc_def:
   //  | FUNCTION IDENT ';' FAR ';' block ';' 
   //             { $$ = new proc_def_node($1, NULL, NULL, $2, NULL, NULL, NULL, $3, $4, $5, $6, $7); } 
 
-fun_qualifier: FORWARD | OVERLOAD | REGISTER | PASCAL | CDECL | STDCALL | SAFECALL | WINAPI | VARARGS | EXTERNAL 
+fun_qualifier: FORWARD | OVERLOAD | REGISTER | PASCAL | CDECL | STDCALL | SAFECALL | WINAPI | VARARGS | EXTERNAL | INLINE 
 
 meth_qualifier: REINTRODUCE | ABSTRACT | VIRTUAL | DYNAMIC | STATIC | OVERRIDE | FINAL
 
@@ -994,6 +996,7 @@ qualifiers: qualifier { $$ = new token_list($1); }
          { $$ = new token_list($3, $1); }
 
 formal_params: { $$ = NULL; } 
+    | '(' ')' { $$ = new param_list_node($1, NULL, $2); }
     | '(' formal_param_list ')' { $$ = new param_list_node($1, $2, $3); }
 
 formal_param_list: formal_param 
@@ -1045,10 +1048,15 @@ array_type: packed ARRAY '[' indices ']' OF type
 const_array_type: packed ARRAY '[' indices ']' OF const_type 
         { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
 
-conformant_array_type: packed ARRAY '[' conformant_indices ']' OF simple_type 
-        { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
-    | packed ARRAY '[' conformant_indices ']' OF conformant_array_type 
-        { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
+// Delphi does not support arrays with bounds in parameters e.g. 'array [0..10] of Integer' - not supported
+// Also it does not support 'array of array...' in parameters
+// While Delphi supports open arrays in parameters - 'array of Cardinal' - works well
+conformant_array_type: packed ARRAY OF simple_type 
+        { $$ = new array_tpd_node($1, $2, NULL, NULL, NULL, $3, $4); }
+ //       packed ARRAY '[' conformant_indices ']' OF simple_type 
+ //       { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
+ //   | packed ARRAY '[' conformant_indices ']' OF conformant_array_type 
+ //       { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
 
 enum_type: '(' ident_list ')' { $$ = new enum_tpd_node($1, $2, $3); }
 
@@ -1135,7 +1143,7 @@ interface_type:
     | INTERFACE END
         { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, NULL, $2); }
 //  | INTERFACE
- //      { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL, NULL); }
+ //      { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, NULL, NULL); }
 
 interface_components: interface_component interface_components
         { 
@@ -1170,7 +1178,9 @@ class_type: class_or_object object_body END
         { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2); }
     | class_or_object
         { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
-
+    | CLASS OF IDENT 
+        { $$ = new metaclass_tpd_node($1, $2, $3); }
+	
 
 object_body: field_decl_list object_components
         { 
@@ -1248,11 +1258,11 @@ file_type: packed FIL OF type { $$ = new file_tpd_node($1, $2, $3, $4); }
 
 packed: { $$ = NULL; } | PACKED 
 
-conformant_indices: conformant_index
-    | conformant_index ';' conformant_indices { $1->next = $3; $$ = $1; }
+//conformant_indices: conformant_index
+//    | conformant_index ';' conformant_indices { $1->next = $3; $$ = $1; }
 
-conformant_index: IDENT DOTS IDENT ':' type 
-        { $$ = new conformant_index_node($1, $2, $3, $4, $5); }
+//conformant_index: IDENT DOTS IDENT ':' type 
+//        { $$ = new conformant_index_node($1, $2, $3, $4, $5); }
 
 indices: index_spec 
     | index_spec ',' indices 
