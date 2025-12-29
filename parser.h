@@ -131,62 +131,63 @@ extern int zzdebug;
     UNTIL = 332,                   /* UNTIL  */
     UNIT = 333,                    /* UNIT  */
     UNIT_END = 334,                /* UNIT_END  */
-    VAR = 335,                     /* VAR  */
-    VARARGS = 336,                 /* VARARGS  */
-    VIRTUAL = 337,                 /* VIRTUAL  */
-    WHILE = 338,                   /* WHILE  */
-    WINAPI = 339,                  /* WINAPI  */
-    WITH = 340,                    /* WITH  */
-    WRITE = 341,                   /* WRITE  */
-    SCOPE = 342,                   /* SCOPE  */
-    LET = 343,                     /* LET  */
-    LETADD = 344,                  /* LETADD  */
-    LETSUB = 345,                  /* LETSUB  */
-    LETDIV = 346,                  /* LETDIV  */
-    LETMUL = 347,                  /* LETMUL  */
-    LETAND = 348,                  /* LETAND  */
-    LETOR = 349,                   /* LETOR  */
-    LETSHL = 350,                  /* LETSHL  */
-    LETSHR = 351,                  /* LETSHR  */
-    EQ = 352,                      /* EQ  */
-    NE = 353,                      /* NE  */
-    LT = 354,                      /* LT  */
-    LE = 355,                      /* LE  */
-    GT = 356,                      /* GT  */
-    GE = 357,                      /* GE  */
-    IN = 358,                      /* IN  */
-    IS = 359,                      /* IS  */
-    PLUS = 360,                    /* PLUS  */
-    MINUS = 361,                   /* MINUS  */
-    OR = 362,                      /* OR  */
-    XOR = 363,                     /* XOR  */
-    BINOR = 364,                   /* BINOR  */
-    MOD = 365,                     /* MOD  */
-    DIV = 366,                     /* DIV  */
-    DIVR = 367,                    /* DIVR  */
-    MUL = 368,                     /* MUL  */
-    AND = 369,                     /* AND  */
-    SHR = 370,                     /* SHR  */
-    SHL = 371,                     /* SHL  */
-    BINAND = 372,                  /* BINAND  */
-    AS = 373,                      /* AS  */
-    UPLUS = 374,                   /* UPLUS  */
-    UMINUS = 375,                  /* UMINUS  */
-    NOT = 376,                     /* NOT  */
-    ADDRESS = 377,                 /* ADDRESS  */
-    BINNOT = 378,                  /* BINNOT  */
-    EQUAL = 379,                   /* EQUAL  */
-    NOTEQUAL = 380,                /* NOTEQUAL  */
-    LESSTH = 381,                  /* LESSTH  */
-    GREATERTH = 382,               /* GREATERTH  */
-    ADD = 383,                     /* ADD  */
-    SUBSTRACT = 384,               /* SUBSTRACT  */
-    MULTIPLY = 385,                /* MULTIPLY  */
-    DIVIDE = 386,                  /* DIVIDE  */
-    INTDIVIDE = 387,               /* INTDIVIDE  */
-    MODULUS = 388,                 /* MODULUS  */
-    IMPLICIT = 389,                /* IMPLICIT  */
-    EXPLICIT = 390                 /* EXPLICIT  */
+    UNSAFE = 335,                  /* UNSAFE  */
+    VAR = 336,                     /* VAR  */
+    VARARGS = 337,                 /* VARARGS  */
+    VIRTUAL = 338,                 /* VIRTUAL  */
+    WHILE = 339,                   /* WHILE  */
+    WINAPI = 340,                  /* WINAPI  */
+    WITH = 341,                    /* WITH  */
+    WRITE = 342,                   /* WRITE  */
+    SCOPE = 343,                   /* SCOPE  */
+    LET = 344,                     /* LET  */
+    LETADD = 345,                  /* LETADD  */
+    LETSUB = 346,                  /* LETSUB  */
+    LETDIV = 347,                  /* LETDIV  */
+    LETMUL = 348,                  /* LETMUL  */
+    LETAND = 349,                  /* LETAND  */
+    LETOR = 350,                   /* LETOR  */
+    LETSHL = 351,                  /* LETSHL  */
+    LETSHR = 352,                  /* LETSHR  */
+    EQ = 353,                      /* EQ  */
+    NE = 354,                      /* NE  */
+    LT = 355,                      /* LT  */
+    LE = 356,                      /* LE  */
+    GT = 357,                      /* GT  */
+    GE = 358,                      /* GE  */
+    IN = 359,                      /* IN  */
+    IS = 360,                      /* IS  */
+    PLUS = 361,                    /* PLUS  */
+    MINUS = 362,                   /* MINUS  */
+    OR = 363,                      /* OR  */
+    XOR = 364,                     /* XOR  */
+    BINOR = 365,                   /* BINOR  */
+    MOD = 366,                     /* MOD  */
+    DIV = 367,                     /* DIV  */
+    DIVR = 368,                    /* DIVR  */
+    MUL = 369,                     /* MUL  */
+    AND = 370,                     /* AND  */
+    SHR = 371,                     /* SHR  */
+    SHL = 372,                     /* SHL  */
+    BINAND = 373,                  /* BINAND  */
+    AS = 374,                      /* AS  */
+    UPLUS = 375,                   /* UPLUS  */
+    UMINUS = 376,                  /* UMINUS  */
+    NOT = 377,                     /* NOT  */
+    ADDRESS = 378,                 /* ADDRESS  */
+    BINNOT = 379,                  /* BINNOT  */
+    EQUAL = 380,                   /* EQUAL  */
+    NOTEQUAL = 381,                /* NOTEQUAL  */
+    LESSTH = 382,                  /* LESSTH  */
+    GREATERTH = 383,               /* GREATERTH  */
+    ADD = 384,                     /* ADD  */
+    SUBSTRACT = 385,               /* SUBSTRACT  */
+    MULTIPLY = 386,                /* MULTIPLY  */
+    DIVIDE = 387,                  /* DIVIDE  */
+    INTDIVIDE = 388,               /* INTDIVIDE  */
+    MODULUS = 389,                 /* MODULUS  */
+    IMPLICIT = 390,                /* IMPLICIT  */
+    EXPLICIT = 391                 /* EXPLICIT  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -208,8 +209,8 @@ union YYSTYPE
     expr_node            *n_expr; 
     expr_group_node      *n_grp; 
 
-    write_param_node     *n_wrtp; 
-    write_list_node      *n_wrls; 
+    //write_param_node     *n_wrtp; 
+    //write_list_node      *n_wrls; 
     case_node            *n_case; 
     set_item_node        *n_item; 
 
