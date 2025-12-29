@@ -54,7 +54,14 @@
 * DONE - implemented 'deprecated message' directive for consts and vars
 * DONE - if class does not have parent in its ancestor list then add TObject as parent explicitly: TMyClass = class end; ==> class TMyClass : public TObject {};
 * DONE - now functions like 'function fun1();' and 'function fun2;' are both parsed correctly as functions and as methods
-* 
+* DONE - improved work of $I and $Include directives
+
+implement processing of conditional compilation directives
+{$IF Defined(xxx) and Declared(YYY)}
+{$IF Version > 2.0}
+{$ELSEIF version=2}
+{$IFEND} => the same as {$ENDIF}
+
 
 how to properly work with such stements?
 procedure DDelete;  overload; {comment1} virtual; {comment2}
@@ -122,7 +129,7 @@ static void load_predefined()
 	// all simple built-in types need to be aded to b_ring here
 
     b_ring::add_cur(nm_entry::add("integer", TKN_IDENT), nm_entry::add("int", TKN_IDENT),     symbol::s_type, &integer_type);
-    b_ring::add_cur(nm_entry::add("real",    TKN_IDENT), nm_entry::add(" double ", TKN_IDENT),  symbol::s_type, &real_type);
+    b_ring::add_cur(nm_entry::add("real",    TKN_IDENT), nm_entry::add(" double ", TKN_IDENT),  symbol::s_type, &double_type);
     b_ring::add_cur(nm_entry::add("boolean", TKN_IDENT), nm_entry::add("bool", TKN_IDENT),    symbol::s_type, &bool_type);
     b_ring::add_cur(nm_entry::add("nil",     TKN_IDENT), nm_entry::add("nullptr", TKN_IDENT), symbol::s_const, &any_type);
 	b_ring::add_cur(nm_entry::add("zero_terminated_string", TKN_IDENT), nm_entry::add("char *", TKN_IDENT), symbol::s_type, &string_type);
@@ -156,7 +163,7 @@ static void load_predefined()
 		b_ring::add_cur(nm_entry::add("fixedint",  TKN_IDENT),  nm_entry::add(" int", TKN_IDENT),            symbol::s_type, &integer_type);
 		b_ring::add_cur(nm_entry::add("fixeduint", TKN_IDENT),  nm_entry::add("unsigned  int ", TKN_IDENT), symbol::s_type, &cardinal_type);
 
-		b_ring::add_cur(nm_entry::add("single",    TKN_IDENT),  nm_entry::add("float", TKN_IDENT),          symbol::s_type, &real_type);
+		b_ring::add_cur(nm_entry::add("single",    TKN_IDENT),  nm_entry::add("float", TKN_IDENT),          symbol::s_type, &single_type);
 		b_ring::add_cur(nm_entry::add("extended",  TKN_IDENT),  nm_entry::add("long double", TKN_IDENT),    symbol::s_type, &double_type);
 		b_ring::add_cur(nm_entry::add("currency",  TKN_IDENT),  nm_entry::add("double ", TKN_IDENT),        symbol::s_type, &double_type);
 		b_ring::add_cur(nm_entry::add("double",    TKN_IDENT),  nm_entry::add("double", TKN_IDENT),         symbol::s_type, &double_type);
