@@ -7,8 +7,8 @@
 
 class token;
 extern int   yylex();
-extern char  *yytext;
-extern int   yyleng;
+//extern char  *yytext;
+//extern int   yyleng;
 extern token *curr_token;  
 
 #define TAB_WIDTH 8
