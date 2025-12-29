@@ -260,7 +260,7 @@ class pcall_node : public stmt_node {
     virtual void translate(int ctx);
 };
 
-
+/*
 class read_node : public stmt_node { 
   public:
     token*           t_read; 
@@ -285,7 +285,7 @@ class write_node : public stmt_node {
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
-
+*/
 
 class compound_node : public stmt_node {
   public:
@@ -759,7 +759,7 @@ public:
     expr_node* right;
     expr_node* parent;
 
-    op_node(int tag, expr_node* left, token* op, expr_node* right = NULL);
+    op_node(int tag, expr_node* left, token* op, expr_node* right = nullptr);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -849,7 +849,7 @@ class record_constant_node : public expr_node {
     virtual void translate(int ctx);
 };
 
-
+/*
 class write_param_node : public expr_node { 
   public: 
     expr_node*      val;
@@ -878,6 +878,7 @@ class write_list_node : public node {
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
 };
+*/
 
 class inherited_node : public expr_node {
 public:
@@ -1044,7 +1045,7 @@ class type_def_node : public decl_node {
   public: 
     token*       t_ident; 
     token*       t_equal;
-    tpd_node*    tpd; 
+    tpd_node*    tpd;
     symbol*      sym;
   
     type_def_node(token* t_ident, token* t_equal, tpd_node* tpd); 
@@ -1089,8 +1090,8 @@ class var_decl_node : public decl_node {
     token*        scope;
     token*        t_eq;
     expr_node*    def_value;
-    token*        t_depr;
-    token*        t_mess;
+    token*        t_depr;  // deprecated
+    token*        t_mess;  // deprecated message
 
     var_decl_node(token_list* vars, token* coln, tpd_node* tpd, token* eq, expr_node* def_value, token* t_depr, token* t_mess);
 
@@ -1104,9 +1105,9 @@ class var_decl_node : public decl_node {
 //      for local and global variable definitions
 class var_decl_part_node : public decl_node { 
   public: 
-    token*           t_classvar;
-    token*           t_var; 
-    var_decl_node*   vars;
+    token*           t_classvar; // 'class' - marker that it is static field in class
+    token*           t_var;      // var, const or out
+    var_decl_node*   vars;       
     bool             is_const;
 
     var_decl_part_node(token* t_classvar, token* t_var, var_decl_node* vars);
@@ -1162,7 +1163,6 @@ public:
 //
 // Procedures and functions declarations and definition
 //
-
 
 class param_list_node : public node {
   public: 

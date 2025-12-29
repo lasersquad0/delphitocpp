@@ -373,14 +373,14 @@ void module_node::translate(int)
 block_node::block_node(asm_block_node* asm_body)
 {
 	CONS1(asm_body);
-	decls = NULL;
-	body = NULL;
+	decls = nullptr;
+	body = nullptr;
 }
 
 block_node::block_node(decl_node* decls, compound_node* body)
 {
     CONS2(decls, body);
-	asm_body = NULL;
+	asm_body = nullptr;
 }
 
 token* block_node::body_begin_tkn()
@@ -613,7 +613,7 @@ void pcall_node::translate(int)
     force_semicolon();
 }
 
-
+/*
 read_node::read_node(token* t_read, expr_group_node* params)
 {
     CONS2(t_read, params);
@@ -881,6 +881,7 @@ void write_node::translate(int)
     }
     force_semicolon();
 }
+*/
 
 compound_node::compound_node(token* t_begin,  stmt_node* body, token* t_end)
 {
@@ -1934,13 +1935,17 @@ void string_node::attrib(int)
     }
 }
 
+// checks if one parameter has read successfully
+#define sscanf_check_1(_res_) if((_res_) != 1) warning(value_tkn, "cannot parse string value.")
+
 void string_node::translate(int ctx)
 {
     char *s = value_tkn->out_text;
 
     f_tkn = l_tkn = value_tkn;
 
-	if (s[0] == '\'' && s[1] != '\'' && s[2] == '\'' && s[3] == '\0') {
+	if (s[0] == '\'' && s[1] != '\'' && s[2] == '\'' && s[3] == '\0') 
+	{
 		tag = tn_char;
 		value = (unsigned char)s[1];
 		if (s[1] == '\\') {
@@ -1948,23 +1953,24 @@ void string_node::translate(int ctx)
 			s[3] = '\'';
 			s[4] = '\0';
 		}
-	} else if (s[0] == '\'' && s[1] == '\'' && s[2] == '\''
-		&& s[3] == '\'' && s[4] == '\0')
+
+	} else if (s[0] == '\'' && s[1] == '\'' && s[2] == '\''	&& s[3] == '\'' && s[4] == '\0')
 	{
 		tag = tn_char;
 		value = '\'';
 		s[1] = '\\';
-	} else if (s[0] == '#' && strchr(s + 1, '#') == NULL
-		&& strchr(s + 1, '\'') == NULL)
+
+	} else if (s[0] == '#' && strchr(s + 1, '#') == NULL && strchr(s + 1, '\'') == NULL)
 	{
 		tag = tn_char;
 		if (s[1] == '$') {
-			sscanf(s + 2, "%llx\n", &value);
+			sscanf_check_1(sscanf(s + 2, "%llx\n", &value));
 			value_tkn->set_trans(dprintf("'\\x%llx'", value));
 		} else {
-			sscanf(s + 1, "%lld\n", &value);
-			value_tkn->set_trans(dprintf("'\\%llo'", value));
+			sscanf_check_1(sscanf(s + 1, "%lld\n", &value));
+			value_tkn->set_trans(dprintf("'\\%lld'", value));
 		}
+
 	} else {
 	if (!language_c && ctx == ctx_record) {
 	    char *buf = new char[strlen(s)*4];
@@ -2023,93 +2029,94 @@ void string_node::translate(int ctx)
 	    *d++ = '\0';
 	    value_tkn->set_trans(buf);
 	    return;
+
 	} else {
 	    char *buf = new char[strlen(s)*2 + 1];
 	    char ch, *d = buf;
 	    bool in_quotes = false;
 	    *d++ = '"';
-	    while((ch = *s++) != '\0') {
-		switch(ch) {
-		  case '\\':
-		    *d++ = '\\';
-		    *d++ = '\\';
-		    continue;
-		  case '"':
-		    *d++ = '\\';
-		    *d++= '"';
-		    continue;
-		  case '\'':
-		    if (in_quotes) {
-			if (*s == '\'') {
-			    *d++ = '\'';
-			}
-			in_quotes = false;
-		    } else {
-			in_quotes = true;
-		    }
-		    continue;
-		  case '?':
-		    if (s[-1] == '?' &&
-			(s[1] == '=' || s[1] == '/' ||
-			 (s[1] == '\'' && s[2] == '\'') ||
-			 s[1] == '(' || s[1] == ')' || s[1] == '!' ||
-			 s[1] == '-' || s[1] == '<' || s[1] == '>'))
-		    {
-			*d++ = '\\';
-                    }
-		    *d++ = ch;
-		    continue;
-		  case '#':
-		    if (!in_quotes) {
-			int code = 0;
-			if (*s == '$') {
-			    *d++ = '\\';
-			    *d++ = 'x';
-			    while (ch = *++s, isxdigit((unsigned char)ch)) {
+		while ((ch = *s++) != '\0') {
+			switch (ch) {
+			case '\\':
+				*d++ = '\\';
+				*d++ = '\\';
+				continue;
+			case '"':
+				*d++ = '\\';
+				*d++ = '"';
+				continue;
+			case '\'':
+				if (in_quotes) {
+					if (*s == '\'') {
+						*d++ = '\'';
+					}
+					in_quotes = false;
+				} else {
+					in_quotes = true;
+				}
+				continue;
+			case '?':
+				if (s[-1] == '?' && (s[1] == '=' || s[1] == '/' ||
+					(s[1] == '\'' && s[2] == '\'') ||
+					s[1] == '(' || s[1] == ')' || s[1] == '!' ||
+					s[1] == '-' || s[1] == '<' || s[1] == '>'))
+				{
+					*d++ = '\\';
+				}
 				*d++ = ch;
-			    }
-			    continue;
-			} else {
-			    while ((ch = *s++) >= '0' && ch <= '9') {
-				code = code*10 + ch - '0';
-			    }
-			    s -= 1;
+				continue;
+			case '#':
+				if (!in_quotes) {
+					int code = 0;
+					if (*s == '$') {
+						*d++ = '\\';
+						*d++ = 'x';
+						while (ch = *++s, isxdigit((unsigned char)ch)) {
+							*d++ = ch;
+						}
+						continue;
+					} else {
+						while ((ch = *s++) >= '0' && ch <= '9') {
+							code = code * 10 + ch - '0';
+						}
+						s -= 1;
+					}
+
+					switch (code) {
+					case '\n':
+						*d++ = '\\';
+						*d++ = 'n';
+						break;
+					case '\t':
+						*d++ = '\\';
+						*d++ = 't';  //'n'
+						break;
+					case '\r':
+						*d++ = '\\';
+						*d++ = 'r';
+						break;
+					case '\f':
+						*d++ = '\\';
+						*d++ = 'f';
+						break;
+					case '\b':
+						*d++ = '\\';
+						*d++ = 'b';
+						break;
+					case '\v':
+						*d++ = '\\';
+						*d++ = 'v';
+						break;
+					default:
+						*d++ = '\\';
+						d += sprintf(d, "%o", code); //TODO shall we have "%d" here instead of "%o" ?
+					}
+					continue;
+				} //if (!in_quotes)
+				[[fallthrough]];
+			default: *d++ = ch;
 			}
-			switch (code) {
-			  case '\n':
-			    *d++ = '\\';
-			    *d++ = 'n';
-			    break;
-			  case '\t':
-			    *d++ = '\\';
-			    *d++ = 'n';
-			    break;
-			  case '\r':
-			    *d++ = '\\';
-			    *d++ = 'r';
-			    break;
-			  case '\f':
-			    *d++ = '\\';
-			    *d++ = 'f';
-			    break;
-			  case '\b':
-			    *d++ = '\\';
-			    *d++ = 'b';
-			    break;
-			  case '\v':
-			    *d++ = '\\';
-			    *d++ = 'v';
-			    break;
-			  default:
-			    *d++ = '\\';
-			    d += sprintf(d, "%o", code);
-			}
-			continue;
-		    }
-		  default:
-		    *d++ = ch;
 		}
-	    }
 	    *d++ = '"';
 	    *d++ = '\0';
 	    value_tkn->set_trans(buf);
@@ -2670,7 +2677,7 @@ void op_node::attrib(int)
     } else if (left && right && left->type && right->type &&
 		      (left->type->tag == tp_real || right->type->tag == tp_real))
 	{
-		type = &real_type;
+		type = &single_type;
 	}
 	else if (left && right && left->type && right->type &&
 	        (right->type->tag == tp_string || right->type->tag == tp_char))
@@ -3977,7 +3984,7 @@ void expr_group_node::translate(int)
     }
 }
 
-
+/*
 write_list_node::write_list_node(token* lpar, write_param_node* vals, token* rpar)
 {
     CONS3(lpar, vals, rpar);
@@ -3990,7 +3997,6 @@ void write_list_node::attrib(int)
         prm->attrib(ctx_value);
     }
 }
-
 
 void write_list_node::translate(int)
 {
@@ -4176,7 +4182,7 @@ void write_param_node::translate(int ctx)
 		}
 	}
 }
-
+*/
 
 //
 // Declaration
@@ -4713,8 +4719,7 @@ void var_decl_node::attrib(int ctx)
 				}
 			}
 		} // C++
-		else if (ctx == ctx_varpar && tp->tag != tp_array
-			&& tp->tag != tp_string && curr_proc->is_extern_c)
+		else if (ctx == ctx_varpar && tp->tag != tp_array && tp->tag != tp_string && curr_proc->is_extern_c)
 		{
 			prm_class = symbol::s_ref;
 		}
@@ -4741,7 +4746,7 @@ static token* var_decl_coln; // align formal parameters of procedures
 void var_decl_node::translate(int ctx)
 {
     tpexpr* tp;
-    if (tpd != NULL) {
+    if (tpd) {
 		tpd->translate(ctx);
 		tp = tpd->type;
     } else {
@@ -4753,13 +4758,12 @@ void var_decl_node::translate(int ctx)
     f_tkn = vars->ident;
     l_tkn = t_mess ? t_mess : t_depr ? t_depr: def_value ? def_value->l_tkn: t_coln ? t_coln : f_tkn; //TODO shall we use tpd->l_tkn instead of t_coln here?
 
-    if (t_coln != NULL) {
+    if (t_coln) {
 		token::disable(t_coln->prev_relevant()->next, tpd->f_tkn->prev); // disables two tokens: ":" and "PascalType" in variable decl
     }
 
 	if (ctx == ctx_valpar || ctx == ctx_varpar || ctx == ctx_constpar) {  // working with fun/method parameters here
-		assert(!t_depr); //no deprecated in parameters
-		assert(!t_mess);
+		assert(!t_depr); assert(!t_mess); //no deprecated in parameters
 		if (language_c && tp->tag == tp_dynarray) {
 			token* t = vars->ident->prev;
 			((array_tp*)tp->get_typedef())->insert_bound_params(vars->ident);
@@ -4767,11 +4771,11 @@ void var_decl_node::translate(int ctx)
 				t->next->set_bind(var_decl_coln);
 			}
 		}
-		for (token_list* tkn = vars; tkn != NULL; tkn = tkn->next) {
+		for (token_list* tkn = vars; tkn != nullptr; tkn = tkn->next) {
 			token* t;
 			tkn->var->translate(tkn->ident);
 			if (language_c) {
-				if (tpd != NULL) {
+				if (tpd) {
 					if (tpd->tag == tpd_node::tpd_array) {
 						tpd_node* eltd = ((array_tpd_node*)tpd)->eltd;
 						t = tkn->ident->copy(eltd->f_tkn, eltd->l_tkn);
@@ -4790,8 +4794,10 @@ void var_decl_node::translate(int ctx)
 					t = tkn->ident->prepend("void* ");
 				}
 			} else { // C++
-				if (tpd == NULL) {
+				if (tpd == nullptr) {
 					t = tkn->ident->prepend("void* ");
+					if (ctx == ctx_constpar)
+						t->prepend("const ");  // parameters are with const modificator
 				} else {
 					char* modifier = " ";
 					if (ctx == ctx_varpar) {
@@ -4934,9 +4940,13 @@ var_decl_part_node::var_decl_part_node(token* t_classvar, token* t_var, var_decl
 //      for local and global variable definitions
 void var_decl_part_node::attrib(int ctx)
 {
-	is_const = (t_var) && (strcmp(t_var->in_text, "const") == 0);
+	//is_const = (t_var) && (strcmp(t_var->in_text, "const") == 0);
+	is_const = (t_var) && (t_var->tag == TKN_CONST);
 
-    for (decl_node* var = vars; var != NULL; var = var->next) {
+	// ctx_valpar means that we processing formal parameters of proc/fun declaration
+	// ctx_module - for global variable declarations 
+	// ctx_block - for local variable declarations (inside procs/functions)
+    for (decl_node* var = vars; var != nullptr; var = var->next) {
         var->attrib(ctx == ctx_valpar ? (is_const? ctx_constpar: (int)ctx_varpar) : ctx);
     }
 }
@@ -4945,7 +4955,7 @@ void var_decl_part_node::translate(int ctx)
 {
     f_tkn = l_tkn = t_var;
 
-    for (decl_node* var = vars; var != NULL; var = var->next) 
+    for (decl_node* var = vars; var != nullptr; var = var->next) 
 	{
 		if (t_classvar) var->attr |= decl_flags::is_static; // raise up is_static flag for variable
 		var->translate(ctx == ctx_valpar ? (is_const ? ctx_constpar : (int)ctx_varpar) : ctx);
@@ -4961,8 +4971,7 @@ void var_decl_part_node::translate(int ctx)
 
     //    token::disable(t_var, t_var->next_relevant()->prev);
 	if (ctx == ctx_module || ctx == ctx_program) {
-		(new token((char*)0, TKN_BEG_SHIFT, f_tkn->line,
-			f_tkn->next_relevant()->pos))->insert_b(f_tkn);
+		(new token((char*)0, TKN_BEG_SHIFT, f_tkn->line, f_tkn->next_relevant()->pos))->insert_b(f_tkn);
 		(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
 		if (unit_node::interface_part) {
 			f_tkn = f_tkn->prepend(dprintf("\n#ifdef __%s_implementation__\n"
@@ -5105,7 +5114,7 @@ param_list_node::param_list_node(token* lpar, decl_node* params, token* rpar)
 
 void param_list_node::attrib(int)
 {
-    for (decl_node* dcl = params; dcl != NULL; dcl = dcl->next) {
+    for (decl_node* dcl = params; dcl != nullptr; dcl = dcl->next) {
         dcl->attrib(ctx_valpar);
     }
 }
@@ -5115,13 +5124,13 @@ void param_list_node::translate(int)
     f_tkn = lpar;
     l_tkn = rpar;
 
-    for (decl_node* dcl = params; dcl != NULL; dcl = dcl->next) {
+    for (decl_node* dcl = params; dcl != nullptr; dcl = dcl->next) {
         dcl->translate(ctx_valpar);
-	if (var_decl_coln == NULL) {
+	if (var_decl_coln == nullptr) {
 	    var_decl_coln = dcl->f_tkn->prev->next_relevant();
         }
     }
-    var_decl_coln = NULL;
+    var_decl_coln = nullptr;
 }
 
 
@@ -5130,8 +5139,8 @@ void param_list_node::translate(int)
 proc_decl_node::proc_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type)
 {
     CONS5(t_proc, t_ident, params, t_coln, ret_type);
-	var = NULL;
-	type = NULL;
+	var = nullptr;
+	type = nullptr;
 }
 
 void proc_decl_node::attrib(int ctx)
@@ -5315,7 +5324,6 @@ proc_fwd_decl_node::proc_fwd_decl_node(token* t_proc, token* t_ident, param_list
 	is_static = false;
 	is_virtual = false;
 	is_override = false;
-	//is_overload = false;
 	is_stdcall = false;
 	is_pascal = false;
 	is_cdecl = false;
@@ -5498,8 +5506,11 @@ void proc_fwd_decl_node::translate(int)
 	if (is_stdcall)
 		f_tkn->append(" __stdcall");
 
+	// <windows.h> supports the PASCAL macro, which translates obsolete PASCAL calling convention to __stdcall. 
+	// Leaving PASCAL here for backward compatibility
+	//TODO shall we add option to translate 'pascal' Delphi directive directly into __stdcall C++ convention?
 	if (is_pascal)
-		f_tkn->append(" __pascal");
+		f_tkn->append(" PASCAL");
 
 	if (is_cdecl)
 		f_tkn->append(" __cdecl");
@@ -5632,9 +5643,20 @@ void operator_fwd_decl_node::translate(int ctx)
 		char* var_name = nullptr;
 
 		// take second parameter name and type
+		// in this section all operators have two parameters
+		// if list of parameters starts with const, var or out then params->params has var_decl_part_node* type
+		// otherwise it has var_decl_node* type
+		assert(params->params);
 		auto vdn = dynamic_cast<var_decl_node*>(params->params);
+		if (vdn == nullptr) {
+			auto vdpn = dynamic_cast<var_decl_part_node*>(params->params);
+			assert(vdpn);
+			vdn = vdpn->vars;
+		}
+
 		if (vdn->next)
 		{
+			// case when parameters defined as (a: TMyRec; b: TMyRec)
 			vdn = dynamic_cast<var_decl_node*>(vdn->next);
 			l_tkn = l_tkn->append(vdn->vars->var->type->name);
 			l_tkn = l_tkn->append(" ");
@@ -5643,6 +5665,7 @@ void operator_fwd_decl_node::translate(int ctx)
 		}
 		else
 		{
+			// case when parameters defined as (a, b: TMyRec)
 			assert(vdn->vars->next);
 			l_tkn = l_tkn->append(vdn->vars->next->var->type->name);
 			l_tkn = l_tkn->append(" ");
@@ -5741,8 +5764,8 @@ void proc_def_node::attrib(int ctx)
 				type = new proc_tp(ret_type ? ret_type->type : nullptr);
 		}
 	} else { // procedure-function  (not a method)
-		if (ret_type)
-			ret_type->attrib(ctx); 
+		if (ret_type) ret_type->attrib(ctx); 
+
 		type = new proc_tp(ret_type ? ret_type->type : nullptr);
 
 		if ((var = b_ring::search_cur(t_ident)) == NULL || var->type == NULL
