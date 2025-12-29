@@ -9,8 +9,8 @@ tpexpr void_type(tp_void, NULL, "void");
 tpexpr any_type(tp_any, NULL, "unknown_type");
 tpexpr integer_type(tp_integer, NULL, "int ");
 tpexpr long_type(tp_long, NULL, "long"); // 32bit on Windows and 64bits on Linux
-tpexpr real_type(tp_real, NULL, "single"); // this is actually 4 bytes delphi single type
-tpexpr double_type(tp_double, NULL, "double"); // this is 8 bytes double type
+tpexpr single_type(tp_real, NULL, "single"); // this is actually 4 bytes Delphi Single type
+tpexpr double_type(tp_double, NULL, "double"); // this is 8 bytes Delphi Double or Real type
 tpexpr char_type(tp_char, NULL, "char");
 tpexpr bool_type(tp_bool, NULL, "bool ");
 ref_tp pointer_type(&void_type); 

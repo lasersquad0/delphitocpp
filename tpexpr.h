@@ -298,7 +298,7 @@ class proc_tp : public tpexpr, public b_ring {
 };
 
 extern tpexpr    integer_type;
-extern tpexpr    real_type;
+extern tpexpr    single_type;
 extern tpexpr    double_type;
 extern tpexpr    long_type;
 extern tpexpr    char_type;
