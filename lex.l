@@ -14,7 +14,7 @@
 #define yywrap() 1
 #define YY_SKIP_YYWRAP 1
 
-#define YY_NO_UNPUT 1
+//#define YY_NO_UNPUT 1
 
 // Some static data definition
 
@@ -32,7 +32,6 @@ struct scan_state {
 };
 
 #define MAX_INCLUDE_DEPTH 256   // Include stack depth
-//#define MAX_ID_LENGTH     256
 
 class scan_ctx {
   protected:
@@ -49,7 +48,7 @@ class scan_ctx {
 };
 
 static scan_ctx scanner;
-static int type_or_var_context;
+//static bool type_or_var_context; // this 'mode' is for recognising special control symbols like ^J ^I ^@ ^[ ^\ and so on
 
 
 void scanner_input(char *file)
@@ -57,15 +56,16 @@ void scanner_input(char *file)
     FILE* f = fopen (file, "r");
 
     if (f == NULL) {
-	error("can't open input source file: %s", file);
+	    error("can't open input source file: %s", file);
     }
     scanner.attach(file, f);
 }
 
 
 // Hints for macro functionality (inherited from rtl2c)
-static nm_entry *nm = NULL;	       // Token name
-static char *text   = NULL;        // Token text if != NULL
+static nm_entry *nm = NULL;	      // Token name
+static char *text   = NULL;       // Token text if != NULL
+static char *yytext_copy = NULL;  // used when unput() brokes yytext
 
 static int include_level;
 
@@ -74,10 +74,7 @@ class use_ctx {
     char* fname;
     use_ctx* next;
 
-    use_ctx(char* name, use_ctx* chain) {
-	fname = name;
-	next = chain;
-    }
+    use_ctx(char* name, use_ctx* chain) { fname = name; next = chain; }
 };
 
 static use_ctx* use_chain;
@@ -85,16 +82,21 @@ static use_ctx* use_chain;
 #undef  ECHO
 #define ECHO
 
+
 // Token generator function
 
 static int tkn(int tag) {
-   curr_token = new token(text ? text : mystrdup(yytext), tag, line, pos, nm);
+   curr_token = new token(text ? text : mystrdup(yytext_ptr), tag, line, pos, nm);
    nm = NULL; text = NULL;
-   for (char *c = yytext; *c != 0; c++) {
+  
+   yytext_copy = yytext_copy ? yytext_copy : yytext;
+   for (char *c = yytext_copy; *c != 0; c++) {
        if (*c == '\n') { line++; pos = 0; }
        else if (*c == '\t') { pos += TAB_WIDTH - (pos % TAB_WIDTH); }
        else pos++;
    }
+   yytext_copy = NULL;
+
    curr_token->fname = file_name;
    if (include_level > 0) {
        curr_token->attr |= token::from_include_file;
@@ -107,15 +109,25 @@ static int tkn(int tag) {
 // Include file name processing
 
 static char *include_name (char *src) {
-    char *t;
-    char *name = new char[strlen(src)+8];
+    //char *t;
+    char *name = new char[strlen(src) + 8];
     char *dst = name;
-    if (strchr(src, '\n') != NULL) {
+
+    if (strchr(src, '\n') != NULL) { //TODO what is two ro three \n in this string?
         line += 1;
         pos = 0;
+ 
+ }
+
+    while (*src == ' ' || *src == '\t') src++;   // Skip leading spaces and tabs
+    bool in_quotes = false;
+    if(*src == '\'')
+    {
+        in_quotes = true;
+        src++;
     }
-    while (*src == '\'' || isspace(*src)) src++;        // Skip leading '[ ]
-    if ((t = strchr (src, '[')) != NULL) {
+    //while (*src == '\'' || isspace(*src)) src++;   // Skip leading '[ ]
+/*    if ((t = strchr (src, '[')) != NULL) {
 #if 0
         int gid, uid, n;
         if (sscanf(t, "[%d,%d]%n", &gid, &uid, &n) == 2) {
@@ -129,19 +141,28 @@ static char *include_name (char *src) {
 	        src = t+1;
             }
         }
-    }
+    }*/
     bool suffix = false;
-    while(*src && !isspace(*src) && *src != ';' && *src != '\'' && *src!='\n' && *src != '}')
-    {
-        if (*src == '.') suffix = true;
-	    *dst++ = (char)tolower(*(unsigned char*)src++);
-    }
+    if(in_quotes)
+        while(*src && *src != '\'' && *src!='\n' && *src != '}')
+        {
+            if (*src == '.') suffix = true;
+	        *dst++ = (char)tolower(*(unsigned char*)src++);
+        }
+    else
+        while(*src && !isspace(*src) && *src != ';' /*&& *src != '\''*/ && *src!='\n' && *src != '}')
+        {
+            if (*src == '.') suffix = true;
+	        *dst++ = (char)tolower(*(unsigned char*)src++);
+        }
+
     *dst = 0;
     if (!suffix) strcpy(dst, ".pas");
 
     if (scanner.find(name)) {
-	error(line, pos, file_name, "file %s already included !\n", name);
+	    error(line, pos, file_name, "file %s already included !\n", name);
     }
+
     return name;
 }
 
@@ -190,87 +211,133 @@ static int process_comments() {
     pos += strlen(yytext);
 
     if (nested_comments) {
-	while((c = yyinput_file()) != EOF) {
-	    if (c == '/' && pc == '*') c = ' ';
-	    if (p == cmt_buf + cmt_buf_len) {
-		cmt_buf = (char*)realloc(cmt_buf, 2*cmt_buf_len);
-		p = cmt_buf + cmt_buf_len;
-		cmt_buf_len *= 2;
-	    }
-	    if ((cmt_start == '{' && c == '}') ||
-		(cmt_start == '(' && c == ')' && pc == '*'))
+	    while((c = yyinput_file()) != EOF) {
+	        if (c == '/' && pc == '*') c = ' ';
+	    
+            if (p == cmt_buf + cmt_buf_len) {
+		        cmt_buf = (char*)realloc(cmt_buf, 2*cmt_buf_len);
+		        p = cmt_buf + cmt_buf_len;
+		        cmt_buf_len *= 2;
+	        }
+
+	        if ((cmt_start == '{' && c == '}') || (cmt_start == '(' && c == ')' && pc == '*'))
             {
-		size_t len = p - cmt_buf;
-		char* cmt_text = new char[len + 3];
-		memcpy(cmt_text, cmt_buf, len);
-		if (pc != '*') cmt_text[len++] = '*';
-		cmt_text[len++] = '/';
-		cmt_text[len] = '\0';
+		        size_t len = p - cmt_buf;
+		        char* cmt_text = new char[len + 3];
+		        memcpy(cmt_text, cmt_buf, len);
+		        if (pc != '*') cmt_text[len++] = '*';
+		        cmt_text[len++] = '/';
+		        cmt_text[len] = '\0';
                 if (turbo_pascal && cmt_text[2] == '$') {
-                   *p = '\0';
-                   if (strincmp(cmt_text+3, "IFDEF", 5) == 0) {
-                      sprintf(cmt_text, "#ifdef %s", cmt_buf+9);
-                   } else if (strincmp(cmt_text+3, "ELSE", 4) == 0) {
-                      sprintf(cmt_text, "#else");
-                   } else if (strincmp(cmt_text+3, "ENDIF", 5) == 0) {
-                      sprintf(cmt_text, "#endif");
-                   } else if (strincmp(cmt_text+3, "IFNDEF", 6) == 0) {
-                      sprintf(cmt_text, "#ifndef %s", cmt_buf+10);
-                   } else if (strincmp(cmt_text+3, "DEFINE", 6) == 0) {
-                      sprintf(cmt_text, "#define %s", cmt_buf+10);
-                   } else if (strincmp(cmt_text+3, "IFOPT", 5) == 0) {
-		      int value = 1;
-                      char* p = strchr(cmt_text+8, '+');
-		      if (p != NULL) *p = '\0';
-		      else if ((p = strchr(cmt_text+8, '-')) != NULL) {
-			value = 0;
-			*p = '\0';
-		      }
-		      for (p = cmt_buf+8; *p == ' '; p++);
-                      sprintf(cmt_text, "#if OPTION_%s == %d",
-			      p, value);
-                   }
+                    *p = '\0';
+                    if (strincmp(cmt_text + 3, "IFDEF", 5) == 0) {
+                        sprintf(cmt_text, "#ifdef %s", cmt_buf + 9);
+                    } else if (strincmp(cmt_text + 3, "IF ", 3) == 0) {
+                        sprintf(cmt_text, "#if %s", cmt_buf+5);
+                    } else if (strincmp(cmt_text + 3, "ELSE ", 5) == 0) {
+                        sprintf(cmt_text, "#else%s", cmt_buf + 8);
+                    } else if (strincmp(cmt_text + 3, "ELSEIF", 6) == 0) {
+                        sprintf(cmt_text, "#elif%s", cmt_buf + 9);
+                    } else if (strincmp(cmt_text + 3, "ENDIF", 5) == 0) {
+                        sprintf(cmt_text, "#endif%s", cmt_buf + 8);
+                    } else if (strincmp(cmt_text + 3, "IFEND", 5) == 0) {
+                        sprintf(cmt_text, "#endif%s", cmt_buf + 8);
+                    } else if (strincmp(cmt_text + 3, "IFNDEF", 6) == 0) {
+                        sprintf(cmt_text, "#ifndef %s", cmt_buf + 10);
+                    } else if (strincmp(cmt_text + 3, "DEFINE", 6) == 0) {
+                        sprintf(cmt_text, "#define %s", cmt_buf+10);
+                    } else if (strincmp(cmt_text + 3, "IFOPT", 5) == 0) {
+		                int value = 1;
+                        char* p = strchr(cmt_text+8, '+');
+		                if (p != NULL) *p = '\0';
+		                else if ((p = strchr(cmt_text+8, '-')) != NULL) {
+			                value = 0;
+			                *p = '\0';
+		                }
+		                for (p = cmt_buf+8; *p == ' '; p++);
+                        sprintf(cmt_text, "#if OPTION_%s == %d", p, value);
+                    }
                 }
-		curr_token->in_text = curr_token->out_text = cmt_text;
-		return 1;
-	    }
-	    *p++ = pc = c;
-	}
+
+		        curr_token->in_text = curr_token->out_text = cmt_text;
+		        return 1;
+	        }
+	        *p++ = (char)(pc = c);
+	    } // while
+
     } else {
-	while((c = yyinput_file()) != EOF) {
-	    if (c == '/' && pc == '*') c = ' ';
-	    if (p == cmt_buf + cmt_buf_len) {
-		cmt_buf = (char*)realloc(cmt_buf, 2*cmt_buf_len);
-		p = cmt_buf + cmt_buf_len;
-		cmt_buf_len *= 2;
+	    while((c = yyinput_file()) != EOF) {
+	        if (c == '/' && pc == '*') c = ' ';
+
+	        if (p == cmt_buf + cmt_buf_len) {
+		        cmt_buf = (char*)realloc(cmt_buf, 2*cmt_buf_len);
+		        p = cmt_buf + cmt_buf_len;
+		        cmt_buf_len *= 2;
+	        }
+	        
+            if (c == '}' || (c == ')' && pc == '*')) {
+		        size_t len = p - cmt_buf;
+		        char* cmt_text = new char[len + 3];
+		        memcpy(cmt_text, cmt_buf, len);
+		        if (pc != '*') cmt_text[len++] = '*';
+		        cmt_text[len++] = '/';
+		        cmt_text[len] = '\0';
+		        curr_token->in_text = curr_token->out_text = cmt_text;
+		        return 1;
+	        }
+	        *p++ = (char)(pc = c);
 	    }
-	    if (c == '}' || (c == ')' && pc == '*')) {
-		size_t len = p - cmt_buf;
-		char* cmt_text = new char[len + 3];
-		memcpy(cmt_text, cmt_buf, len);
-		if (pc != '*') cmt_text[len++] = '*';
-		cmt_text[len++] = '/';
-		cmt_text[len] = '\0';
-		curr_token->in_text = curr_token->out_text = cmt_text;
-		return 1;
-	    }
-	    *p++ = pc = c;
-	}
     }
+
     error(line, pos, file_name, "EOF in comment !\n");
     return -1;
 }
 
+// process include directive {$I filename.ext} and {$INCLUDE 'file name.ext' }
+static int process_include(int start) 
+{  
+    char *fname = include_name(yytext + start);
+    char *xname = NULL;
+    FILE *in = NULL;
+    char *try_dir, *next_dir;
+    int dir_length;
+
+    for (try_dir = i_path; try_dir != NULL; try_dir = next_dir) {
+	    if ((next_dir = strchr (try_dir, path_sep)) != NULL ) {
+	        dir_length = (int)(next_dir - try_dir);
+	        next_dir++;
+	    } else {
+	        dir_length = strlen(try_dir);
+	    }
+
+	    xname = dprintf ("%.*s" FILE_SEP "%s", dir_length, try_dir, fname);
+	    
+        if ((in = fopen(xname, "r")) != NULL) {
+	        include_level += 1;
+	        scanner.push();
+	        scanner.attach(xname, in);
+	        curr_token = new token(xname, TKN_PUSH_FILE);
+	        curr_token->out_text = fname;
+	        return 1;
+	    }
+    }
+
+    warning(line, pos, file_name, "can't include file '%s'", fname);
+    curr_token = new token(dprintf("/*#include \"%s\"*/", fname), TKN_CMNT, line, pos);
+    return 1;
+}
+
+
 %}
 
 ID           [_\$A-Z][_\$A-Z0-9]*
-UNITNAME     [_a-zA-Z][_a-z0-9A-Z\.]* 
+
 DIGIT        [0-9]
 DIGIT_       [0-9_]
 BINDIGIT     [0-1]
 OCTDIGIT     [0-7]
 HEXDIGIT     [0-9A-F]
-HEXDIGIT_     [0-9A-F_]
+HEXDIGIT_    [0-9A-F_]
 SIGN         [+-]?
 EXPONENT     E{SIGN}{DIGIT}+
 
@@ -279,6 +346,8 @@ REAL         {DIGIT}+\.{DIGIT}+{EXPONENT}?|{DIGIT}+{EXPONENT}
 ROOT         {DIGIT}\#|{DIGIT}{DIGIT}\#
 
 INTEGER      {DIGIT}{DIGIT_}*|\${HEXDIGIT}{HEXDIGIT_}*|{ROOT}{HEXDIGIT}{HEXDIGIT_}*|{BINDIGIT}+B|0x{HEXDIGIT}+|0X{HEXDIGIT}+|{DIGIT}{HEXDIGIT}*H|{DIGIT}{HEXDIGIT}*h|%{BINDIGIT}+
+
+CTRLCODE     \^[0-9A-Z_\\\[\]\?@^][^0-9A-Z_\\\[\]\?@]
 
 /* 
  the "incl" state is used for picking up the name of an include file 
@@ -302,7 +371,7 @@ unit     {
 	 char *src = yytext, *dst = lc_buf;
 	         
 	 do {
-	    *dst++ = tolower(*(unsigned char*)src);
+	    *dst++ = (char)tolower(*(unsigned char*)src);
 	 } while (*src++);
 
 	 nm = nm_entry::add(lc_buf, TKN_UNIT); // important to initialize nm before tkn()
@@ -319,7 +388,7 @@ unit     {
 	 char *src = yytext, *dst = lc_buf;
 	         
 	 do {
-	    *dst++ = tolower(*(unsigned char*)src);
+	    *dst++ = (char)tolower(*(unsigned char*)src);
 	 } while (*src++);
 
 	nm = nm_entry::add(lc_buf, TKN_IDENT); // important to initialize nm before tkn()
@@ -356,7 +425,7 @@ unit     {
 <use>[_a-z0-9A-Z\.]+ { // file name can contain dot ('.') in its name
                        /* got the include file name */
     char *fname = dprintf("%s.pas", yytext);
-    for (char* p = fname; *p != '\0'; p++) *p = tolower(*p);
+    for (char* p = fname; *p != '\0'; p++) *p = (char)tolower(*p);
 
     use_ctx* up;
     for (up = use_chain; // check whether we processed this this earlier
@@ -371,7 +440,7 @@ unit     {
 
 	    for (try_dir = i_path; try_dir != NULL; try_dir = next_dir) {
 	        if ((next_dir = strchr (try_dir, path_sep)) != NULL ) {
-		        dir_length = next_dir - try_dir;
+		        dir_length = (int)(next_dir - try_dir);
 		        next_dir++;
 	        } else {
 		        dir_length = strlen(try_dir);
@@ -409,17 +478,14 @@ unit     {
 }
 
 
-
-
 <incl>[ \t\n]* {  /* eat the whitespace */
     char* p = yytext;
     while(*p != '\0') {
 	if (*p++ == '\n') line += 1;
     }
 }
-<incl>[^\;\n]+\;* {
-                  /* got the include file name */
-    BEGIN(INITIAL);     // To leave include state
+<incl>[^\;\n]+\;* {   /* got the include file name */
+    BEGIN(INITIAL);   // To leave include state
 
     char *fname = include_name(yytext);
     char *xname;
@@ -429,10 +495,10 @@ unit     {
 
     for (try_dir = i_path; try_dir != NULL; try_dir = next_dir) {
 	if ((next_dir = strchr (try_dir, path_sep)) != NULL ) {
-	    dir_length = next_dir - try_dir;
+	    dir_length = (int)(next_dir - try_dir);
 	    next_dir++;
 	} else {
-	    dir_length = strlen (try_dir);
+	    dir_length = strlen(try_dir);
 	}
 	xname = dprintf ("%.*s" FILE_SEP "%s", dir_length, try_dir, fname);
 	if ((in = fopen(xname, "r")) != NULL) {
@@ -444,7 +510,7 @@ unit     {
 	    return 1;
 	}
     }
-    warning(line, pos, file_name, "can't include file %s", fname);
+    warning(line, pos, file_name, "can't include file '%s'", fname);
     curr_token = new token(dprintf("/*#include \"%s\"*/", fname), TKN_CMNT, line, pos);
     return 1;
 }
@@ -453,34 +519,9 @@ unit     {
     error(line, pos, file_name, "unrecognized token: %s\n",	yytext);
 }
 
-\{\$I[ \t]*[a-zA-Z0-9\.]+[ \t]*\} {  // {$I ...} - include directive
-    char *fname = include_name(yytext+3);
-    char *xname;
-    FILE *in = NULL;
-    char *try_dir, *next_dir;
-    int dir_length;
+\{\$I[ \t]+[a-zA-Z0-9\.\']+[ \t]*\} { return process_include(3); }
 
-    for (try_dir = i_path; try_dir != NULL; try_dir = next_dir) {
-	    if ((next_dir = strchr (try_dir, path_sep)) != NULL ) {
-	        dir_length = next_dir - try_dir;
-	        next_dir++;
-	    } else {
-	        dir_length = strlen (try_dir);
-	    }
-	    xname = dprintf ("%.*s" FILE_SEP "%s", dir_length, try_dir, fname);
-	    if ((in = fopen(xname, "r")) != NULL) {
-	        include_level += 1;
-	        scanner.push();
-	        scanner.attach(xname, in);
-	        curr_token = new token(xname, TKN_PUSH_FILE);
-	        curr_token->out_text = fname;
-	        return 1;
-	    }
-    }
-    warning(line, pos, file_name, "can't include file %s", fname);
-    curr_token = new token(dprintf("/*#include \"%s\"*/", fname), TKN_CMNT, line, pos);
-    return 1;
-}
+\{\$INCLUDE[ \t]+[a-zA-Z0-9\.\']+[ \t]*\} { return process_include(9); }
 
 <<EOF>>      {
     if (scanner.empty()) {
@@ -523,19 +564,46 @@ unit     {
 ","         { return tkn(TKN_COMMA);}
 "."         { return tkn(TKN_DOT);  }
 ".."        { return tkn(TKN_DOTS); }
-"/"         { return tkn(TKN_DIVR);  }
+"/"         { return tkn(TKN_DIVR); }
 "@"         { return turbo_pascal ? tkn(TKN_ADDR) : tkn(TKN_HEAP); }
-"^"         { if (turbo_pascal && !type_or_var_context
-		  && curr_token->tag != TKN_HEAP
+
+{CTRLCODE}  {
+              assert(yyleng == 3);
+              text = dprintf("#%d", yytext[1] & 31); // bypass symbol ^ and take second one
+              
+              yytext_copy = mystrdup(yytext);
+              unput(yytext[2]);
+              
+              return tkn(TKN_SCONST); 
+            }
+
+"^"         { /*if (turbo_pascal //&& !type_or_var_context // condition to recognize special control symbols like ^J ^I ^@ ^[ ^\ 
+		          && curr_token->tag != TKN_HEAP
                   && curr_token->tag != TKN_RBR && curr_token->tag != TKN_RPAR
-		  && curr_token->tag != TKN_REF
-		  && curr_token->tag != TKN_IDENT
-		  && curr_token->cat != CAT_ID)
-               {
-		   text = dprintf("#%d", yyinput() & 31);
-		   return tkn(TKN_SCONST);
-              }
-	      return tkn(TKN_HEAP);
+		          && curr_token->tag != TKN_REF
+		          && curr_token->tag != TKN_IDENT
+		          && curr_token->cat != CAT_ID)
+              {
+                  yytext_copy = mystrdup(yytext); // it is enough to assign "^" here // making copy because unput() brokes yytext
+                  char c1 =  yyinput();
+                  char c2 =  yyinput();
+                  //check second symbol after '^', if it is [\._0-9A-Z] then it is ident, not a control code 
+                  //TODO may be we need to determine if c1 digit and process it this way ((c1-'0') & 31) ?
+                  if(isalnum(c2) || c2 == '_' || c2 == '.')
+                  {
+                      unput(c2);
+                      unput(c1);
+                  }
+                  else
+                  {
+                      pos++;
+                      unput(c2);
+                      text = dprintf("#%d", c1 & 31);
+                      return tkn(TKN_SCONST);
+                  }
+              }*/
+
+	          return tkn(TKN_HEAP);
             }
 ":="        { return tkn(TKN_LET);  }
 ":"         { return tkn(TKN_COLON);}
@@ -547,11 +615,11 @@ unit     {
 "="         { return tkn(TKN_EQ);  }
 "<>"        { return tkn(TKN_NE);  }
 
+{REAL}      { return tkn(TKN_RCONST); }
 
-{REAL}       { return tkn(TKN_RCONST); }
-{INTEGER}    { return tkn(TKN_ICONST);  }
+{INTEGER}   { return tkn(TKN_ICONST); }
 
-{ID}         {
+{ID}        {
              char lc_buf[MAX_ID_LENGTH];
 	         char *src = yytext, *dst = lc_buf;
 	         if (*yytext == '$') {
@@ -581,7 +649,7 @@ unit     {
                    }
  	         }
 	         do {
-	             *dst++ = tolower(*(unsigned char*)src);
+	             *dst++ = (char)tolower(*(unsigned char*)src);
 	         } while (*src++);
 
              // all ID and KWD tokens from token.dpp have already added into nm_entry list
@@ -590,11 +658,14 @@ unit     {
 	         int tag = nm->tag;
 
 	         if (turbo_pascal) {
-	             if (tag == TKN_TYPE || tag == TKN_VAR) {
-		             type_or_var_context = true;
-	             } else if (tag == TKN_BEGIN || tag == TKN_CONST) {
-		             type_or_var_context = false;
-		         } else if (tag == TKN_IMPLEMENTATION) {
+	             //if (tag == TKN_TYPE || tag == TKN_VAR ) {
+		         //    type_or_var_context = true;
+	             //} else if (tag == TKN_BEGIN || tag == TKN_INITIALIZATION || tag == TKN_FINALIZATION /*|| tag == TKN_CONST*/) { 
+                 // added initialization and finalization because code in these sections may work without begin end tokens 
+                 // removed TKN_CONST because it is possible to have constants with control symbols
+		         //    type_or_var_context = false;
+		         //} else 
+                 if (tag == TKN_IMPLEMENTATION) {
 		             if (include_level > 0)  {
 		                 scanner.pop();
 		                 include_level -= 1;
@@ -632,6 +703,7 @@ unit     {
 [\n]         { return tkn(TKN_LN); }
 
 "\xEF\xBB\xBF" { return tkn(TKN_SPACE); } // this is UTF-8 BOM (Byte Order Mark) which present in some sources, treat it as space for simplicity
+
 .            {
                 error(line, pos, file_name, "unrecognized token: %s\n", yytext);
              }
@@ -657,7 +729,7 @@ void scan_ctx::attach(char* name, FILE* in) {
     yyin = in;
     char* base_name = strrchr(name, PATH_SEP);
     if (base_name != NULL) {
-	i_path = dprintf("%.*s%c%s", base_name-name, name, path_sep, i_path);
+	    i_path = dprintf("%.*s%c%s", base_name-name, name, path_sep, i_path);
     }
     yy_switch_to_buffer(yy_create_buffer(yyin, YY_BUF_SIZE));
 }
@@ -676,9 +748,9 @@ void scan_ctx::pop() {
 
 bool scan_ctx::find(char* name) {
     for (int i = 0; i < sp; i ++ ) {
-	if (strcmp(stack[i].file_name, name) == 0) {
-	    return true;
-	}
+	    if (strcmp(stack[i].file_name, name) == 0) {
+	        return true;
+	    }
     }
     return false;
 }
