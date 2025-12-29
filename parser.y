@@ -42,8 +42,8 @@ void zzerror(const char* text)
     expr_node            *n_expr; 
     expr_group_node      *n_grp; 
 
-    write_param_node     *n_wrtp; 
-    write_list_node      *n_wrls; 
+    //write_param_node     *n_wrtp; 
+    //write_list_node      *n_wrls; 
     case_node            *n_case; 
     set_item_node        *n_item; 
 
@@ -149,6 +149,7 @@ void zzerror(const char* text)
              UNTIL
              UNIT
              UNIT_END
+	     UNSAFE
              VAR
              VARARGS            
              VIRTUAL
@@ -217,12 +218,17 @@ void zzerror(const char* text)
 //%type <n_wrtp>  write_list
 //%type <n_wrtp>  write_param
 
+%type <n_expr>  const_expr
+%type <n_expr>  const_simple_expr
 %type <n_expr>  expr
 %type <n_expr>  simple_expr
 %type <n_expr>  primary
 %type <n_expr>  constant
 %type <n_expr>  record_constant
 %type <n_expr>  expr_list
+%type <n_expr>  const_expr_list
+%type <n_expr>  const_act_param_list
+%type <n_expr>  const_act_param
 %type <n_expr>  act_param_list
 %type <n_expr>  act_param
 %type <n_expr>  case_elem
@@ -366,7 +372,7 @@ void zzerror(const char* text)
 %printer { auto obj = dynamic_cast<base_obj_tpd_node*>($$); assert(obj); fprintf(yyo, "%s", obj->t_startof->in_text); } class_type
 %printer { if($$) $$->print_debug(); } <tok> 
 %printer { $$->print_debug(); } <toks> 
-%printer { fprintf (yyo, "%s", $$? ((literal_node*)$$)->value_tkn->in_text: "NULL"); } constant 
+%printer { fprintf(yyo, "%s", $$? ((literal_node*)$$)->value_tkn->in_text: "NULL"); } constant 
 %printer { $$->print_debug(); } <n_expr> 
 %printer { if($$) $$->print_debug(); } <n_stmt> 
 %printer { $$->print_debug(); } <n_tpd> 
@@ -475,7 +481,7 @@ prog_param_list: { $$ = NULL; }
 
 // read, write, index are reserved keywords in Delphi. However they can be used as variable and function names in source code.
 // ident_ext non-terminal is an implementation for that.
-ident_ext: IDENT | INDEX //| READ | WRITE
+ident_ext: IDENT | INDEX | READ | WRITE
 
 ident_list: ident_ext ',' ident_list { $$ = new token_list($1, $3); }
     | ident_ext { $$ = new token_list($1); }
@@ -530,7 +536,9 @@ unit_decl: label_decl_part | const_def_part | type_def_part | var_decl_part
 //=============================================================================
 */
 
-inherited: INHERITED { $$ = new inherited_node($1, NULL, NULL, NULL, NULL); }
+inherited: 
+      INHERITED 
+        { $$ = new inherited_node($1, NULL, NULL, NULL, NULL); }
     | INHERITED IDENT
         { $$ = new inherited_node($1, $2, NULL, NULL, NULL); }
     | INHERITED IDENT '(' act_param_list ')' 
@@ -635,8 +643,8 @@ case_item: case_elem_list ':' statement { $$ = new case_node($1, $2, $3); }
 case_elem_list: case_elem 
     | case_elem ',' case_elem_list { $1->next = $3; $$ = $1; }
 
-case_elem: expr { $$ = $1; }
-    | expr DOTS expr { $$ = new case_range_node($1, $2, $3); }
+case_elem: const_expr { $$ = $1; }
+    | const_expr DOTS const_expr { $$ = new case_range_node($1, $2, $3); }
 
 /*
 //=============================================================================
@@ -660,6 +668,52 @@ case_elem: expr { $$ = $1; }
 //=============================================================================
 */
 
+const_expr: const_simple_expr
+    | const_expr PLUS const_expr { $$ = new op_node(tn_add, $1, $2, $3); } 
+    | const_expr MINUS const_expr { $$ = new op_node(tn_sub, $1, $2, $3); } 
+    | const_expr MOD const_expr { $$ = new op_node(tn_mod, $1, $2, $3); } 
+    | const_expr MUL const_expr { $$ = new op_node(tn_mul, $1, $2, $3); } 
+    | const_expr DIV const_expr { $$ = new op_node(tn_div, $1, $2, $3); } 
+    | const_expr DIVR const_expr { $$ = new op_node(tn_divr, $1, $2, $3); } 
+ 
+    | const_expr AND const_expr { $$ = new op_node(tn_and, $1, $2, $3); } 
+    | const_expr BINAND const_expr { $$ = new op_node(tn_binand, $1, $2, $3); } 
+    | const_expr SHL const_expr { $$ = new op_node(tn_shl, $1, $2, $3); } 
+    | const_expr SHR const_expr { $$ = new op_node(tn_shr, $1, $2, $3); } 
+    | const_expr OR const_expr  { $$ = new op_node(tn_or, $1, $2, $3); } 
+    | const_expr BINOR const_expr  { $$ = new op_node(tn_binor, $1, $2, $3); } 
+    | const_expr XOR const_expr { $$ = new op_node(tn_xor, $1, $2, $3); } 
+
+    | const_expr GT const_expr { $$ = new op_node(tn_gt, $1, $2, $3); } 
+    | const_expr LT const_expr { $$ = new op_node(tn_lt, $1, $2, $3); } 
+    | const_expr LE const_expr { $$ = new op_node(tn_le, $1, $2, $3); } 
+    | const_expr GE const_expr { $$ = new op_node(tn_ge, $1, $2, $3); } 
+   // | const_expr EQ const_expr { $$ = new op_node(tn_eq, $1, $2, $3); } // this rule causes many warnings because we have IDENT EQ const_expr in const_def and var_decl, temporary commented out
+    | const_expr NE const_expr { $$ = new op_node(tn_ne, $1, $2, $3); } 
+    | const_expr IN const_expr { $$ = new op_node(tn_in, $1, $2, $3); } 
+    | const_expr IS const_expr { $$ = new op_node(tn_is, $1, $2, $3); } 
+    | const_expr AS const_expr { $$ = new op_node(tn_as, $1, $2, $3); } 
+    | '(' const_expr_list ')' { $$ = new expr_group_node($1, $2, $3); }
+    | const_simple_expr '(' const_act_param_list ')' { $$ = new fcall_node($1, $2, $3, $4); }
+    | '@' const_simple_expr { $$ = new address_node($1, $2); }
+    
+const_simple_expr: constant
+    | PLUS const_simple_expr %prec UPLUS 
+        { $$ = new op_node(tn_plus, NULL, $1, $2); }
+    | MINUS const_simple_expr %prec UMINUS 
+        { $$ = new op_node(tn_minus, NULL, $1, $2); }
+    | NOT const_simple_expr 
+        { $$ = new op_node(tn_not, NULL, $1, $2); }
+    | BINNOT const_simple_expr 
+        { $$ = new op_node(tn_binnot, NULL, $1, $2); }
+
+const_expr_list: const_expr | const_expr ',' const_expr_list { $1->next = $3; $$ = $1; }
+
+const_act_param_list: const_act_param 
+    | const_act_param ',' const_act_param_list { $1->next = $3; $$ = $1; }
+
+const_act_param: const_expr | { $$ = new skipped_node(curr_token->prev_relevant()); }
+ 
 expr: simple_expr
     | expr PLUS expr { $$ = new op_node(tn_add, $1, $2, $3); } 
     | expr MINUS expr { $$ = new op_node(tn_sub, $1, $2, $3); } 
@@ -690,7 +744,7 @@ expr: simple_expr
     | expr LT expr { $$ = new op_node(tn_lt, $1, $2, $3); } 
     | expr LE expr { $$ = new op_node(tn_le, $1, $2, $3); } 
     | expr GE expr { $$ = new op_node(tn_ge, $1, $2, $3); } 
-    | expr EQ expr { $$ = new op_node(tn_eq, $1, $2, $3); } 
+    | expr EQ expr { $$ = new op_node(tn_eq, $1, $2, $3); } // this rule causes many warnings because we have IDENT EQ expr in const_def and var_decl, temporary commented out
     | expr NE expr { $$ = new op_node(tn_ne, $1, $2, $3); } 
     | expr IN expr { $$ = new op_node(tn_in, $1, $2, $3); } 
     | expr IS expr { $$ = new op_node(tn_is, $1, $2, $3); } 
@@ -724,13 +778,14 @@ constant: record_constant
     | '[' set_elem_list ']' { $$ = new set_node($1, $2, $3); }
     | IDENT { $$ = new atom_expr_node($1); }
     | INDEX { $$ = new atom_expr_node($1); }
+    //| READ { $$ = new atom_expr_node($1); }
 
 set_elem_list: { $$ = NULL; } 
     | set_elem 
     | set_elem ',' set_elem_list { $1->next = $3; $$ = $1; }
 
-set_elem: expr { $$ = new set_elem_node($1); }
-    | expr DOTS expr { $$ = new set_range_node($1, $2, $3); }
+set_elem: const_expr { $$ = new set_elem_node($1); }
+    | const_expr DOTS const_expr { $$ = new set_range_node($1, $2, $3); }
 
 expr_list: expr | expr ',' expr_list { $1->next = $3; $$ = $1; }
 
@@ -745,7 +800,7 @@ record_constant: '(' field_init_list ')' { $$ = new record_constant_node($1, $2,
 field_init_list: field_init_item { $$ = $1; }
     | field_init_item ';' field_init_list { $1->next = $3; $$ = $1; }
    
-field_init_item: IDENT ':' expr { $$ = new field_init_node($1, $2, $3); }
+field_init_item: IDENT ':' const_expr { $$ = new field_init_node($1, $2, $3); }
 
 
 //expr_group: '(' expr_list ')' { $$ = new expr_group_node($1, $2, $3); }
@@ -811,17 +866,17 @@ const_def_part: const const_def_list { $$ = new const_def_part_node($1, $2); }
 const_def_list: { $$ = NULL; } 
     | const_def ';' const_def_list { $1->next = $3; $$ = $1; }
 
-const_def: IDENT EQ expr 
+const_def: ident_ext EQ const_expr 
         { $$ = new const_def_node($1, $2, $3, NULL, NULL); }
-    | IDENT EQ expr DEPRECATED 
+    | ident_ext EQ const_expr DEPRECATED 
         { $$ = new const_def_node($1, $2, $3, $4, NULL); }
-    | IDENT EQ expr DEPRECATED SCONST 
+    | ident_ext EQ const_expr DEPRECATED SCONST 
         { $$ = new const_def_node($1, $2, $3, $4, $5); }
-    | IDENT ':' const_type EQ expr 
+    | ident_ext ':' const_type EQ const_expr 
         { $$ = new typed_const_def_node($1, $2, $3, $4, $5, NULL, NULL); }
-    | IDENT ':' const_type EQ expr DEPRECATED
+    | ident_ext ':' const_type EQ const_expr DEPRECATED
         { $$ = new typed_const_def_node($1, $2, $3, $4, $5, $6, NULL); }
-    | IDENT ':' const_type EQ expr DEPRECATED SCONST
+    | ident_ext ':' const_type EQ const_expr DEPRECATED SCONST
         { $$ = new typed_const_def_node($1, $2, $3, $4, $5, $6, $7); }
 
 type_def_part: TYPE type_def_list  
@@ -830,8 +885,10 @@ type_def_part: TYPE type_def_list
 type_def_list: { $$ = NULL; }
     | type_def ';' type_def_list { $1->next = $3; $$ = $1; }
 
-type_def: IDENT EQ type { $$ = new type_def_node($1, $2, $3); }
+type_def: 
+      IDENT EQ type { $$ = new type_def_node($1, $2, $3); }
     | IDENT EQ TYPE type { $$ = new type_def_node($1, $2, $4); }  // this is so called 'strong type alias' in Delphi, example: type CppLongInt = type LongInt;
+    | IDENT EQ CLASS {$$ = new type_def_node($1, $2, new object_tpd_node($3, NULL, NULL, NULL, NULL, NULL)); }
     | simple_templ_type EQ type { $$ = new type_def_templ_node($1, $2, $3); }
 
 var_decl_part: VAR var_decl_list { $$ = new var_decl_part_node(NULL, $1, $2); }
@@ -853,14 +910,14 @@ var_decl_list: { $$ = NULL; }
 //       }
 
 var_decl: ident_list ':' type { $$ = new var_decl_node($1, $2, $3, NULL, NULL, NULL, NULL); }
-   // | ident_list ':' type EQ expr { $$ = new var_decl_node($1, $2, $3, $4, $5, NULL, NULL); }
+    | ident_list ':' type EQ const_expr { $$ = new var_decl_node($1, $2, $3, $4, $5, NULL, NULL); }
     | ident_list ':' type DEPRECATED { $$ = new var_decl_node($1, $2, $3, NULL, NULL, $4, NULL); }
     | ident_list ':' type DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, NULL, NULL, $4, $5); }
-   // | ident_list ':' type EQ expr DEPRECATED { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, NULL); }
-   // | ident_list ':' type EQ expr DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, $7); }
+   // | ident_list ':' type EQ const_expr DEPRECATED { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, NULL); }
+   // | ident_list ':' type EQ const_expr DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, $7); }
     
    // temporarity commented out since it generates too many bison warnings (ambiguities)
-   //  | IDENT ORIGIN expr ':' simple_type 
+   //  | IDENT ORIGIN const_expr ':' const_simple_type 
    //    { $$ = (var_decl_node*)new var_origin_decl_node($1, $2, $3, $4, $5); }
 
 /* Temporary comment it out. Since we have proc_spec that does everything we need.
@@ -875,11 +932,11 @@ proc_decl:
 // proc_fwd_decl and proc_spec - we cannot replace IDENT by ident_ext because bison generates too many warnings for unknown reason
 // while duplicated lines with IDENT replaced by READ, WRITE and INDEX work well
 proc_fwd_decl: 
-      PROCEDURE IDENT formal_params ';' qualifiers ';' 
+      PROCEDURE ident_ext formal_params ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
-    | FUNCTION IDENT formal_params ':' type ';' qualifiers ';' 
+    | FUNCTION ident_ext formal_params ':' type ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
-    /*
+  /*  
     | PROCEDURE READ formal_params ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION READ formal_params ':' type ';' qualifiers ';' 
@@ -888,16 +945,16 @@ proc_fwd_decl:
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION WRITE formal_params ':' type ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
-    */
+    
     | PROCEDURE INDEX formal_params ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
     | FUNCTION INDEX formal_params ':' type ';' qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
-
+*/
 proc_spec: 
-      PROCEDURE IDENT formal_params ';'
+      PROCEDURE ident_ext formal_params ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
-    | FUNCTION IDENT formal_params ':' type ';'
+    | FUNCTION ident_ext formal_params ':' type ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
     /*
     | PROCEDURE READ formal_params ';'
@@ -908,14 +965,14 @@ proc_spec:
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
     | FUNCTION WRITE formal_params ':' type ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
-    */
+    
     | PROCEDURE INDEX formal_params ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
     | FUNCTION INDEX formal_params ':' type ';'
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
-
+*/
 operator_fwd_decl:     
-       OPERATOR IDENT formal_params ':' type ';'
+      OPERATOR IDENT formal_params ':' type ';'
         { $$ = new operator_fwd_decl_node($1, $2, $3, $4, $5, $6, NULL, NULL); } 
     | OPERATOR IDENT formal_params ':' type ';' qualifiers ';' // here should be fun_qualifierS however we use qualifiers for simplicity.
         { $$ = new operator_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
@@ -958,9 +1015,9 @@ prop_param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3, 
 
 
 proc_def: 
-      PROCEDURE IDENT formal_params ';' block ';' 
+      PROCEDURE ident_ext formal_params ';' block ';' 
           { $$ = new proc_def_node(NULL, $1, NULL, NULL, $2, $3, NULL, NULL, $4, $5, $6); } 
-    | FUNCTION IDENT formal_params ':' type ';' block ';' 
+    | FUNCTION ident_ext formal_params ':' type ';' block ';' 
           { $$ = new proc_def_node(NULL, $1, NULL, NULL, $2, $3, $4, $5, $6, $7, $8); } 
     | PROCEDURE IDENT '.' ident_ext formal_params ';' block ';' 
           { $$ = new proc_def_node(NULL, $1, $2, $3, $4, $5, NULL, NULL, $6, $7, $8); } 
@@ -985,7 +1042,7 @@ proc_def:
   //  | FUNCTION IDENT ';' FAR ';' block ';' 
   //             { $$ = new proc_def_node($1, NULL, NULL, $2, NULL, NULL, NULL, $3, $4, $5, $6, $7); } 
 
-fun_qualifier: FORWARD | OVERLOAD | REGISTER | PASCAL | CDECL | STDCALL | SAFECALL | WINAPI | VARARGS | EXTERNAL | INLINE 
+fun_qualifier: FORWARD | OVERLOAD | REGISTER | PASCAL | CDECL | STDCALL | SAFECALL | WINAPI | VARARGS | EXTERNAL | INLINE | UNSAFE
 
 meth_qualifier: REINTRODUCE | ABSTRACT | VIRTUAL | DYNAMIC | STATIC | OVERRIDE | FINAL
 
@@ -1009,7 +1066,7 @@ formal_param: VAR param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
     //| proc_decl - see comment to proc_decl definition
 
 param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3, NULL, NULL, NULL, NULL); }
-    | ident_list ':' param_type EQ expr { $$ = new var_decl_node($1, $2, $3, $4, $5, NULL, NULL); }
+    | ident_list ':' param_type EQ const_expr { $$ = new var_decl_node($1, $2, $3, $4, $5, NULL, NULL); }
     | ident_list { $$ = new var_decl_node($1, NULL, NULL, NULL, NULL, NULL, NULL); }
 
 param_type: simple_type | conformant_array_type
@@ -1021,7 +1078,7 @@ param_type: simple_type | conformant_array_type
 type: simple_type | array_type | record_type | class_type | interface_type | set_type | file_type 
     | pointer_type | enum_type | range_type | string_type | fptr_type | simple_templ_type
 
-const_type: simple_type | const_array_type | record_type | const_set_type | string_type
+const_type: simple_type | const_array_type | record_type | const_set_type | string_type | pointer_type
 
 fptr_type: FUNCTION formal_params ':' type
         { $$ = new fptr_tpd_node($1, $2, $3, $4); }
@@ -1032,7 +1089,7 @@ fptr_type: FUNCTION formal_params ':' type
     | PROCEDURE formal_params OF OBJECT 
         { $$ = new fptr_tpd_node($1, $2, NULL, NULL, $3, $4); }
 
-string_type: STRING '[' expr ']' { $$ = new varying_tpd_node($1, $2, $3, $4); }
+string_type: STRING '[' const_expr ']' { $$ = new varying_tpd_node($1, $2, $3, $4); }
 
 simple_templ_type: IDENT LT const_type GT { $$ = new simple_templ_tpd_node($1, $2, $3, $4); }
 
@@ -1060,7 +1117,7 @@ conformant_array_type: packed ARRAY OF simple_type
 
 enum_type: '(' ident_list ')' { $$ = new enum_tpd_node($1, $2, $3); }
 
-range_type: expr DOTS expr 
+range_type: const_expr DOTS const_expr 
         { $$ = new range_tpd_node($1, $2, $3); } 
 
 pointer_type: '^' type { $$ = new ptr_tpd_node($1, $2); }
@@ -1159,9 +1216,7 @@ interface_components: interface_component interface_components
 interface_component: object_methods
     | object_properties
 
-guid: { $$ = NULL; }
-    | '[' SCONST ']' 
-        { $$ = new guid_node($1, $2, $3); }
+guid: '[' SCONST ']' { $$ = new guid_node($1, $2, $3); }
 
 
 class_or_object: OBJECT | CLASS
@@ -1176,8 +1231,8 @@ class_type: class_or_object object_body END
         { $$ = new object_tpd_node($1, $2, $3, $4, NULL, NULL); }
     | class_or_object END
         { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2); }
-    | class_or_object
-        { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
+  //  | class_or_object
+  //      { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, NULL); }
     | CLASS OF IDENT 
         { $$ = new metaclass_tpd_node($1, $2, $3); }
 	
@@ -1269,7 +1324,7 @@ indices: index_spec
         { $1->next = $3; $$ = $1; }
 
 index_spec: simple_type { $$ = new type_index_node($1); }
-    | expr DOTS expr { $$ = new range_index_node($1, $2, $3); }
+    | const_expr DOTS const_expr { $$ = new range_index_node($1, $2, $3); }
 
 
 field_list: fixed_part variant_part  //<n_vdcl>   
@@ -1301,12 +1356,10 @@ int zzlex() {
     if (curr_token->tag == TKN_SCONST) { 
         while (curr_token->next != NULL && curr_token->next->tag == TKN_SCONST)
         {
-	    curr_token->in_text = curr_token->out_text = 
-	      dprintf("%s%s", curr_token->in_text, curr_token->next->in_text);
+	    curr_token->in_text = curr_token->out_text = dprintf("%s%s", curr_token->in_text, curr_token->next->in_text);
 	    curr_token->next->remove();
 	}
-    } else if (turbo_pascal && curr_token->tag == TKN_FILE 
-	       && curr_token->next_relevant()->tag != TKN_OF) 
+    } else if (turbo_pascal && curr_token->tag == TKN_FILE && curr_token->next_relevant()->tag != TKN_OF) 
     {
 	curr_token->tag = TKN_IDENT;
 	curr_token->in_text = curr_token->out_text = "untyped_file";
