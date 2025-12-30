@@ -1058,7 +1058,7 @@ void on_except_node::translate(int ctx)
 }
 
 inherited_node::inherited_node(token* t_inherited, token* t_ident, token* t_lpar, expr_node* params, token* t_rpar)
-	: expr_node(tn_fcall)
+	: stmt_node() //tn_fcall)
 {
 	CONS5(t_inherited, t_ident, t_lpar, params, t_rpar);
 }
@@ -1067,12 +1067,13 @@ void inherited_node::attrib(int)
 	assert(!(t_ident == NULL && params != NULL));
 	
 	for (expr_node* e = params; e != NULL; e = e->next) {
-		e->attrib(ctx_valpar); //TODO not sure if here should be ctx_valpar
+		e->attrib(ctx_valpar); // ctx_valpar here tells about parameters context
 	}
 
 	f_tkn = t_inherited;
 	l_tkn = t_rpar ? t_rpar : (t_ident ? t_ident : t_inherited);
 }
+
 void inherited_node::translate(int)
 {
 	// *** see function proc_def_node::attrib(int ctx) how to find class and work with it.
@@ -2870,10 +2871,9 @@ void op_node::translate(int)
 				{
 					right->f_tkn->prepend(rtype->size == 1 ? "(unsigned char)" : rtype->size == 2 ? "(unsigned short)" : "(unsigned)");
 				}
-			} else if (((rtype->tag == tp_range && rtype->min_value >= 0) ||
-				rtype->tag == tp_enum) &&
-				((ltype->tag == tp_range && ltype->min_value < 0) ||
-					(ltype->tag == tp_integer && !(left->flags & tn_is_const))))
+			} else if (((rtype->tag == tp_range && rtype->min_value >= 0) || rtype->tag == tp_enum) &&
+				      ((ltype->tag == tp_range && ltype->min_value < 0) ||
+					  (ltype->tag == tp_integer && !(left->flags & tn_is_const))))
 			{
 				if (ltype->tag == tp_integer) {
 					f_tkn = left->f_tkn->prepend("(cardinal)");
@@ -5393,7 +5393,7 @@ void proc_fwd_decl_node::attrib(int ctx)
 		case TKN_FINAL:    is_final    = true; break;
 		case TKN_ABSTRACT: is_abstract = true; break;
 		case TKN_INLINE:   is_inline   = true; break;
-		case TKN_C: type->is_extern_c  = true; break;
+		//case TKN_C: type->is_extern_c  = true; break;
 		}
 
 		/*
@@ -6424,8 +6424,7 @@ void array_tpd_node::translate(int ctx)
 				if (idx->next) {
 					token* comma = idx->l_tkn->next_relevant();
 					assert(comma->tag == TKN_COMMA);
-					token::disable(idx->l_tkn->next,
-						comma->next_relevant()->prev);
+					token::disable(idx->l_tkn->next, comma->next_relevant()->prev);
 					idx->l_tkn->append("][");
 					curr_array = (array_tp*)curr_array->elem_type;
 				}

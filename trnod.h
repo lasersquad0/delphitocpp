@@ -210,13 +210,13 @@ class block_node : public node {
 class stmt_node : public node {
   public:
     stmt_node*   next;
-    stmt_node() : next(NULL) {}
+    stmt_node() : next(nullptr) {}
 
     virtual bool is_compound() { return false; }
 
     virtual stmt_node* find_last() { 
         stmt_node* last; 
-        for (last = this; last->next != NULL; last = last->next); 
+        for (last = this; last->next != nullptr; last = last->next); 
         return last;
     };
 };
@@ -880,7 +880,7 @@ class write_list_node : public node {
 };
 */
 
-class inherited_node : public expr_node {
+class inherited_node : public stmt_node {
 public:
     token*      t_inherited;
     token*      t_ident;
