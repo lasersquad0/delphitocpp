@@ -54,13 +54,15 @@
 * DONE - implemented 'deprecated message' directive for consts and vars
 * DONE - if class does not have parent in its ancestor list then add TObject as parent explicitly: TMyClass = class end; ==> class TMyClass : public TObject {};
 * DONE - now functions like 'function fun1();' and 'function fun2;' are both parsed correctly as functions and as methods
-* DONE - improved work of $I and $Include directives
-
-implement processing of conditional compilation directives
+* DONE - improved work of $I and $INCLUDE directives
+* DONE - implemented {IFEND}, {$IF ... } and {$ELSEIF ...} directives
+* 
+* 
+* 
+implement parsing of complex conditions in these directives
 {$IF Defined(xxx) and Declared(YYY)}
 {$IF Version > 2.0}
 {$ELSEIF version=2}
-{$IFEND} => the same as {$ENDIF}
 
 
 how to properly work with such stements?
@@ -291,11 +293,11 @@ static void scan_opt (int argc, char **argv) {
     bool found;
 
     static struct opt_str {
-	bool *flag;
-	char **value;
-	char *str;
+		bool *flag;
+		char **value;
+		char *str;
         char *defval; 
-	char *comment;
+		char *comment;
     } opt[] = {
 
 //      Add command options to this table:
@@ -306,62 +308,36 @@ static void scan_opt (int argc, char **argv) {
 #else
 	  "Include path (colon separated directory list)" },
 #endif
-	{ NULL, &input_file, "-in", NULL, 
-	  "Input pascal file" },
-	{ NULL, &output_file, "-out", NULL, 
-	  "Output C/C++ file" },
-	{ NULL, &output_suf, "-suf", ".cxx",
-	  "Output C/C++ file suffix" },
-	{ &language_c, NULL, "-c", NULL,
-	  "Translate into ANSI C" },
-	{ &no_array_assign_operator, NULL, "-assign", NULL,
-	  "Do not use assignment operators for array" },
-	{ &use_call_graph, NULL, "-analyze", NULL,
-	  "Analyze call graph to find non-recursive functions" },
-	{ &short_set, NULL, "-intset", NULL,
-	  "Use integer types for short sets of enumerations" },
-	{ &pio_init, NULL, "-init", NULL,
-	  "Call pio_initialize() function from main()" },
-	{ &small_enum, NULL, "-smallenum", NULL,
-	  "Use for enumerated types as small bytes as possible" },
-	{ &unsigned_comparison, NULL, "-unsigned", NULL,
-	  "Generate correct code for sign/unsigned comparisons" },
-	{ &output_not_existed_hdr, NULL, "-h", NULL,
-	  "Output only not existed header files" },
-	{ &turbo_pascal, NULL, "-turbo", NULL,
-	  "Convert Turbo Pascal" },
-	{ &hp_pascal, NULL, "-hp", NULL,
-	  "Convert HP64000 Pascal" },
-	{ &use_c_strings, NULL, "-cstring", NULL,
-	  "Use char* type for string fields in records and arrays" },
-	{ &nological, NULL, "-nological", NULL,
-	  "Use | and & instead of || and && for boolean operations" },
-	{ &force_logical, NULL, "-logical", NULL,
-	  "Use || and && for all types" },
-	{ &extern_vars, NULL, "-extern", NULL,
-	  "Declare all variables from included files as \"EXTERN\"" },
-	{ &preserve_case, NULL, "-preserve", NULL,
-	  "Preserve case of identifiers" },
-	{ &nested_comments, NULL, "-nested", NULL,
-	  "Nested comments: (* {} *)" },
-	{ &copy_array, NULL, "-copy", NULL,
-	  "Always make a copy of array passed by value" },
-	{ &comment_tags, NULL, "-comment_tags", NULL,
-	  "Place in comments tags of Pascal variant records" },
-	{ &smart_union, NULL, "-smartunion", NULL,
-	  "Convert variant records with empty fixed part to unions" },
-	{ &use_namespaces, NULL, "-namespace", NULL,
-	  "Place Turbo Pascal units in separate namespaces" },
-	{ &no_index_decrement, NULL, "-0based", NULL,
-	  "Assume all arrays are zero based" },
-	{ &ignore_preprocessor_directives, NULL, "-ignore_directives", NULL,
-	  "Ignore all lines started with '$' character" },
-	{ &do_not_use_enums, NULL, "-no_enums", NULL,
-	  "Do not use enums for integer constants" },
-	{ NULL, &pascall, "-pascall", "",
-	  "Specify modifier (pascal,WINAPI...) for converted functions" }
+	{ NULL, &input_file, "-in", NULL, "Input pascal file" },
+	{ NULL, &output_file, "-out", NULL, "Output C/C++ file" },
+	{ NULL, &output_suf, "-suf", ".cxx", "Output C/C++ file suffix" },
+	{ &language_c, NULL, "-c", NULL, "Translate into ANSI C" },
+	{ &no_array_assign_operator, NULL, "-assign", NULL, "Do not use assignment operators for array" },
+	{ &use_call_graph, NULL, "-analyze", NULL, "Analyze call graph to find non-recursive functions" },
+	{ &short_set, NULL, "-intset", NULL, "Use integer types for short sets of enumerations" },
+	{ &pio_init, NULL, "-init", NULL, "Call pio_initialize() function from main()" },
+	{ &small_enum, NULL, "-smallenum", NULL, "Use for enumerated types as small bytes as possible" },
+	{ &unsigned_comparison, NULL, "-unsigned", NULL, "Generate correct code for sign/unsigned comparisons" },
+	{ &output_not_existed_hdr, NULL, "-h", NULL, "Output only not existed header files" },
+	{ &turbo_pascal, NULL, "-turbo", NULL, "Convert Turbo Pascal" },
+	{ &hp_pascal, NULL, "-hp", NULL, "Convert HP64000 Pascal" },
+	{ &use_c_strings, NULL, "-cstring", NULL, "Use char* type for string fields in records and arrays" },
+	{ &nological, NULL, "-nological", NULL, "Use | and & instead of || and && for boolean operations" },
+	{ &force_logical, NULL, "-logical", NULL, "Use || and && for all types" },
+	{ &extern_vars, NULL, "-extern", NULL, "Declare all variables from included files as \"EXTERN\"" },
+	{ &preserve_case, NULL, "-preserve", NULL, "Preserve case of identifiers" },
+	{ &nested_comments, NULL, "-nested", NULL, "Nested comments: (* {} *)" },
+	{ &copy_array, NULL, "-copy", NULL, "Always make a copy of array passed by value" },
+	{ &comment_tags, NULL, "-comment_tags", NULL, "Place in comments tags of Pascal variant records" },
+	{ &smart_union, NULL, "-smartunion", NULL, "Convert variant records with empty fixed part to unions" },
+	{ &use_namespaces, NULL, "-namespace", NULL, "Place Turbo Pascal units in separate namespaces" },
+	{ &no_index_decrement, NULL, "-0based", NULL, "Assume all arrays are zero based" },
+	{ &ignore_preprocessor_directives, NULL, "-ignore_directives", NULL, "Ignore all lines started with '$' character" },
+	{ &do_not_use_enums, NULL, "-no_enums", NULL, "Do not use enums for integer constants" },
+	{ NULL, &pascall, "-pascall", "", "Specify modifier (pascal,WINAPI...) for converted functions" }
 
     };
+
     for (j = 0; j < (sizeof(opt)/sizeof(opt_str)); j++) {
 	if (opt[j].value != NULL) { 
  	    *opt[j].value = opt[j].defval;
