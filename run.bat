@@ -30,3 +30,7 @@ delphitocpp.exe %OPT% -in %PROJDIR%\Test0.pas -out Test0.pas.cpp >log.log 2>&1
 @rem                                              -> variant_part
 
 
+bison -Wcounterexamples -Dcex.timeout=30 -d -p zz -o parser.cxx parser.y >examplex.log 2>&1
+
+
+bison -v -Hparser.h -p zz -o parser.cxx parser.y
