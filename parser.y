@@ -233,7 +233,7 @@ void zzerror(const char* text)
 %type <n_expr>  act_param
 %type <n_expr>  case_elem
 %type <n_expr>  case_elem_list
-%type <n_expr>  inherited
+%type <n_stmt>  inherited
 
 //%type <n_grp>   expr_group
 
@@ -325,6 +325,7 @@ void zzerror(const char* text)
 %type <n_tpd>   const_array_type
 %type <n_tpd>   const_set_type
 %type <n_tpd>   array_type
+//%type <n_tpd>   array_of_const_type
 %type <n_tpd>   string_type
 %type <n_tpd>   conformant_array_type
 %type <n_tpd>   enum_type
@@ -586,11 +587,12 @@ statement: { $$ = new empty_node(curr_token->prev_relevant()); }
     | primary { $$ = new pcall_node($1); } 
  //   | RETURN { $$ = new return_node($1); }
     | WITH expr_list DO statement { $$ = new with_node($1, $2, $3, $4); }
-    | ICONST ':' statement { $$ = new label_node($1, $2, $3); }
+    | ICONST ':' statement { $$ = new label_node($1, $2, $3); } // label name can be just an integer 
     | IDENT ':' statement { $$ = new label_node($1, $2, $3); }
     | compoundst { $$ = $1; }
     | try_finally
     | try_except
+    | inherited
 
 compoundst: BEGIN sequence END { $$ = new compound_node($1, $2, $3); }
 
@@ -768,7 +770,6 @@ primary: constant
     | primary '.' ident_ext { $$ = new access_expr_node($1, $2, $3); }
     | primary '^' { $$ = new deref_expr_node($1, $2); }
     | primary '[' expr_list ']' { $$ = new idx_expr_node($1, $2, $3, $4); }
-    | inherited
 //   | LOOPHOLE '(' type ',' expr ')' { $$ = new loophole_node($1, $2, $3, $4, $5, $6); }
 
 constant: record_constant
@@ -778,7 +779,8 @@ constant: record_constant
     | '[' set_elem_list ']' { $$ = new set_node($1, $2, $3); }
     | IDENT { $$ = new atom_expr_node($1); }
     | INDEX { $$ = new atom_expr_node($1); }
-    //| READ { $$ = new atom_expr_node($1); }
+    //| READ  { $$ = new atom_expr_node($1); }
+    //| WRITE { $$ = new atom_expr_node($1); }
 
 set_elem_list: { $$ = NULL; } 
     | set_elem 
@@ -1069,7 +1071,7 @@ param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3, NULL,
     | ident_list ':' param_type EQ const_expr { $$ = new var_decl_node($1, $2, $3, $4, $5, NULL, NULL); }
     | ident_list { $$ = new var_decl_node($1, NULL, NULL, NULL, NULL, NULL, NULL); }
 
-param_type: simple_type | conformant_array_type
+param_type: simple_type | conformant_array_type //| array_of_const_type
 
 
 
@@ -1097,6 +1099,9 @@ simple_type: IDENT { $$ = new simple_tpd_node(NULL, NULL, $1); }
     | IDENT '.' ident_ext { $$ = new simple_tpd_node($1, $2, $3); }  
     | STRING { $$ = new string_tpd_node($1); }
 
+//array_of_const_type: ARRAY OF CONST 
+//        { $$ = new array_tpd_node(NULL, $1, NULL, NULL, NULL, $2, NULL); }
+
 array_type: packed ARRAY '[' indices ']' OF type 
         { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
     | packed ARRAY OF type 
@@ -1107,9 +1112,13 @@ const_array_type: packed ARRAY '[' indices ']' OF const_type
 
 // Delphi does not support arrays with bounds in parameters e.g. 'array [0..10] of Integer' - not supported
 // Also it does not support 'array of array...' in parameters
-// While Delphi supports open arrays in parameters - 'array of Cardinal' - works well
-conformant_array_type: packed ARRAY OF simple_type 
+// However Delphi does support open arrays in parameters - 'array of Cardinal' works well
+conformant_array_type: 
+      packed ARRAY OF simple_type 
         { $$ = new array_tpd_node($1, $2, NULL, NULL, NULL, $3, $4); }
+    //| ARRAY OF CONST 
+    //    { $$ = new array_tpd_node(NULL, $1, NULL, NULL, NULL, $2, NULL); }
+
  //       packed ARRAY '[' conformant_indices ']' OF simple_type 
  //       { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
  //   | packed ARRAY '[' conformant_indices ']' OF conformant_array_type 
