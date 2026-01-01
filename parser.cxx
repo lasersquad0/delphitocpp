@@ -3327,24 +3327,24 @@ yyreduce:
     {
   case 2: /* $@1: %empty  */
 {
-  if (turbo_pascal) { 
-    zzcnv_table[TKN_STRING] = STRING;
+//  if (turbo_pascal) { 
+//    zzcnv_table[TKN_STRING] = STRING;
 //    zzcnv_table[TKN_STR] = WRITE;
-    zzcnv_table[TKN_SHL] = SHL;
-    zzcnv_table[TKN_SHR] = SHR;
-    zzcnv_table[TKN_XOR] = XOR;
-    zzcnv_table[TKN_UNIT] = UNIT;
-    zzcnv_table[TKN_FAR] = FAR;
-    zzcnv_table[TKN_IMPLEMENTATION] = IMPLEMENTATION;
-    zzcnv_table[TKN_INTERFACE] = INTERFACE;
+//    zzcnv_table[TKN_SHL] = SHL;
+//    zzcnv_table[TKN_SHR] = SHR;
+//    zzcnv_table[TKN_XOR] = XOR;
+//    zzcnv_table[TKN_UNIT] = UNIT;
+//    zzcnv_table[TKN_FAR] = FAR;
+//    zzcnv_table[TKN_IMPLEMENTATION] = IMPLEMENTATION;
+//    zzcnv_table[TKN_INTERFACE] = INTERFACE;
 
-    zzcnv_table[TKN_OBJECT] = OBJECT;
-    zzcnv_table[TKN_CLASS] = CLASS;
-    zzcnv_table[TKN_CONSTRUCTOR] = PROCEDURE;
-    zzcnv_table[TKN_DESTRUCTOR] = PROCEDURE;
-  } else { 
-    zzcnv_table[TKN_ORIGIN] = ORIGIN;
-  }      
+//    zzcnv_table[TKN_OBJECT] = OBJECT;
+//    zzcnv_table[TKN_CLASS] = CLASS;
+//    zzcnv_table[TKN_CONSTRUCTOR] = PROCEDURE;
+//    zzcnv_table[TKN_DESTRUCTOR] = PROCEDURE;
+//  } else { 
+//    zzcnv_table[TKN_ORIGIN] = ORIGIN;
+//  }      
 }
     break;
 
