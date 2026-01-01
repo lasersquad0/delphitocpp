@@ -33,6 +33,11 @@ struct scan_state {
 
 #define MAX_INCLUDE_DEPTH 256   // Include stack depth
 
+#define fileno _fileno
+#define read _read
+#define isatty _isatty
+
+
 class scan_ctx {
   protected:
     scan_state      stack[ MAX_INCLUDE_DEPTH ];
@@ -107,11 +112,11 @@ static int tkn(int tag) {
 
 
 // Extracts file name from a string
-// Automaticalle bypasses leading spaces and table
-// Filename can be either in single quotes or witout
-// Allocates new buffer where file name is returned, does not change src string
+// Automaticalle bypasses leading spaces and tabs
+// Filename can be either in single quotes or without
+// Allocates new buffer where file name is copied and returned, does not change src string
 
-static char *include_name (char *src) {
+static char *get_filename(char *src, char* def_ext) {
     char *t = src;
     char *name = new char[strlen(src) + 8];
     char *dst = name;
@@ -163,7 +168,7 @@ static char *include_name (char *src) {
         }
 
     *dst = 0;
-    if (!suffix) strcpy(dst, ".pas");
+    if (!suffix) strcpy(dst, def_ext);
 
     if (scanner.find(name)) {
 	    error(line, pos, file_name, "file %s already included !\n", name);
@@ -213,7 +218,7 @@ static int process_comments() {
     *p++ = '*';
 
     curr_token = new token(NULL, TKN_CMNT, line, pos);
-    pos += strlen(yytext);
+    pos += (int)strlen(yytext);
 
     if (nested_comments) {
 	    while((c = yyinput_file()) != EOF) {
@@ -230,20 +235,18 @@ static int process_comments() {
 		        size_t len = p - cmt_buf;
 		        char* cmt_text = new char[len + 25]; // extra space for '*/', \0 and '#pragma comment(lib, ...)'
 		        memcpy(cmt_text, cmt_buf, len);
-		        if (pc != '*') cmt_text[len++] = '*';
-		        cmt_text[len++] = '/';
 		        cmt_text[len] = '\0';
-                
-                char *startcmp = cmt_text + 3;
 
                 if (turbo_pascal && cmt_text[2] == '$') {
                     *p = '\0';
+                    char *startcmp = cmt_text + 3;
+
                     if (strincmp(startcmp, "IFDEF", 5) == 0) {
                         sprintf(cmt_text, "#ifdef %s", cmt_buf + 9);
                     } else if (strincmp(startcmp, "IF ", 3) == 0) {
-                        sprintf(cmt_text, "#if%s", cmt_buf + 6);
+                        sprintf(cmt_text, "#if %s", cmt_buf + 6);
                     } else if (strincmp(startcmp, "ELSE ", 5) == 0) {
-                        sprintf(cmt_text, "#else%s", cmt_buf + 8);
+                        sprintf(cmt_text, "#else %s", cmt_buf + 8);
                     } else if (strincmp(startcmp , "ELSEIF", 6) == 0) {
                         sprintf(cmt_text, "#elif%s", cmt_buf + 9);
                     } else if (strincmp(startcmp, "ENDIF", 5) == 0) {
@@ -254,23 +257,31 @@ static int process_comments() {
                         sprintf(cmt_text, "#ifndef%s", cmt_buf + 9);
                     } else if (strincmp(startcmp, "DEFINE", 6) == 0) {
                         sprintf(cmt_text, "#define%s", cmt_buf + 9);
+                    } else if (strincmp(startcmp, "UNDEF", 5) == 0) {
+                        sprintf(cmt_text, "#undef%s", cmt_buf + 8);
                     } else if (strincmp(startcmp, "IFOPT", 5) == 0) {
 		                int value = 1;
-                        char* p = strchr(cmt_text + 8, '+');
-		                if (p != NULL) *p = '\0';
-		                else if ((p = strchr(cmt_text + 8, '-')) != NULL) {
+                        char* pp = strchr(cmt_text + 8, '+');
+		                if (pp != NULL) *pp = '\0';
+		                else if ((pp = strchr(cmt_text + 8, '-')) != NULL) {
 			                value = 0;
-			                *p = '\0';
+			                *pp = '\0';
 		                }
-		                for (p = cmt_buf + 8; *p == ' '; p++);
-                        sprintf(cmt_text, "#if OPTION_%s == %d", p, value);
+		                for (pp = cmt_buf + 8; *pp == ' '; pp++);
+                        sprintf(cmt_text, "#if OPTION_%s == %d", pp, value);
                     } else if (strincmp(startcmp, "L ", 2) == 0) {
-                        char* fname = include_name(startcmp + 2);
+                        char* fname = get_filename(startcmp + 2, ".obj");
                         sprintf(cmt_text, "#pragma comment(lib, \"%s\")", fname);
 		            } else if (strincmp(startcmp, "LINK ", 5) == 0) {
-                        char* fname = include_name(startcmp + 5);
+                        char* fname = get_filename(startcmp + 5, ".obj");
                         sprintf(cmt_text, "#pragma comment(lib, \"%s\")", fname); //TODO rest of text after filename will be lost
 		            }
+                }
+                else
+                {
+                    if (pc != '*') cmt_text[len++] = '*';
+		            cmt_text[len++] = '/';
+		            cmt_text[len] = '\0';
                 }
 
 		        curr_token->in_text = curr_token->out_text = cmt_text;
@@ -313,7 +324,7 @@ static int process_comments() {
 // start tells function where (offset) to start looking for filename (after $I or after $INLUDE word in yytext) 
 static int process_include(int start) 
 {  
-    char *fname = include_name(yytext + start);
+    char *fname = get_filename(yytext + start, ".pas");
     char *xname = NULL;
     FILE *in = NULL;
     char *try_dir, *next_dir;
@@ -324,7 +335,7 @@ static int process_include(int start)
 	        dir_length = (int)(next_dir - try_dir);
 	        next_dir++;
 	    } else {
-	        dir_length = strlen(try_dir);
+	        dir_length = (int)strlen(try_dir);
 	    }
 
 	    xname = dprintf ("%.*s" FILE_SEP "%s", dir_length, try_dir, fname);
@@ -460,7 +471,7 @@ unit     {
 		        dir_length = (int)(next_dir - try_dir);
 		        next_dir++;
 	        } else {
-		        dir_length = strlen(try_dir);
+		        dir_length = (int)strlen(try_dir);
 	        }
 
             // dir_length below specifies prescision for try_dir argument (how many characters from try_dir are printed)
@@ -505,7 +516,7 @@ unit     {
 <incl>[^\;\n]+\;* {   /* got the include file name */
     BEGIN(INITIAL);   // To leave include state
 
-    char *fname = include_name(yytext);
+    char *fname = get_filename(yytext, ".pas");
     char *xname;
     FILE *in = NULL;
     char *try_dir, *next_dir;
@@ -516,7 +527,7 @@ unit     {
 	        dir_length = (int)(next_dir - try_dir);
 	        next_dir++;
 	    } else {
-	        dir_length = strlen(try_dir);
+	        dir_length = (int)strlen(try_dir);
 	    }
 	    
         xname = dprintf ("%.*s" FILE_SEP "%s", dir_length, try_dir, fname);
@@ -540,20 +551,23 @@ unit     {
     error(line, pos, file_name, "unrecognized token: %s\n",	yytext);
 }
 
-/*
-The following formats are correct for both $I and $INCLUDE
-Filename can be either in single quotes or without quotes
-{$I filename.ext}
-{$I filename} => .pas will be added at the end of filename
-{$I 'fn.ext'}
-{$I fn.ext
-} => closing '}' is on new line
-{$I fn.ext text after file name   } => text after file name is ignored and will be lost
-*/
+ /*
+ The following formats are correct for both $I and $INCLUDE
+ Filename can be either in single quotes or without quotes
+ {$I filename.ext}
+ {$I filename} => .pas will be added at the end of filename
+ {$I 'fn.ext'}
+ {$I fn.ext
+ } => closing '}' is on new line
+ {$I fn.ext text after file name   } => text after file name is ignored and will be lost
+ */
 
-\{\$I[ \t]+[a-zA-Z0-9\.\']+(([ \t\n]*\})|([ \t\n]+[^\}]+\})) { return process_include(3); }
+\{\$I[ \t]+[^\}]*\} { return process_include(3); }
 
-\{\$INCLUDE[ \t]+[a-zA-Z0-9\.\']+(([ \t\n]*\})|([ \t\n]+[^\}]+\})) { return process_include(9); }
+  /* \{\$INCLUDE[ \t]+[_a-zA-Z0-9\.\']+(([ \t\n]*\})|([ \t\n]+[^\}]+\})) { return process_include(9); }
+  \{\$INCLUDE[ \t]+[^<>:"/\\\|\?\*\}]+(([ \t\n]*\})|([ \t\n]+[^\}]+\})) { return process_include(9); }*/
+
+\{\$INCLUDE[ \t]+[^\}]*\} { return process_include(9); }
 
 <<EOF>>      {
     if (scanner.empty()) {
@@ -662,7 +676,7 @@ Filename can be either in single quotes or without quotes
                      char cmt_buffer[1024];
                      int i = sprintf(cmt_buffer, "/*%s", yytext);
                      curr_token = new token(NULL, TKN_CMNT, line, pos);
-                     pos += strlen(yytext);
+                     pos += (int)strlen(yytext);
  	                 while((c = yyinput_file()) != EOF && c != '\n') {
                          if (i == (int)sizeof(cmt_buffer)-4) {
                              error(line, pos, file_name, "Preprocessor directive too long\n");
