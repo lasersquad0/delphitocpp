@@ -31,7 +31,7 @@ void zzerror(const char* text)
 
 %union {
     token                *tok;
-
+    two_tokens           *tok2;
     token_list           *toks; 
 
     node                 *n_node;
@@ -64,7 +64,9 @@ void zzerror(const char* text)
 
     asm_line_node        *n_asm;       
     asm_block_node       *n_basm;       
-    import_list_node     *n_imp; 
+    import_list_node     *n_imp;
+    
+    attrib_node          *n_attr;
 }
 
 
@@ -194,6 +196,7 @@ void zzerror(const char* text)
 %type <tok>     record_access_spec_tok
 %type <tok>     const
 %type <tok>     ident_ext
+%type <tok>     optional_semicolon
 
 %type <n_imp>   prog_param_list
 
@@ -233,7 +236,7 @@ void zzerror(const char* text)
 %type <n_expr>  act_param
 %type <n_expr>  case_elem
 %type <n_expr>  case_elem_list
-%type <n_stmt>  inherited
+%type <n_expr>  inherited
 
 //%type <n_grp>   expr_group
 
@@ -354,6 +357,8 @@ void zzerror(const char* text)
 %type <n_asm>  asm_line
 %type <n_asm>  asm_text
 %type <n_basm> assemblerst
+
+%type <n_attr> attr_decl 
 
 %precedence THEN
 %precedence ELSE
@@ -592,7 +597,6 @@ statement: { $$ = new empty_node(curr_token->prev_relevant()); }
     | compoundst { $$ = $1; }
     | try_finally
     | try_except
-    | inherited
 
 compoundst: BEGIN sequence END { $$ = new compound_node($1, $2, $3); }
 
@@ -770,6 +774,7 @@ primary: constant
     | primary '.' ident_ext { $$ = new access_expr_node($1, $2, $3); }
     | primary '^' { $$ = new deref_expr_node($1, $2); }
     | primary '[' expr_list ']' { $$ = new idx_expr_node($1, $2, $3, $4); }
+    | inherited
 //   | LOOPHOLE '(' type ',' expr ')' { $$ = new loophole_node($1, $2, $3, $4, $5, $6); }
 
 constant: record_constant
@@ -911,12 +916,20 @@ var_decl_list: { $$ = NULL; }
 //	 $1->next = $5; $$ = $1; 
 //       }
 
-var_decl: ident_list ':' type { $$ = new var_decl_node($1, $2, $3, NULL, NULL, NULL, NULL); }
-    | ident_list ':' type EQ const_expr { $$ = new var_decl_node($1, $2, $3, $4, $5, NULL, NULL); }
-    | ident_list ':' type DEPRECATED { $$ = new var_decl_node($1, $2, $3, NULL, NULL, $4, NULL); }
-    | ident_list ':' type DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, NULL, NULL, $4, $5); }
-   // | ident_list ':' type EQ const_expr DEPRECATED { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, NULL); }
-   // | ident_list ':' type EQ const_expr DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, $7); }
+attr_decl: '[' ident_list ']' { $$ = new attrib_node($1, $2, $3); }
+ 
+var_decl: 
+      ident_list ':' type { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, NULL, NULL); }
+    | ident_list ':' type EQ const_expr { $$ = new var_decl_node(NULL, $1, $2, $3, $4, $5, NULL, NULL); }
+    | ident_list ':' type DEPRECATED { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, $4, NULL); }
+    | ident_list ':' type DEPRECATED SCONST { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, $4, $5); }
+    
+    | attr_decl ident_list ':' type { $$ = new var_decl_node($1, $2, $3, $4, NULL, NULL, NULL, NULL); }
+    | attr_decl ident_list ':' type EQ const_expr { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, NULL, NULL); }
+    | attr_decl ident_list ':' type DEPRECATED { $$ = new var_decl_node($1, $2, $3, $4, NULL, NULL, $5, NULL); }
+    | attr_decl ident_list ':' type DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, $4, NULL, NULL, $5, $6); }
+   // | ident_list ':' type EQ const_expr DEPRECATED { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, $7, NULL); }
+   // | ident_list ':' type EQ const_expr DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, $7, $8); }
     
    // temporarity commented out since it generates too many bison warnings (ambiguities)
    //  | IDENT ORIGIN const_expr ':' const_simple_type 
@@ -934,87 +947,22 @@ proc_decl:
 // proc_fwd_decl and proc_spec - we cannot replace IDENT by ident_ext because bison generates too many warnings for unknown reason
 // while duplicated lines with IDENT replaced by READ, WRITE and INDEX work well
 proc_fwd_decl: 
-      PROCEDURE ident_ext formal_params ';' qualifiers ';' 
+      PROCEDURE ident_ext formal_params optional_semicolon qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
-    | FUNCTION ident_ext formal_params ':' type ';' qualifiers ';' 
+    | FUNCTION ident_ext formal_params ':' type optional_semicolon qualifiers ';' 
         { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
-  /*  
-    | PROCEDURE READ formal_params ';' qualifiers ';' 
-        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
-    | FUNCTION READ formal_params ':' type ';' qualifiers ';' 
-        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
-    | PROCEDURE WRITE formal_params ';' qualifiers ';' 
-        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
-    | FUNCTION WRITE formal_params ':' type ';' qualifiers ';' 
-        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
-    
-    | PROCEDURE INDEX formal_params ';' qualifiers ';' 
-        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, $5, $6); } 
-    | FUNCTION INDEX formal_params ':' type ';' qualifiers ';' 
-        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
-*/
+  
 proc_spec: 
       PROCEDURE ident_ext formal_params ';'
-        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
+        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4, NULL, NULL); } 
     | FUNCTION ident_ext formal_params ':' type ';'
-        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
-    /*
-    | PROCEDURE READ formal_params ';'
-        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
-    | FUNCTION READ formal_params ':' type ';'
-        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
-    | PROCEDURE WRITE formal_params ';'
-        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
-    | FUNCTION WRITE formal_params ':' type ';'
-        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
-    
-    | PROCEDURE INDEX formal_params ';'
-        { $$ = new proc_fwd_decl_node($1, $2, $3, NULL, NULL, $4); } 
-    | FUNCTION INDEX formal_params ':' type ';'
-        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6); } 
-*/
+        { $$ = new proc_fwd_decl_node($1, $2, $3, $4, $5, $6, NULL, NULL); } 
+
 operator_fwd_decl:     
       OPERATOR IDENT formal_params ':' type ';'
         { $$ = new operator_fwd_decl_node($1, $2, $3, $4, $5, $6, NULL, NULL); } 
-    | OPERATOR IDENT formal_params ':' type ';' qualifiers ';' // here should be fun_qualifierS however we use qualifiers for simplicity.
+    | OPERATOR IDENT formal_params ':' type optional_semicolon qualifiers ';' // here should be fun_qualifierS however we use qualifiers for simplicity.
         { $$ = new operator_fwd_decl_node($1, $2, $3, $4, $5, $6, $7, $8); } 
-
-property_decl: PROPERTY IDENT prop_array prop_type_def prop_index prop_read prop_write prop_stored prop_default ';' prop_default_directive
-        { $$ = new property_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); } 
-
-property_decl_list: property_decl
-    | property_decl property_decl_list { $1->next = $2; $$ = $1; }
-
-prop_array: { $$ = NULL; }
-    | '[' prop_param_list ']'
-        { $$ = new prop_array_node($1, $2, $3); }
-prop_index: { $$ = NULL; } 
-    | INDEX constant     //TODO we may need expr type here instead of 'constant' to be able to handle 'property ... index IND+3 ...' statements 
-        { $$ = new prop_index_node($1, $2); }
-prop_type_def: { $$ = NULL; }
-    | ':' type 
-        { $$ = new prop_type_def_node($1, $2); }
-prop_read: { $$ = NULL; }
-    | READ IDENT
-        { $$ = new prop_read_node($1, $2); }
-prop_write: { $$ = NULL; }
-    | WRITE IDENT
-        { $$ = new prop_write_node($1, $2); }
-prop_stored: { $$ = NULL; }
-    | STORED IDENT
-        { $$ = new prop_stored_node($1, $2); }
-prop_default:  { $$ = NULL; }
-    | DEFAULT constant
-        { $$ = new prop_default_node($1, $2); }
-prop_default_directive:  { $$ = NULL; }
-    | DEFAULT ';'
-        { $$ = new prop_default_directive_node($1, $2); }
-
-prop_param_list: prop_param_decl 
-    | prop_param_decl ';' prop_param_list { $1->next = $3; $$ = $1; }
-
-prop_param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3, NULL, NULL, NULL, NULL); }
-
 
 proc_def: 
       PROCEDURE ident_ext formal_params ';' block ';' 
@@ -1048,11 +996,55 @@ fun_qualifier: FORWARD | OVERLOAD | REGISTER | PASCAL | CDECL | STDCALL | SAFECA
 
 meth_qualifier: REINTRODUCE | ABSTRACT | VIRTUAL | DYNAMIC | STATIC | OVERRIDE | FINAL
 
-qualifier: fun_qualifier | meth_qualifier
+optional_semicolon: { $$ = NULL; } | ';'
+ 
+qualifier: fun_qualifier 
+    | meth_qualifier
+    | DEPRECATED SCONST { $$ = new two_tokens($1, $2); }
       
 qualifiers: qualifier { $$ = new token_list($1); }
-     | qualifiers ';' qualifier
+    | qualifiers optional_semicolon qualifier
          { $$ = new token_list($3, $1); }
+
+
+property_decl:
+      PROPERTY IDENT prop_array prop_type_def prop_index prop_read prop_write prop_stored prop_default ';' prop_default_directive
+        { $$ = new property_node(NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); }
+    | CLASS PROPERTY IDENT prop_array prop_type_def prop_index prop_read prop_write prop_stored prop_default ';' prop_default_directive
+        { $$ = new property_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12); } 
+
+property_decl_list: property_decl
+    | property_decl property_decl_list { $1->next = $2; $$ = $1; }
+
+prop_array: { $$ = NULL; }
+    | '[' prop_param_list ']'
+        { $$ = new prop_array_node($1, $2, $3); }
+prop_index: { $$ = NULL; } 
+    | INDEX constant     //TODO we may need expr type here instead of 'constant' to be able to handle 'property ... index IND+3 ...' statements 
+        { $$ = new prop_index_node($1, $2); }
+prop_type_def: ':' type 
+        { $$ = new prop_type_def_node($1, $2); }
+prop_read: { $$ = NULL; }
+    | READ IDENT
+        { $$ = new prop_read_node($1, $2); }
+prop_write: { $$ = NULL; }
+    | WRITE IDENT
+        { $$ = new prop_write_node($1, $2); }
+prop_stored: { $$ = NULL; }
+    | STORED IDENT
+        { $$ = new prop_stored_node($1, $2); }
+prop_default:  { $$ = NULL; }
+    | DEFAULT constant
+        { $$ = new prop_default_node($1, $2); }
+prop_default_directive:  { $$ = NULL; }
+    | DEFAULT ';'
+        { $$ = new prop_default_directive_node($1, $2); }
+
+prop_param_list: prop_param_decl 
+    | prop_param_decl ';' prop_param_list { $1->next = $3; $$ = $1; }
+
+prop_param_decl: ident_list ':' param_type { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, NULL, NULL); }
+
 
 formal_params: { $$ = NULL; } 
     | '(' ')' { $$ = new param_list_node($1, NULL, $2); }
@@ -1067,9 +1059,9 @@ formal_param: VAR param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
     | param_decl { $$ = $1; } 
     //| proc_decl - see comment to proc_decl definition
 
-param_decl: ident_list ':' param_type { $$ = new var_decl_node($1, $2, $3, NULL, NULL, NULL, NULL); }
-    | ident_list ':' param_type EQ const_expr { $$ = new var_decl_node($1, $2, $3, $4, $5, NULL, NULL); }
-    | ident_list { $$ = new var_decl_node($1, NULL, NULL, NULL, NULL, NULL, NULL); }
+param_decl: ident_list ':' param_type { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, NULL, NULL); }
+    | ident_list ':' param_type EQ const_expr { $$ = new var_decl_node(NULL, $1, $2, $3, $4, $5, NULL, NULL); }
+    | ident_list { $$ = new var_decl_node(NULL, $1, NULL, NULL, NULL, NULL, NULL, NULL); }
 
 param_type: simple_type | conformant_array_type //| array_of_const_type
 
@@ -1116,8 +1108,8 @@ const_array_type: packed ARRAY '[' indices ']' OF const_type
 conformant_array_type: 
       packed ARRAY OF simple_type 
         { $$ = new array_tpd_node($1, $2, NULL, NULL, NULL, $3, $4); }
-    //| ARRAY OF CONST 
-    //    { $$ = new array_tpd_node(NULL, $1, NULL, NULL, NULL, $2, NULL); }
+    | packed ARRAY OF CONST 
+        { $$ = new array_tpd_node($1, $2, NULL, NULL, NULL, $3, NULL); }
 
  //       packed ARRAY '[' conformant_indices ']' OF simple_type 
  //       { $$ = new array_tpd_node($1, $2, $3, $4, $5, $6, $7); }
@@ -1170,7 +1162,9 @@ record_component: record_access_spec_decl
     | record_access_spec_decl record_field_list
         { $1->next = $2; $$ = $1; }
     | VAR field_list
-        { $$ = new record_field_part_node($1, $2); } 
+        { $$ = new record_field_part_node(NULL, $1, $2); }
+    | CLASS VAR field_list
+        { $$ = new record_field_part_node($1, $2, $3); }    
     | record_methods
     | object_properties
     | const_def_part 
@@ -1192,7 +1186,7 @@ record_method_decl:
         { $$ = new method_decl_node($1, $2); }
 
 record_field_list: field_list
-        { $$ = new record_field_part_node(NULL, $1); }
+        { $$ = new record_field_part_node(NULL, NULL, $1); }
 
 
 interface_type: 
@@ -1200,14 +1194,18 @@ interface_type:
         { $$ = new interface_tpd_node($1, NULL, NULL, NULL, $2, $3, $4); }  
     | INTERFACE guid END
         { $$ = new interface_tpd_node($1, NULL, NULL, NULL, $2, NULL, $3); }      
+    | INTERFACE interface_components END
+        { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, $2, $3); }
+    | INTERFACE END
+        { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, NULL, $2); }
     | INTERFACE '(' IDENT ')' guid interface_components END
         { $$ = new interface_tpd_node($1, $2, $3, $4, $5, $6, $7); }
     | INTERFACE '(' IDENT ')' guid END
         { $$ = new interface_tpd_node($1, $2, $3, $4, $5, NULL, $6); }
+    | INTERFACE '(' IDENT ')' interface_components END
+        { $$ = new interface_tpd_node($1, $2, $3, $4, NULL, $5, $6); }
     | INTERFACE '(' IDENT ')' END
         { $$ = new interface_tpd_node($1, $2, $3, $4, NULL, NULL, $5); }
-    | INTERFACE END
-        { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, NULL, $2); }
 //  | INTERFACE
  //      { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, NULL, NULL); }
 
@@ -1284,14 +1282,15 @@ object_components: object_component object_components
 object_component: class_access_spec_decl 
     | class_access_spec_decl field_decl_list
         { $1->next = $2; $$ = $1; } 
-    | field_decl_part 
+    | field_decl_part
     | object_methods
     | object_properties
     | const_def_part 
     | type_def_part 
 
 
-field_decl_part: VAR field_decl_list 
+field_decl_part:
+      VAR field_decl_list 
         { $$ = new var_decl_part_node(NULL, $1, $2); }
     | CLASS VAR field_decl_list 
         { $$ = new var_decl_part_node($1, $2, $3); }
