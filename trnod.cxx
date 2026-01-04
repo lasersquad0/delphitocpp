@@ -81,6 +81,22 @@ void node::swallow_semicolon()
 // Statements
 //=============================================================================
 
+attrib_node::attrib_node(token* t_lbr, token_list* idents, token* t_rbr)
+{
+	CONS3(t_lbr, idents, t_rbr);
+}
+
+void attrib_node::attrib(int)
+{
+	f_tkn = t_lbr;
+	l_tkn = t_rbr;
+}
+
+void attrib_node::translate(int)
+{
+	
+}
+
 import_list_node::import_list_node(token* lpar, token_list* params, token* rpar)
 {
     CONS3(lpar, params, rpar);
@@ -1058,7 +1074,7 @@ void on_except_node::translate(int ctx)
 }
 
 inherited_node::inherited_node(token* t_inherited, token* t_ident, token* t_lpar, expr_node* params, token* t_rpar)
-	: stmt_node() //tn_fcall)
+	: expr_node(tn_fcall)
 {
 	CONS5(t_inherited, t_ident, t_lpar, params, t_rpar);
 }
@@ -4672,9 +4688,9 @@ void unit_spec_node::translate(int ctx)
 }
 
 
-var_decl_node::var_decl_node(token_list* vars, token* t_coln, tpd_node* tpd, token* t_eq, expr_node* def_value, token* t_depr, token* t_mess)
+var_decl_node::var_decl_node(attrib_node* attribute, token_list* vars, token* t_coln, tpd_node* tpd, token* t_eq, expr_node* def_value, token* t_depr, token* t_mess)
 {
-    CONS7(vars, t_coln, tpd, t_eq, def_value, t_depr, t_mess);
+    CONS8(attribute, vars, t_coln, tpd, t_eq, def_value, t_depr, t_mess);
     scope = NULL;
 }
 
@@ -4985,20 +5001,26 @@ void var_decl_part_node::translate(int ctx)
 	}
 }
 
-record_field_part_node::record_field_part_node(token* t_var, field_list_node* flist)
+record_field_part_node::record_field_part_node(token* t_classvar, token* t_var, field_list_node* flist)
 {
-	CONS2(t_var, flist);
+	CONS3(t_classvar, t_var, flist);
 }
 
 void record_field_part_node::attrib(int ctx)
 {
+	//TODO implement t_classvar processing here
 	flist->attrib(ctx);
 }
 
 void record_field_part_node::translate(int ctx)
 {
+	//TODO implement t_classvar processing here
+
 	flist->translate(ctx);
-	if(t_var) t_var->disable();
+	
+	if (t_classvar) t_classvar->disable();
+
+	if (t_var) t_var->disable();
 }
 
 /*
@@ -5336,11 +5358,12 @@ proc_fwd_decl_node::proc_fwd_decl_node(token* t_proc, token* t_ident, param_list
 void proc_fwd_decl_node::attrib(int ctx)
 {
 	f_tkn = t_proc;
-	l_tkn = t_semi1;
+	l_tkn = t_semi2 ? t_semi2 : t_semi1; // one of them two always not null
+	assert(l_tkn);
 
     if (ret_type) ret_type->attrib(ctx);
     
-    type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)NULL);
+	type = new proc_tp(ret_type ? ret_type->type : nullptr); // (tpexpr*)NULL);
     type->forward = this;
 
 	if (turbo_pascal) {
@@ -5348,7 +5371,7 @@ void proc_fwd_decl_node::attrib(int ctx)
 		else if (t_proc->tag == TKN_DESTRUCTOR) type->is_destructor = true;
 	}
 
-	if ( (var = b_ring::search_cur(t_ident)) == NULL || var->type == NULL
+	if ( (var = b_ring::search_cur(t_ident)) == nullptr || var->type == nullptr
 	     || var->type->tag != tp_proc || var->ring != b_ring::curr_b_ring
 		 || (var->flags & symbol::f_syslib))
 	{
@@ -5366,7 +5389,7 @@ void proc_fwd_decl_node::attrib(int ctx)
 	}
 
 
-	for (token_list* t = qualifiers; t != NULL; t = t->next)
+	for (token_list* t = qualifiers; t != nullptr; t = t->next)
 	{
 		switch (t->ident->tag) {
 		case TKN_VIRTUAL: 
@@ -5381,18 +5404,18 @@ void proc_fwd_decl_node::attrib(int ctx)
 			is_override = type->is_constructor ? false : true; // in C++ constructors cannot be marked override since they are NOT virtual
 			if (ctx != ctx_object) warning(t->ident, "method %s: override directive cannot be used here, only class methods can be marked override", t_ident->in_text);
 			break;
-		case TKN_EXTERNAL: is_external = true; break;
-		case TKN_STATIC:   is_static   = true; break;
-		//case TKN_OVERLOAD: is_overload = true; break;
-		case TKN_WINAPI:   is_stdcall  = true; break; // winapi qualifier is the same as stdcall on WIN32
-		case TKN_SAFECALL: is_stdcall  = true; break; // safecall qualifier is the same as stdcall in C++
-		case TKN_STDCALL:  is_stdcall  = true; break;
-		case TKN_PASCAL:   is_pascal   = true; break;
-		case TKN_CDECL:    is_cdecl    = true; break;
-		case TKN_REGISTER: is_register = true; break;
-		case TKN_FINAL:    is_final    = true; break;
-		case TKN_ABSTRACT: is_abstract = true; break;
-		case TKN_INLINE:   is_inline   = true; break;
+		case TKN_EXTERNAL:   is_external = true; break;
+		case TKN_STATIC:     is_static   = true; break;
+		case TKN_WINAPI:     is_stdcall  = true; break; // winapi qualifier is the same as stdcall on WIN32
+		case TKN_SAFECALL:   is_stdcall  = true; break; // safecall qualifier is the same as stdcall in C++
+		case TKN_STDCALL:    is_stdcall  = true; break;
+		case TKN_PASCAL:     is_pascal   = true; break;
+		case TKN_CDECL:      is_cdecl    = true; break;
+		case TKN_REGISTER:   is_register = true; break;
+		case TKN_FINAL:      is_final    = true; break;
+		case TKN_ABSTRACT:   is_abstract = true; break;
+		case TKN_INLINE:     is_inline   = true; break;
+		case TKN_DEPRECATED: is_deprecated = true; t_depr = t->ident; t_mess = dynamic_cast<two_tokens*>(t->ident)->t_tok2; break;
 		//case TKN_C: type->is_extern_c  = true; break;
 		}
 
@@ -5489,6 +5512,16 @@ void proc_fwd_decl_node::translate(int)
 		t_proc->set_trans(dprintf("~%s", var ? ((object_tp*)var->ring)->class_name->out_name->text : "<UNKNOWN CLASS>"));
 	}
 
+	token* m_tkn;
+	token* first_qual = nullptr;
+	if (qualifiers) {
+		auto qual = qualifiers;
+		while (qual->next) qual = qual->next; // look for the first qualifier because "qualifiers" refers to the last one
+		m_tkn = qual->ident;
+		first_qual = qual->ident;
+	} else {
+		m_tkn = t_semi1;
+	}
 
 	// 'static' directive is not translated into C++ keyword 'static' because keyword 'class' tells us that method is static
 	// e.g. 'class procedure AAAA;'. Compare to - 'class procedure AAAA; static;'
@@ -5501,7 +5534,7 @@ void proc_fwd_decl_node::translate(int)
 		f_tkn = f_tkn->prepend("virtual ");
 
 	if (is_override)
-		l_tkn = l_tkn->prepend(" override");
+		m_tkn->prepend(" override");
 
 	if (is_stdcall)
 		f_tkn->append(" __stdcall");
@@ -5519,15 +5552,18 @@ void proc_fwd_decl_node::translate(int)
 		f_tkn->append(" __fastcall");
 
 	if (is_final)
-		l_tkn = l_tkn->prepend(" final");
+		m_tkn->prepend(" final");
 
 	// interfaces are translated as abstract classes. it means that methods of interface may not contain qualifiers but be abstract
 	if (is_abstract)
-		l_tkn = l_tkn->prepend(" = 0");
+		m_tkn->prepend(" = 0");
 
 	if (is_inline)
 		f_tkn = f_tkn->prepend("inline ");
 
+	if (is_deprecated)
+		insert_depr(t_depr, t_mess, f_tkn);
+	
 	// explicit and implicit are C++ keywords. they are not translated by regular mechanism (via ptoc.cfg file) because  
 	// they are Delphi tokens defined in token.dpp file. Tokens from token.dpp file are not tranlated using ptoc.cfg file.
 	// So we need to translate those tokens manually here
@@ -5539,9 +5575,9 @@ void proc_fwd_decl_node::translate(int)
 
 	if (qualifiers)
 	{
-		auto qual = qualifiers;
-		while (qual->next) qual = qual->next; // look for the first qualifier because "qualifiers" refers to the last one
-		token::disable(qual->ident, t_semi2);
+		//auto qual = qualifiers;
+		//while (qual->next) qual = qual->next; // look for the first qualifier because "qualifiers" refers to the last one
+		token::disable(first_qual, t_semi2);
 	}
 }
 
@@ -6390,8 +6426,12 @@ void array_tpd_node::set_indices_attrib(idx_node* idx)
 
 void array_tpd_node::attrib(int)
 {
-    eltd->attrib(ctx_component);
-    type = eltd->type;
+	//for 'array of const' eltd==NULL and type==NULL
+	if (eltd) { 
+		eltd->attrib(ctx_component);
+		type = eltd->type;
+	}
+
     if (indices) set_indices_attrib(indices);
 }
 
@@ -6401,7 +6441,7 @@ void array_tpd_node::translate(int ctx)
 
     if (t_packed) t_packed->disable();
     
-    eltd->translate(ctx_component);
+    if (eltd) eltd->translate(ctx_component);
 
 	if (language_c) {
 		token::disable(t_array, t_lbr->prev);
@@ -6431,7 +6471,7 @@ void array_tpd_node::translate(int ctx)
 			}
 		}
 	} else { // C++
-		if (type->tag == tp_dynarray) {
+		if (type && type->tag == tp_dynarray) {
 
 			if (eltd->type->tag == tp_dynarray) {
 				array_tpd_node* atp = (array_tpd_node*)eltd;
@@ -6439,7 +6479,7 @@ void array_tpd_node::translate(int ctx)
 				t_of = atp->t_of;
 				t_array->set_trans("conf_matrix");
 			} else {
-				t_array->set_trans(indices->next == NULL ? "conf_array" : "conf_matrix");
+				t_array->set_trans(indices->next == nullptr ? "conf_array" : "conf_matrix");
 			}
 			token::disable(t_array->next, eltd->f_tkn->prev);
 			eltd->f_tkn->prepend("<");
@@ -6447,7 +6487,7 @@ void array_tpd_node::translate(int ctx)
 
 		} else if (indices) {
 
-			for (idx_node* idx = indices; idx != NULL; idx = idx->next) {
+			for (idx_node* idx = indices; idx != nullptr; idx = idx->next) {
 				idx->translate(ctx_component);
 			}
 
@@ -6467,13 +6507,19 @@ void array_tpd_node::translate(int ctx)
 				token::disable(t_rbr->next, eltd->f_tkn->prev);
 				l_tkn = eltd->l_tkn->append(">");
 			}
-		} else { // Delphi dynamic array		
+
+		} else if (eltd) { // Delphi dynamic array 'array of Byte'		
 			t_array->set_trans("conf_array<");
 			token::disable(t_array->next, eltd->f_tkn->prev);
-			if(eltd->type->tag == tp_object)
+			if (eltd->type->tag == tp_object)
 				l_tkn = eltd->l_tkn->append("*>");
 			else
 				l_tkn = eltd->l_tkn->append(">");
+
+		} else { // array of const
+			token::disable(t_array, t_of->next_relevant());
+			l_tkn = t_array->append("...");
+
 		}
 	}
 }
@@ -7339,20 +7385,21 @@ void prop_default_directive_node::translate(int)
 	t_semi->disable();
 }
 
-property_node::property_node(token* t_property, token* t_ident, decl_node* array, decl_node* type, decl_node* index,
+property_node::property_node(token* t_class, token* t_property, token* t_ident, decl_node* array, decl_node* type, decl_node* index,
 	decl_node* read, decl_node* write, decl_node* stored, decl_node* dfault, token* t_semi, decl_node* dfault_d)
 {
+	this->t_class    = t_class;
 	this->t_property = t_property;
-	this->t_ident = t_ident;
-	this->array = (prop_array_node*)array;
-	this->prop_type = (prop_type_def_node*)type;
-	this->index = (prop_index_node*)index;
-	this->read = (prop_read_node*)read;
-	this->write = (prop_write_node*)write;
-	this->stored = (prop_stored_node*)stored; 
-	this->dfault = (prop_default_node*)dfault;
-	this->t_semi = t_semi;
-	this->dfault_d = (prop_default_directive_node*)dfault_d;
+	this->t_ident    = t_ident;
+	this->array      = (prop_array_node*)array;
+	this->prop_type  = (prop_type_def_node*)type;
+	this->index      = (prop_index_node*)index;
+	this->read       = (prop_read_node*)read;
+	this->write      = (prop_write_node*)write;
+	this->stored     = (prop_stored_node*)stored; 
+	this->dfault     = (prop_default_node*)dfault;
+	this->t_semi     = t_semi;
+	this->dfault_d   = (prop_default_directive_node*)dfault_d;
 }
 void property_node::attrib(int ctx)
 {
@@ -7461,6 +7508,7 @@ void property_node::translate(int ctx)
 	//	t_semi->prepend(dprintf("\n\nconst %s operator[](const %s key) const { return (%s)(%s[key]); }", 
 	//		            prop_type->val_type, array->key_type, prop_type->val_type, t_ident->out_text));
 
+	if (t_class) t_class->disable();
 	t_property->disable();
 	t_ident->disable();
 	t_semi->disable();

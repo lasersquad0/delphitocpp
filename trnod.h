@@ -54,6 +54,22 @@ class node : public heap_object {
     virtual void print_debug() {};
 };
 
+class two_tokens : public token {
+public:
+   // token* t_tok1;
+    token* t_tok2;
+
+    two_tokens(token* token1, token* token2): token(*token1)
+    {
+        //*(token*)this = *token1;
+        t_tok2 = token2;
+    }
+
+ //   void attrib(int) override { f_tkn = t_tok1; l_tkn = t_tok2; };
+ //   void translate(int ctx) override;
+
+};
+
 class token_list : public heap_object {
   public: 
     token*           ident;
@@ -880,7 +896,7 @@ class write_list_node : public node {
 };
 */
 
-class inherited_node : public stmt_node {
+class inherited_node : public expr_node {
 public:
     token*      t_inherited;
     token*      t_ident;
@@ -949,6 +965,18 @@ class decl_node : public node {
     int	      attr;
 
     decl_node() { next = NULL; attr = 0; }
+};
+
+class attrib_node : public decl_node {
+public:
+    token* t_lbr;
+    token_list* idents;
+    token* t_rbr;
+
+    attrib_node(token* t_lbr, token_list* idents, token* t_rbr);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
 };
 
 //
@@ -1040,7 +1068,6 @@ class const_def_part_node : public decl_node {
 // Type definition
 //
 
-
 class type_def_node : public decl_node { 
   public: 
     token*       t_ident; 
@@ -1084,6 +1111,7 @@ public:
 
 class var_decl_node : public decl_node { 
   public: 
+    attrib_node*  attribute;
     token_list*   vars; 
     token*        t_coln;   // ':'
     tpd_node*     tpd; 
@@ -1093,7 +1121,7 @@ class var_decl_node : public decl_node {
     token*        t_depr;  // deprecated
     token*        t_mess;  // deprecated message
 
-    var_decl_node(token_list* vars, token* coln, tpd_node* tpd, token* eq, expr_node* def_value, token* t_depr, token* t_mess);
+    var_decl_node(attrib_node* attribute, token_list* vars, token* coln, tpd_node* tpd, token* eq, expr_node* def_value, token* t_depr, token* t_mess);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1106,7 +1134,7 @@ class var_decl_node : public decl_node {
 class var_decl_part_node : public decl_node { 
   public: 
     token*           t_classvar; // 'class' - marker that it is static field in class
-    token*           t_var;      // var, const or out
+    token*           t_var;      // var, const or out 
     var_decl_node*   vars;       
     bool             is_const;
 
@@ -1120,10 +1148,11 @@ class field_list_node;
 
 class record_field_part_node : public decl_node {
 public:
+    token* t_classvar; // 'class' - marker that it is static field in record
     token* t_var;
     field_list_node* flist;
 
-    record_field_part_node(token* t_var, field_list_node* flist);
+    record_field_part_node(token* t_classvar, token* t_var, field_list_node* flist);
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
@@ -1212,25 +1241,28 @@ class proc_decl_node : public decl_node {
 };
 
 class proc_fwd_decl_node : public proc_decl_node {
+protected:
+    token*          t_depr;
+    token*          t_mess;
   public: 
-    token*              t_semi1;
-    token_list*         qualifiers; 
-    token*              t_semi2;
-    bool                is_external;
-    bool                is_static;
-    bool                is_virtual;
-    bool                is_stdcall;
-    bool                is_pascal;
-    bool                is_cdecl;
-    bool                is_register;
-    //bool                is_overload;
-    bool                is_abstract;
-    bool                is_final;
-    bool                is_override;
-    bool                is_inline;
+    token*          t_semi1;
+    token_list*     qualifiers; 
+    token*          t_semi2;
+    bool            is_external;
+    bool            is_static;
+    bool            is_virtual;
+    bool            is_stdcall;
+    bool            is_pascal;
+    bool            is_cdecl;
+    bool            is_register;
+    bool            is_deprecated;
+    bool            is_abstract;
+    bool            is_final;
+    bool            is_override;
+    bool            is_inline;
 
     proc_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, 
-                       token* t_semi1, token_list* qualifiers = nullptr, token* t_semi2 = nullptr); 
+                       token* t_semi1, token_list* qualifiers, token* t_semi2); 
   
     void attrib(int ctx) override;
     void translate(int ctx) override;
@@ -1858,6 +1890,7 @@ public:
 
 class property_node : public decl_node {
 public:
+    token* t_class; // 'class' word before property declaration, makes property a static property
     token* t_property;
     token* t_ident;
     prop_array_node* array;
@@ -1870,7 +1903,7 @@ public:
     token* t_semi;
     prop_default_directive_node* dfault_d;
 
-    property_node(token* t_property, token* t_ident, decl_node* array, decl_node* type, decl_node* index,
+    property_node(token* t_class, token* t_property, token* t_ident, decl_node* array, decl_node* type, decl_node* index,
         decl_node* read, decl_node* write, decl_node* stored, decl_node* dfault, token* t_semi, decl_node* dfault_d);
 
     void attrib(int ctx) override;
