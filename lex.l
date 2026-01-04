@@ -245,10 +245,10 @@ static int process_comments() {
                         sprintf(cmt_text, "#ifdef %s", cmt_buf + 9);
                     } else if (strincmp(startcmp, "IF ", 3) == 0) {
                         sprintf(cmt_text, "#if %s", cmt_buf + 6);
-                    } else if (strincmp(startcmp, "ELSE ", 5) == 0) {
-                        sprintf(cmt_text, "#else %s", cmt_buf + 8);
-                    } else if (strincmp(startcmp , "ELSEIF", 6) == 0) {
+                    } else if (strincmp(startcmp , "ELSEIF", 6) == 0) { // ELSEIF should stay before ELSE 
                         sprintf(cmt_text, "#elif%s", cmt_buf + 9);
+                    } else if (strincmp(startcmp, "ELSE", 4) == 0) {
+                        sprintf(cmt_text, "#else%s", cmt_buf + 7);
                     } else if (strincmp(startcmp, "ENDIF", 5) == 0) {
                         sprintf(cmt_text, "#endif%s", cmt_buf + 8);
                     } else if (strincmp(startcmp, "IFEND", 5) == 0) {
@@ -261,9 +261,9 @@ static int process_comments() {
                         sprintf(cmt_text, "#undef%s", cmt_buf + 8);
                     } else if (strincmp(startcmp, "IFOPT", 5) == 0) {
 		                int value = 1;
-                        char* pp = strchr(cmt_text + 8, '+');
+                        char* pp = strchr(cmt_buf + 8, '+');
 		                if (pp != NULL) *pp = '\0';
-		                else if ((pp = strchr(cmt_text + 8, '-')) != NULL) {
+		                else if ((pp = strchr(cmt_buf + 8, '-')) != NULL) {
 			                value = 0;
 			                *pp = '\0';
 		                }
@@ -275,7 +275,11 @@ static int process_comments() {
 		            } else if (strincmp(startcmp, "LINK ", 5) == 0) {
                         char* fname = get_filename(startcmp + 5, ".obj");
                         sprintf(cmt_text, "#pragma comment(lib, \"%s\")", fname); //TODO rest of text after filename will be lost
-		            }
+		            } else {
+                        cmt_text[len++] = '*';
+		                cmt_text[len++] = '/';
+		                cmt_text[len] = '\0';
+                    }
                 }
                 else
                 {
