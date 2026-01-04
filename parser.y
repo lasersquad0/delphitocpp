@@ -263,7 +263,7 @@ void zzerror(const char* text)
 %type <n_decl>  guid
 %type <n_decl>  interface_components
 %type <n_decl>  interface_component
-%type <n_decl>  object_properties 
+//%type <n_decl>  object_properties 
 %type <n_decl>  object_methods
 %type <n_decl>  object_body
 %type <n_decl>  object_components
@@ -313,7 +313,7 @@ void zzerror(const char* text)
 %type <n_decl>  proc_spec
 %type <n_decl>  proc_def
 %type <n_decl>  property_decl
-%type <n_decl>  property_decl_list
+//%type <n_decl>  property_decl_list
 
 %type <n_plist> formal_params
 %type <n_decl>  formal_param_list
@@ -1013,8 +1013,9 @@ property_decl:
     | CLASS PROPERTY IDENT prop_array prop_type_def prop_index prop_read prop_write prop_stored prop_default ';' prop_default_directive
         { $$ = new property_node($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12); } 
 
-property_decl_list: property_decl
-    | property_decl property_decl_list { $1->next = $2; $$ = $1; }
+//property_decl_list: property_decl
+//    | property_decl property_decl_list { $1->next = $2; $$ = $1; }
+
 
 prop_array: { $$ = NULL; }
     | '[' prop_param_list ']'
@@ -1166,7 +1167,7 @@ record_component: record_access_spec_decl
     | CLASS VAR field_list
         { $$ = new record_field_part_node($1, $2, $3); }    
     | record_methods
-    | object_properties
+//    | object_properties
     | const_def_part 
     | type_def_part 
 
@@ -1184,7 +1185,8 @@ record_method_decl:
         { $$ = new method_decl_node($1, $2); }
     | CLASS operator_fwd_decl  
         { $$ = new method_decl_node($1, $2); }
-
+    | property_decl
+    
 record_field_list: field_list
         { $$ = new record_field_part_node(NULL, NULL, $1); }
 
@@ -1221,14 +1223,15 @@ interface_components: interface_component interface_components
     | interface_component
 
 interface_component: object_methods
-    | object_properties
+ //   | object_properties
 
 guid: '[' SCONST ']' { $$ = new guid_node($1, $2, $3); }
 
 
 class_or_object: OBJECT | CLASS
  
-class_type: class_or_object object_body END
+class_type: 
+      class_or_object object_body END
         { $$ = new object_tpd_node($1, NULL, NULL, NULL, $2, $3); }  
     | class_or_object '(' ident_list ')' object_body END
         { $$ = new object_tpd_node($1, $2, $3, $4, $5, $6); }
@@ -1244,18 +1247,19 @@ class_type: class_or_object object_body END
         { $$ = new metaclass_tpd_node($1, $2, $3); }
 	
 
-object_body: field_decl_list object_components
+object_body: object_components
+    | field_decl_list object_components
         { 
-          // rare case when two lists under one roof. 
-          // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
-          decl_node** cpp;   
-          for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
-	  *cpp = $2;
-          $$ = $1; 
+           // rare case when two lists under one roof. 
+           // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
+           decl_node** cpp;   
+           for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
+	      *cpp = $2;
+           $$ = $1; 
         }
-    | object_components
-    | field_decl_list    //<n_vdcl>
+ /*   | field_decl_list    //<n_vdcl>
         { $$ = new var_decl_part_node(NULL, NULL, $1); }
+    */
 
 record_access_spec_tok: PRIVATE | PUBLIC 
 
@@ -1268,23 +1272,23 @@ class_access_spec_decl: class_access_spec_tok { $$ = new access_specifier_node(N
     | STRICT PRIVATE   { $$ = new access_specifier_node($1, $2); }
     | STRICT PROTECTED { $$ = new access_specifier_node($1, $2); }
 
-object_components: object_component object_components
-       { 
-         // special case when two lists under one roof. 
-         // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
-         decl_node** cpp;   
-         for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
-	 *cpp = $2;
-          $$ = $1; 
-       }
-    | object_component
-
+object_components: object_component
+    | object_component object_components
+        { 
+           // special case when two lists under one roof. 
+           // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
+           decl_node** cpp;   
+           for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
+	      *cpp = $2;
+           $$ = $1; 
+        }
+         
 object_component: class_access_spec_decl 
     | class_access_spec_decl field_decl_list
         { $1->next = $2; $$ = $1; } 
     | field_decl_part
+//    | object_properties
     | object_methods
-    | object_properties
     | const_def_part 
     | type_def_part 
 
@@ -1300,22 +1304,23 @@ field_decl_list: var_decl ';' { $$ = $1; }
 
 object_methods: method_decl_list
 
-object_properties: property_decl_list
-        { $$ = new property_decl_part_node($1); }
+//object_properties: property_decl_list
+//        { $$ = new property_decl_part_node($1); }
 
 method_decl_list: method_decl
     | method_decl method_decl_list { $1->next = $2; $$ = $1; }
-  //  | proc_spec     proc_fwd_decl_list { $1->next = $2; $$ = $1; }
 
-method_decl: proc_fwd_decl 
+method_decl: 
+      proc_fwd_decl
         { $$ = new method_decl_node(NULL, $1); }
-    | proc_spec 
+    | proc_spec
         { $$ = new method_decl_node(NULL, $1); }
-    | CLASS proc_fwd_decl  
+    | CLASS proc_fwd_decl
         { $$ = new method_decl_node($1, $2); }
-    | CLASS proc_spec  
+    | CLASS proc_spec
         { $$ = new method_decl_node($1, $2); }
-  
+    | property_decl
+
 
 file_type: packed FIL OF type { $$ = new file_tpd_node($1, $2, $3, $4); }
 
