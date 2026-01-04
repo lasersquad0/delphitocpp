@@ -198,7 +198,7 @@ union YYSTYPE
 {
 
     token                *tok;
-
+    two_tokens           *tok2;
     token_list           *toks; 
 
     node                 *n_node;
@@ -231,7 +231,9 @@ union YYSTYPE
 
     asm_line_node        *n_asm;       
     asm_block_node       *n_basm;       
-    import_list_node     *n_imp; 
+    import_list_node     *n_imp;
+    
+    attrib_node          *n_attr;
 
 
 };

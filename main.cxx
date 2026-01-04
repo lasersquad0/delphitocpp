@@ -57,8 +57,10 @@
 * DONE - improved work of $I and $INCLUDE directives
 * DONE - implemented {IFEND}, {$IF ... } and {$ELSEIF ...} directives
 * 
-* 
-* 
+* implement proper parsing of external directive parameters like below
+* procedure FunctionName; cdecl; external object 'ObjectFile.o' name '_FunctionName';
+* function ExternalMethod(const SomeString: PChar): Integer; stdcall; external 'cstyle.dll' delayed;
+
 implement parsing of complex conditions in these directives
 {$IF Defined(xxx) and Declared(YYY)}
 {$IF Version > 2.0}

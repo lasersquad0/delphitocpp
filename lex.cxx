@@ -2742,10 +2742,10 @@ static int process_comments() {
                         sprintf(cmt_text, "#ifdef %s", cmt_buf + 9);
                     } else if (strincmp(startcmp, "IF ", 3) == 0) {
                         sprintf(cmt_text, "#if %s", cmt_buf + 6);
-                    } else if (strincmp(startcmp, "ELSE ", 5) == 0) {
-                        sprintf(cmt_text, "#else %s", cmt_buf + 8);
-                    } else if (strincmp(startcmp , "ELSEIF", 6) == 0) {
+                    } else if (strincmp(startcmp , "ELSEIF", 6) == 0) { // ELSEIF should stay before ELSE 
                         sprintf(cmt_text, "#elif%s", cmt_buf + 9);
+                    } else if (strincmp(startcmp, "ELSE", 4) == 0) {
+                        sprintf(cmt_text, "#else%s", cmt_buf + 7);
                     } else if (strincmp(startcmp, "ENDIF", 5) == 0) {
                         sprintf(cmt_text, "#endif%s", cmt_buf + 8);
                     } else if (strincmp(startcmp, "IFEND", 5) == 0) {
@@ -2758,9 +2758,9 @@ static int process_comments() {
                         sprintf(cmt_text, "#undef%s", cmt_buf + 8);
                     } else if (strincmp(startcmp, "IFOPT", 5) == 0) {
 		                int value = 1;
-                        char* pp = strchr(cmt_text + 8, '+');
+                        char* pp = strchr(cmt_buf + 8, '+');
 		                if (pp != NULL) *pp = '\0';
-		                else if ((pp = strchr(cmt_text + 8, '-')) != NULL) {
+		                else if ((pp = strchr(cmt_buf + 8, '-')) != NULL) {
 			                value = 0;
 			                *pp = '\0';
 		                }
@@ -2772,7 +2772,11 @@ static int process_comments() {
 		            } else if (strincmp(startcmp, "LINK ", 5) == 0) {
                         char* fname = get_filename(startcmp + 5, ".obj");
                         sprintf(cmt_text, "#pragma comment(lib, \"%s\")", fname); //TODO rest of text after filename will be lost
-		            }
+		            } else {
+                        cmt_text[len++] = '*';
+		                cmt_text[len++] = '/';
+		                cmt_text[len] = '\0';
+                    }
                 }
                 else
                 {
@@ -2853,14 +2857,14 @@ static int process_include(int start)
 }
 
 
-#line 2857 "lex.cxx"
+#line 2861 "lex.cxx"
 /* 
  the "incl" state is used for picking up the name of an include file 
  the "unit" state used for proper parsing name of unit that contains one or more dots ('.'). Because IDENT cannot contain dots.
  the "use" state used to go and parse other units which current unit includes by "uses" directive. 
  */
 
-#line 2864 "lex.cxx"
+#line 2868 "lex.cxx"
 
 #define INITIAL 0
 #define incl 1
@@ -3064,10 +3068,10 @@ YY_DECL
 		}
 
 	{
-#line 390 "lex.l"
+#line 394 "lex.l"
 
 
-#line 3071 "lex.cxx"
+#line 3075 "lex.cxx"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -3121,22 +3125,22 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 392 "lex.l"
+#line 396 "lex.l"
 BEGIN(incl);
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 393 "lex.l"
+#line 397 "lex.l"
 BEGIN(incl);
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 394 "lex.l"
+#line 398 "lex.l"
 BEGIN(use);  // go to the 'uses' section mode, Turbo Pascal
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 396 "lex.l"
+#line 400 "lex.l"
 { 
      BEGIN(unit); // go to the special processing of 'unit' name which can contain several dots.
      char lc_buf[MAX_ID_LENGTH];
@@ -3152,27 +3156,27 @@ YY_RULE_SETUP
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 409 "lex.l"
+#line 413 "lex.l"
 { return process_end_of_line_comment(); }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 410 "lex.l"
+#line 414 "lex.l"
 { return process_comments(); }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 411 "lex.l"
+#line 415 "lex.l"
 { return process_comments(); } //TODO do we really need this line?
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 412 "lex.l"
+#line 416 "lex.l"
 { return process_comments(); }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 414 "lex.l"
+#line 418 "lex.l"
 { // unit name can contain dots ('.') 
      char lc_buf[MAX_ID_LENGTH];
 	 char *src = yytext, *dst = lc_buf;
@@ -3187,7 +3191,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 426 "lex.l"
+#line 430 "lex.l"
 {
     BEGIN(INITIAL);  // To leave unit state
     return tkn(TKN_SEMICOLON);
@@ -3195,18 +3199,18 @@ YY_RULE_SETUP
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 431 "lex.l"
+#line 435 "lex.l"
 { return tkn(TKN_SPACE); }
 	YY_BREAK
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 432 "lex.l"
+#line 436 "lex.l"
 { return tkn(TKN_LN); }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 434 "lex.l"
+#line 438 "lex.l"
 {
     error(line, pos, file_name, "unrecognized token: %s\n",	yytext);
 }
@@ -3214,7 +3218,7 @@ YY_RULE_SETUP
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 439 "lex.l"
+#line 443 "lex.l"
 {  // skip whitespaces and commas in list of unit names from 'uses' section
     char* p = yytext;
     while(*p != '\0') {
@@ -3225,7 +3229,7 @@ YY_RULE_SETUP
 case 15:
 /* rule 15 can match eol */
 YY_RULE_SETUP
-#line 446 "lex.l"
+#line 450 "lex.l"
 { /* skip comments */
     char* p = yytext;
     while(*p != '\0') {
@@ -3235,7 +3239,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 453 "lex.l"
+#line 457 "lex.l"
 { // file name can contain dot ('.') in its name
                        /* got the include file name */
     char *fname = dprintf("%s.pas", yytext);
@@ -3286,14 +3290,14 @@ YY_RULE_SETUP
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 500 "lex.l"
+#line 504 "lex.l"
 {
     BEGIN(INITIAL);     // To leave include state
 }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 505 "lex.l"
+#line 509 "lex.l"
 {
     error(line, pos, file_name, "unrecognized token: %s\n",	yytext);
 }
@@ -3301,7 +3305,7 @@ YY_RULE_SETUP
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 510 "lex.l"
+#line 514 "lex.l"
 {  /* eat the whitespace */
     char* p = yytext;
     while(*p != '\0') {
@@ -3311,7 +3315,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 516 "lex.l"
+#line 520 "lex.l"
 {   /* got the include file name */
     BEGIN(INITIAL);   // To leave include state
 
@@ -3348,7 +3352,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 550 "lex.l"
+#line 554 "lex.l"
 {
     error(line, pos, file_name, "unrecognized token: %s\n",	yytext);
 }
@@ -3366,7 +3370,7 @@ YY_RULE_SETUP
 case 22:
 /* rule 22 can match eol */
 YY_RULE_SETUP
-#line 565 "lex.l"
+#line 569 "lex.l"
 { return process_include(3); }
 	YY_BREAK
 /* \{\$INCLUDE[ \t]+[_a-zA-Z0-9\.\']+(([ \t\n]*\})|([ \t\n]+[^\}]+\})) { return process_include(9); }
@@ -3374,14 +3378,14 @@ YY_RULE_SETUP
 case 23:
 /* rule 23 can match eol */
 YY_RULE_SETUP
-#line 570 "lex.l"
+#line 574 "lex.l"
 { return process_include(9); }
 	YY_BREAK
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(incl):
 case YY_STATE_EOF(use):
 case YY_STATE_EOF(unit):
-#line 572 "lex.l"
+#line 576 "lex.l"
 {
     if (scanner.empty()) {
 	    return -1;  // MAGIC ! (< 0 means end of files)
@@ -3395,163 +3399,163 @@ case YY_STATE_EOF(unit):
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 583 "lex.l"
+#line 587 "lex.l"
 { return process_end_of_line_comment(); }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 584 "lex.l"
+#line 588 "lex.l"
 { return process_comments(); }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 585 "lex.l"
+#line 589 "lex.l"
 { return process_comments(); }//TODO do we really need this line?
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 586 "lex.l"
+#line 590 "lex.l"
 { return process_comments(); }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 588 "lex.l"
+#line 592 "lex.l"
 { return tkn(TKN_LPAR); }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 589 "lex.l"
+#line 593 "lex.l"
 { return tkn(TKN_RPAR); }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 590 "lex.l"
+#line 594 "lex.l"
 { text = "["; return tkn(TKN_LBR);  }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 591 "lex.l"
+#line 595 "lex.l"
 { text = "]"; return tkn(TKN_RBR);  }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 592 "lex.l"
+#line 596 "lex.l"
 { return tkn(TKN_LBR);  }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 593 "lex.l"
+#line 597 "lex.l"
 { return tkn(TKN_RBR);  }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 594 "lex.l"
+#line 598 "lex.l"
 { return tkn(TKN_MUL);  }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 595 "lex.l"
+#line 599 "lex.l"
 { return tkn(TKN_PLUS); }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 596 "lex.l"
+#line 600 "lex.l"
 { return tkn(TKN_MINUS);}
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 597 "lex.l"
+#line 601 "lex.l"
 { return tkn(TKN_C_SHR); }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 598 "lex.l"
+#line 602 "lex.l"
 { return tkn(TKN_C_SHL);}
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 599 "lex.l"
+#line 603 "lex.l"
 { return tkn(TKN_C_AND);}
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 600 "lex.l"
+#line 604 "lex.l"
 { return tkn(TKN_C_OR);}
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 601 "lex.l"
+#line 605 "lex.l"
 { return tkn(TKN_LETMUL);  }
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 602 "lex.l"
+#line 606 "lex.l"
 { return tkn(TKN_LETADD); }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 603 "lex.l"
+#line 607 "lex.l"
 { return tkn(TKN_LETSUB);}
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 604 "lex.l"
+#line 608 "lex.l"
 { return tkn(TKN_LETSHR); }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 605 "lex.l"
+#line 609 "lex.l"
 { return tkn(TKN_LETSHL);}
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 606 "lex.l"
+#line 610 "lex.l"
 { return tkn(TKN_LETAND);}
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 607 "lex.l"
+#line 611 "lex.l"
 { return tkn(TKN_LETOR);}
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 608 "lex.l"
+#line 612 "lex.l"
 { return tkn(TKN_LETDIV);}
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 609 "lex.l"
+#line 613 "lex.l"
 { return tkn(TKN_C_NOT);}
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 610 "lex.l"
+#line 614 "lex.l"
 { return tkn(TKN_COMMA);}
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 611 "lex.l"
+#line 615 "lex.l"
 { return tkn(TKN_DOT);  }
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
-#line 612 "lex.l"
+#line 616 "lex.l"
 { return tkn(TKN_DOTS); }
 	YY_BREAK
 case 53:
 YY_RULE_SETUP
-#line 613 "lex.l"
+#line 617 "lex.l"
 { return tkn(TKN_DIVR); }
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-#line 614 "lex.l"
+#line 618 "lex.l"
 { return turbo_pascal ? tkn(TKN_ADDR) : tkn(TKN_HEAP); }
 	YY_BREAK
 case 55:
 /* rule 55 can match eol */
 YY_RULE_SETUP
-#line 616 "lex.l"
+#line 620 "lex.l"
 {
               assert(yyleng == 3);
               text = dprintf("#%d", yytext[1] & 31); // bypass symbol ^ and take second one
@@ -3564,7 +3568,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 626 "lex.l"
+#line 630 "lex.l"
 { /*if (turbo_pascal //&& !type_or_var_context // condition to recognize special control symbols like ^J ^I ^@ ^[ ^\ 
 		          && curr_token->tag != TKN_HEAP
                   && curr_token->tag != TKN_RBR && curr_token->tag != TKN_RPAR
@@ -3596,62 +3600,62 @@ YY_RULE_SETUP
 	YY_BREAK
 case 57:
 YY_RULE_SETUP
-#line 654 "lex.l"
+#line 658 "lex.l"
 { return tkn(TKN_LET);  }
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
-#line 655 "lex.l"
+#line 659 "lex.l"
 { return tkn(TKN_COLON);}
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
-#line 656 "lex.l"
+#line 660 "lex.l"
 { return tkn(TKN_SEMICOLON); }
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
-#line 657 "lex.l"
+#line 661 "lex.l"
 { return tkn(TKN_LE);  }
 	YY_BREAK
 case 61:
 YY_RULE_SETUP
-#line 658 "lex.l"
+#line 662 "lex.l"
 { return tkn(TKN_GE);  }
 	YY_BREAK
 case 62:
 YY_RULE_SETUP
-#line 659 "lex.l"
+#line 663 "lex.l"
 { return tkn(TKN_LT);  }
 	YY_BREAK
 case 63:
 YY_RULE_SETUP
-#line 660 "lex.l"
+#line 664 "lex.l"
 { return tkn(TKN_GT);  }
 	YY_BREAK
 case 64:
 YY_RULE_SETUP
-#line 661 "lex.l"
+#line 665 "lex.l"
 { return tkn(TKN_EQ);  }
 	YY_BREAK
 case 65:
 YY_RULE_SETUP
-#line 662 "lex.l"
+#line 666 "lex.l"
 { return tkn(TKN_NE);  }
 	YY_BREAK
 case 66:
 YY_RULE_SETUP
-#line 664 "lex.l"
+#line 668 "lex.l"
 { return tkn(TKN_RCONST); }
 	YY_BREAK
 case 67:
 YY_RULE_SETUP
-#line 666 "lex.l"
+#line 670 "lex.l"
 { return tkn(TKN_ICONST); }
 	YY_BREAK
 case 68:
 YY_RULE_SETUP
-#line 668 "lex.l"
+#line 672 "lex.l"
 {
              char lc_buf[MAX_ID_LENGTH];
 	         char *src = yytext, *dst = lc_buf;
@@ -3732,38 +3736,38 @@ YY_RULE_SETUP
 case 69:
 /* rule 69 can match eol */
 YY_RULE_SETUP
-#line 746 "lex.l"
+#line 750 "lex.l"
 { return tkn(TKN_SCONST); }
 	YY_BREAK
 case 70:
 YY_RULE_SETUP
-#line 748 "lex.l"
+#line 752 "lex.l"
 { return tkn(TKN_SPACE); }
 	YY_BREAK
 case 71:
 /* rule 71 can match eol */
 YY_RULE_SETUP
-#line 750 "lex.l"
+#line 754 "lex.l"
 { return tkn(TKN_LN); }
 	YY_BREAK
 case 72:
 YY_RULE_SETUP
-#line 752 "lex.l"
+#line 756 "lex.l"
 { return tkn(TKN_SPACE); } // this is UTF-8 BOM (Byte Order Mark) which present in some sources, treat it as space for simplicity
 	YY_BREAK
 case 73:
 YY_RULE_SETUP
-#line 754 "lex.l"
+#line 758 "lex.l"
 {
                 error(line, pos, file_name, "unrecognized token: %s\n", yytext);
              }
 	YY_BREAK
 case 74:
 YY_RULE_SETUP
-#line 758 "lex.l"
+#line 762 "lex.l"
 ECHO;
 	YY_BREAK
-#line 3767 "lex.cxx"
+#line 3771 "lex.cxx"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -4760,7 +4764,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 758 "lex.l"
+#line 762 "lex.l"
 
 
 void scan_ctx::push() {
