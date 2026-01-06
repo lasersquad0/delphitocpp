@@ -56,6 +56,14 @@
 * DONE - now functions like 'function fun1();' and 'function fun2;' are both parsed correctly as functions and as methods
 * DONE - improved work of $I and $INCLUDE directives
 * DONE - implemented {IFEND}, {$IF ... } and {$ELSEIF ...} directives
+* DONE - added implementation for {$L ...} and {$LINK ... } directives
+* 
+* 
+* 
+* 
+* bug in translating function calls like below (with empty brases)
+* DDelete(); 
+* translated to DDelete( 0)
 * 
 * implement proper parsing of external directive parameters like below
 * procedure FunctionName; cdecl; external object 'ObjectFile.o' name '_FunctionName';
@@ -202,7 +210,7 @@ static void load_configuration(char* name) {
 			if (strcmp(buf, "#begin(reserved)") == 0) {
 				while (fscanf(cfg, "%s", buf) == 1 && strcmp(buf, "#end(reserved)") != 0)
 				{
-					auto nm = nm_entry::add(buf, TKN_RESERVED);
+					nm_entry::add(buf, TKN_RESERVED);
 
 					// If 'RESERVED' name has already added to nm_entry with other TKN_* id then nm will contain original nm with TKN_* <> TKN_RESERVED. 
 					// In this case we set additional flag in nm->flags to mark this nm as reserved
@@ -463,6 +471,7 @@ int main(int argc, char* argv[])
 #else
     token::input(dprintf("%s%s", prog_path, turbo_pascal ? "tptoc.pas" : "ptoc.pas")); 
 #endif
+
     zzparse();
 
     compile_system_library = false;
