@@ -81,9 +81,9 @@ void node::swallow_semicolon()
 // Statements
 //=============================================================================
 
-attrib_node::attrib_node(token* t_lbr, token_list* idents, token* t_rbr)
+attrib_node::attrib_node(token* t_lbr, stmt_node* attr_cont, token* t_rbr)
 {
-	CONS3(t_lbr, idents, t_rbr);
+	CONS3(t_lbr, attr_cont, t_rbr);
 }
 
 void attrib_node::attrib(int)
@@ -95,6 +95,22 @@ void attrib_node::attrib(int)
 void attrib_node::translate(int)
 {
 	
+}
+
+attrib_content::attrib_content(token* ident, token* t_lbr, expr_node* params, token* t_rbr)
+{
+	CONS4(ident, t_lbr, params, t_rbr);
+}
+
+void attrib_content::attrib(int)
+{
+	f_tkn = ident;
+	l_tkn = t_rbr;
+}
+
+void attrib_content::translate(int)
+{
+
 }
 
 import_list_node::import_list_node(token* lpar, token_list* params, token* rpar)
@@ -1580,9 +1596,9 @@ bool expr_node::is_parameter()
 atom_expr_node::atom_expr_node(token* t_tkn) : expr_node(tn_atom)
 {
     CONS1(t_tkn);
-	var = NULL;
-	temp = NULL;
-	with = NULL;
+	var = nullptr;
+	temp = nullptr;
+	with = nullptr;
 }
 
 void atom_expr_node::attrib(int ctx)
@@ -5336,11 +5352,11 @@ void proc_decl_node::translate(int)
     }
 }
 
-proc_fwd_decl_node::proc_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln,
+proc_fwd_decl_node::proc_fwd_decl_node(attrib_node* attribute, token* t_proc, token* t_ident, param_list_node* params, token* t_coln,
                tpd_node* ret_type, token* t_semi1, token_list* qualifiers, token* t_semi2)
 		       : proc_decl_node(t_proc, t_ident, params, t_coln, ret_type)
 {
-    CONS3(t_semi1, qualifiers, t_semi2);
+    CONS4(attribute, t_semi1, qualifiers, t_semi2);
 
 	is_external = false;
 	is_static = false;
@@ -5353,6 +5369,9 @@ proc_fwd_decl_node::proc_fwd_decl_node(token* t_proc, token* t_ident, param_list
 	is_final = false;
 	is_abstract = false;
 	is_inline = false;
+	is_deprecated = false;
+
+	t_depr = t_mess = nullptr;
 }
 
 void proc_fwd_decl_node::attrib(int ctx)
@@ -5512,16 +5531,14 @@ void proc_fwd_decl_node::translate(int)
 		t_proc->set_trans(dprintf("~%s", var ? ((object_tp*)var->ring)->class_name->out_name->text : "<UNKNOWN CLASS>"));
 	}
 
-	token* m_tkn;
+	token* m_tkn = t_semi1; // t_semi1 may be NULL 
 	token* first_qual = nullptr;
 	if (qualifiers) {
 		auto qual = qualifiers;
 		while (qual->next) qual = qual->next; // look for the first qualifier because "qualifiers" refers to the last one
-		m_tkn = qual->ident;
+		if (m_tkn == nullptr) m_tkn = qual->ident; // if not initialized by t_semi1 then initialize by first qualifier
 		first_qual = qual->ident;
-	} else {
-		m_tkn = t_semi1;
-	}
+	} 
 
 	// 'static' directive is not translated into C++ keyword 'static' because keyword 'class' tells us that method is static
 	// e.g. 'class procedure AAAA;'. Compare to - 'class procedure AAAA; static;'
@@ -5581,9 +5598,10 @@ void proc_fwd_decl_node::translate(int)
 	}
 }
 
+//operators cannot have Delphi attributes applied on them, that is why we pass nullptr as attribute parameter of proc_fwd_decl_node
 operator_fwd_decl_node::operator_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, 
 	       token* t_coln, tpd_node* ret_type, token* t_semi1, token_list* qualifiers, token* t_semi2)
-	          : proc_fwd_decl_node(t_proc, t_ident, params, t_coln, ret_type, t_semi1, qualifiers, t_semi2)
+	          : proc_fwd_decl_node(nullptr, t_proc, t_ident, params, t_coln, ret_type, t_semi1, qualifiers, t_semi2)
 {
 	//this->t_semi = t_semi;
 }
@@ -5755,8 +5773,8 @@ proc_def_node::proc_def_node
 {
     CONS6(t_static, t_class, t_dot, t_semi1, /*t_attrib, t_semi2,*/ block, t_semi3);
     use_forward = false;
-    s_self = NULL;
-    self = NULL;
+    s_self = nullptr;
+    self = nullptr;
 }
 
 void proc_def_node::attrib(int ctx)
@@ -7385,9 +7403,10 @@ void prop_default_directive_node::translate(int)
 	t_semi->disable();
 }
 
-property_node::property_node(token* t_class, token* t_property, token* t_ident, decl_node* array, decl_node* type, decl_node* index,
+property_node::property_node(attrib_node* attribute, token* t_class, token* t_property, token* t_ident, decl_node* array, decl_node* type, decl_node* index,
 	decl_node* read, decl_node* write, decl_node* stored, decl_node* dfault, token* t_semi, decl_node* dfault_d)
 {
+	this->attribute  = attribute;
 	this->t_class    = t_class;
 	this->t_property = t_property;
 	this->t_ident    = t_ident;
@@ -7401,6 +7420,7 @@ property_node::property_node(token* t_class, token* t_property, token* t_ident, 
 	this->t_semi     = t_semi;
 	this->dfault_d   = (prop_default_directive_node*)dfault_d;
 }
+
 void property_node::attrib(int ctx)
 {
 	prop_type->attrib(ctx);
@@ -7415,6 +7435,7 @@ void property_node::attrib(int ctx)
 	//TODO think of tag and type of property. probably we need add new tag for this property type
 	b_ring::add_cur(t_ident, symbol::s_var, prop_type->tpd->type);
 }
+
 void property_node::translate(int ctx)
 {
 	prop_type->translate(ctx);

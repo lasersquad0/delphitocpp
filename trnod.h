@@ -964,20 +964,35 @@ class decl_node : public node {
     };	
     int	      attr;
 
-    decl_node() { next = NULL; attr = 0; }
+    decl_node() { next = nullptr; attr = 0; }
 };
 
 class attrib_node : public decl_node {
 public:
     token* t_lbr;
-    token_list* idents;
+    stmt_node* attr_cont; // actually this is attrib_content* type
     token* t_rbr;
 
-    attrib_node(token* t_lbr, token_list* idents, token* t_rbr);
+    attrib_node(token* t_lbr, stmt_node* attr_cont, token* t_rbr);
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
 };
+
+class attrib_content : public stmt_node {
+public:
+    token* ident; //IDENT or SCONST
+    token* t_lbr;
+    expr_node* params;
+    token* t_rbr;
+
+    attrib_content(token* ident, token* t_lbr, expr_node* params, token* t_rbr);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+
 
 //
 // unit initialization and finalization declaration
@@ -1245,6 +1260,7 @@ protected:
     token*          t_depr;
     token*          t_mess;
   public: 
+    attrib_node*    attribute;
     token*          t_semi1;
     token_list*     qualifiers; 
     token*          t_semi2;
@@ -1261,8 +1277,8 @@ protected:
     bool            is_override;
     bool            is_inline;
 
-    proc_fwd_decl_node(token* t_proc, token* t_ident, param_list_node* params, token* t_coln, tpd_node* ret_type, 
-                       token* t_semi1, token_list* qualifiers, token* t_semi2); 
+    proc_fwd_decl_node(attrib_node* attribute, token* t_proc, token* t_ident, param_list_node* params, token* t_coln, 
+                       tpd_node* ret_type, token* t_semi1, token_list* qualifiers, token* t_semi2); 
   
     void attrib(int ctx) override;
     void translate(int ctx) override;
@@ -1890,6 +1906,7 @@ public:
 
 class property_node : public decl_node {
 public:
+    attrib_node* attribute;
     token* t_class; // 'class' word before property declaration, makes property a static property
     token* t_property;
     token* t_ident;
@@ -1903,7 +1920,7 @@ public:
     token* t_semi;
     prop_default_directive_node* dfault_d;
 
-    property_node(token* t_class, token* t_property, token* t_ident, decl_node* array, decl_node* type, decl_node* index,
+    property_node(attrib_node* attribute, token* t_class, token* t_property, token* t_ident, decl_node* array, decl_node* type, decl_node* index,
         decl_node* read, decl_node* write, decl_node* stored, decl_node* dfault, token* t_semi, decl_node* dfault_d);
 
     void attrib(int ctx) override;
