@@ -78,6 +78,11 @@ void zzerror(const char* text)
              BEGIN
              CASE
              CDECL
+             CELSE
+             CENDIF
+             CIF
+             CIFDEF
+             CIFNDEF
              CLASS  
              CONST
              DEFAULT
@@ -189,6 +194,7 @@ void zzerror(const char* text)
 %type <tok>     fun_qualifier
                 meth_qualifier
                 qualifier
+                condition_start
 %type <tok>     packed
 %type <tok>     progend
 %type <tok>     otherwise
@@ -198,6 +204,7 @@ void zzerror(const char* text)
 %type <tok>     const
 %type <tok>     ident_ext
 %type <tok>     optional_semicolon
+%type <tok2>    deprecatd
 
 %type <n_imp>   prog_param_list
 
@@ -227,6 +234,8 @@ void zzerror(const char* text)
 %type <n_expr>  const_expr
 %type <n_expr>  const_simple_expr
 %type <n_expr>  expr
+%type <n_expr>  condition_expr
+%type <n_expr>  condition_const_expr
 %type <n_expr>  simple_expr
 %type <n_expr>  primary
 %type <n_expr>  constant
@@ -266,8 +275,12 @@ void zzerror(const char* text)
 //%type <n_decl>  guid
 %type <n_decl>  interface_methods
 %type <n_decl>  interface_method_decl
-//%type <n_decl>  object_properties 
+%type <n_decl>  interface_method_decl_c
 %type <n_decl>  object_methods
+%type <n_decl>  condition_obj_method
+%type <n_decl>  condition_interface_method
+%type <n_decl>  condition_rec_method
+//%type <n_decl>  condition_obj_body
 %type <n_decl>  object_body
 %type <n_decl>  object_components
 %type <n_decl>  object_component
@@ -299,8 +312,10 @@ void zzerror(const char* text)
 %type <n_decl>  var_const_decl_part
 %type <n_decl>  field_decl_part
 %type <n_vdcl>  var_decl_list
-%type <n_vdcl>  field_decl_list
+%type <n_vdcl>  var_decl_c
+%type <n_vdcl>  var_decl_semi
 %type <n_vdcl>  var_decl
+%type <n_vdcl>  field_decl_list
 %type <n_vdcl>  param_decl
 %type <n_vdcl>  prop_param_decl
 %type <n_vdcl>  prop_param_list
@@ -457,12 +472,21 @@ unit: UNIT IDENT ';' INTERFACE unit_decl_list IMPLEMENTATION unit_def_list END '
     | UNIT IDENT ';' INTERFACE unit_decl_list IMPLEMENTATION unit_def_list init_finit END '.'
         { $$ = new unit_node($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10); }
   
-init_finit: INITIALIZATION var_const_decl_part_list sequence
+init_finit: 
+      INITIALIZATION var_const_decl_part_list sequence
         { $$ = new init_finit_node($1, $2, $3, NULL, NULL, NULL, NULL, NULL); }
+    | INITIALIZATION sequence
+        { $$ = new init_finit_node($1, NULL, $2, NULL, NULL, NULL, NULL, NULL); }
     | INITIALIZATION var_const_decl_part_list sequence FINALIZATION var_const_decl_part_list sequence
         { $$ = new init_finit_node($1, $2, $3, NULL, $4, $5, $6, NULL); }
+    | INITIALIZATION sequence FINALIZATION var_const_decl_part_list sequence
+        { $$ = new init_finit_node($1, NULL, $2, NULL, $3, $4, $5, NULL); }
+    | INITIALIZATION var_const_decl_part_list sequence FINALIZATION sequence
+        { $$ = new init_finit_node($1, $2, $3, NULL, $4, NULL, $5, NULL); }
+    | INITIALIZATION sequence FINALIZATION sequence
+        { $$ = new init_finit_node($1, NULL, $2, NULL, $3, NULL, $4, NULL); }
 
-var_const_decl_part_list: { $$ = NULL; } 
+var_const_decl_part_list: var_const_decl_part //{ $$ = NULL; } 
     | var_const_decl_part var_const_decl_part_list { $1->next = $2; $$ = $1; }
 
 var_const_decl_part: const_def_part | var_decl_part 
@@ -484,7 +508,7 @@ block: decl_part_list compoundst
     | assemblerst 
         { $$ = new block_node($1); }
 
-decl_part_list: { $$ = NULL; } 
+decl_part_list: { $$ = NULL; }
     | decl_part decl_part_list { $1->next = $2; $$ = $1; }
 
 decl_part: label_decl_part | const_def_part | type_def_part | var_decl_part 
@@ -592,13 +616,6 @@ assemblerst: ASM asm_text END { $$ = new asm_block_node($1, $2, $3); }
 // this "stub" for pascal assembler functions, no real assembler parsing yet.
 asm_kwd: IDENT | XOR | ICONST | '@' | ':' | '[' | ']' | '(' | ')' | ',' | PLUS | MINUS
 
-//asm_ident_list: asm_kwd { $$ = new token_list($1); }
-//    | asm_kwd asm_ident_list { $$ = new token_list($1, $2); }
-
-//asm_line: asm_ident_list   { $$ = new asm_line_node($1, NULL); }
-//    | asm_ident_list ',' { $$ = new asm_line_node($1, $2); }
-    //| IDENT IDENT ',' IDENT { $$ = new asm_line_node($1, $2, $3, $4); }
-
 asm_line: asm_kwd { $$ = new asm_line_node($1, NULL); }
 
 asm_text: asm_line
@@ -661,7 +678,14 @@ case_elem: const_expr { $$ = $1; }
 //=============================================================================
 */
 
+condition_start: CIFDEF | CIF | CIFNDEF
+
+condition_const_expr: 
+      condition_start const_expr CELSE const_expr CENDIF  { $$ = new cond_expr_node($1, $2, $3, $4, $5); } 
+    | condition_start const_expr CENDIF  { $$ = new cond_expr_node($1, $2, NULL, NULL, $3); }
+
 const_expr: const_simple_expr
+    | condition_const_expr
     | const_expr PLUS const_expr { $$ = new op_node(tn_add, $1, $2, $3); } 
     | const_expr MINUS const_expr { $$ = new op_node(tn_sub, $1, $2, $3); } 
     | const_expr MOD const_expr { $$ = new op_node(tn_mod, $1, $2, $3); } 
@@ -707,7 +731,12 @@ const_act_param_list: const_act_param
 
 const_act_param: const_expr | { $$ = new skipped_node(curr_token->prev_relevant()); }
  
+condition_expr: 
+      condition_start expr CELSE expr CENDIF  { $$ = new cond_expr_node($1, $2, $3, $4, $5); } 
+    | condition_start expr CENDIF  { $$ = new cond_expr_node($1, $2, NULL, NULL, $3); }
+
 expr: simple_expr
+    | condition_expr
     | expr PLUS expr { $$ = new op_node(tn_add, $1, $2, $3); } 
     | expr MINUS expr { $$ = new op_node(tn_sub, $1, $2, $3); } 
     | expr MOD expr { $$ = new op_node(tn_mod, $1, $2, $3); } 
@@ -857,21 +886,14 @@ const: CONST | RESOURCESTRING
 
 const_def_part: const const_def_list { $$ = new const_def_part_node($1, $2); } 
 
-const_def_list: { $$ = NULL; } 
+const_def_list: const_def ';' { $$ = $1; } 
     | const_def ';' const_def_list { $1->next = $3; $$ = $1; }
 
-const_def: ident_ext EQ const_expr 
-        { $$ = new const_def_node($1, $2, $3, NULL, NULL); }
-    | ident_ext EQ const_expr DEPRECATED 
-        { $$ = new const_def_node($1, $2, $3, $4, NULL); }
-    | ident_ext EQ const_expr DEPRECATED SCONST 
-        { $$ = new const_def_node($1, $2, $3, $4, $5); }
-    | ident_ext ':' const_type EQ const_expr 
-        { $$ = new typed_const_def_node($1, $2, $3, $4, $5, NULL, NULL); }
-    | ident_ext ':' const_type EQ const_expr DEPRECATED
-        { $$ = new typed_const_def_node($1, $2, $3, $4, $5, $6, NULL); }
-    | ident_ext ':' const_type EQ const_expr DEPRECATED SCONST
-        { $$ = new typed_const_def_node($1, $2, $3, $4, $5, $6, $7); }
+const_def: 
+      ident_ext EQ const_expr deprecatd
+        { $$ = new const_def_node($1, $2, $3, $4); }
+    | ident_ext ':' const_type EQ const_expr deprecatd
+        { $$ = new typed_const_def_node($1, $2, $3, $4, $5, $6); }
 
 type_def_part: TYPE type_def_list  
         { $$ = new type_def_part_node($1, $2); }
@@ -882,26 +904,15 @@ type_def_list: { $$ = NULL; }
 type_def: 
       IDENT EQ type { $$ = new type_def_node($1, $2, $3); }
     | IDENT EQ TYPE type { $$ = new type_def_node($1, $2, $4); }  // this is so called 'strong type alias' in Delphi, example: type CppLongInt = type LongInt;
-    | IDENT EQ CLASS {$$ = new type_def_node($1, $2, new object_tpd_node($3, NULL, NULL, NULL, NULL, NULL)); }
+    | IDENT EQ CLASS {$$ = new type_def_node($1, $2, new object_tpd_node($3, NULL, NULL, NULL, NULL, NULL, NULL)); }
     | simple_templ_type EQ type { $$ = new type_def_templ_node($1, $2, $3); }
 
 var_decl_part: VAR var_decl_list { $$ = new var_decl_part_node(NULL, $1, $2); }
 
-var_decl_list: var_decl
-     | var_decl ';' { $$ = $1; }
-     | var_decl ';' var_decl_list { $1->next = $3; $$ = $1; }
-// SCOPE was either 'external' or 'static' - remove it temporary since external or static keywords are not supported for variables any more 
-//     | var_decl ';' SCOPE 
-//       { 
-//	 $1->scope = $3;
-//	 $3->disable();
-//       }
-//     | var_decl ';' SCOPE ';' var_decl_list 
-//       { 
-//	 $1->scope = $3;
-//	 token::remove($3, $4);	    
-//	 $1->next = $5; $$ = $1; 
-//       }
+var_decl_list: //var_decl
+      var_decl_c //';' { $$ = $1; }
+    | var_decl_c var_decl_list { $1->next = $2; $$ = $1; }
+
 
 attr_content: SCONST { $$ = new attrib_content($1, NULL, NULL, NULL); }
     | UNSAFE { $$ = new attrib_content($1, NULL, NULL, NULL); }
@@ -910,20 +921,20 @@ attr_content: SCONST { $$ = new attrib_content($1, NULL, NULL, NULL); }
  
 attr_decl: // { $$ = NULL; } 
      '[' attr_content ']' { $$ = new attrib_node($1, $2, $3); }
- 
-var_decl: 
-      ident_list ':' type { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, NULL, NULL); }
-    | ident_list ':' type EQ const_expr { $$ = new var_decl_node(NULL, $1, $2, $3, $4, $5, NULL, NULL); }
-    | ident_list ':' type DEPRECATED { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, $4, NULL); }
-    | ident_list ':' type DEPRECATED SCONST { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, $4, $5); }
-    
-    | attr_decl ident_list ':' type { $$ = new var_decl_node($1, $2, $3, $4, NULL, NULL, NULL, NULL); }
-    | attr_decl ident_list ':' type EQ const_expr { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, NULL, NULL); }
-    | attr_decl ident_list ':' type DEPRECATED { $$ = new var_decl_node($1, $2, $3, $4, NULL, NULL, $5, NULL); }
-    | attr_decl ident_list ':' type DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, $4, NULL, NULL, $5, $6); }
-   // | ident_list ':' type EQ const_expr DEPRECATED { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, $7, NULL); }
-   // | ident_list ':' type EQ const_expr DEPRECATED SCONST { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, $7, $8); }
-    
+
+var_decl_c: var_decl_semi
+    | condition_start var_decl_semi CELSE var_decl_semi CENDIF { $$ = new cond_var_decl_node($1, $2, $3, $4, $5); } 
+    | condition_start var_decl_semi CENDIF  { $$ = new cond_var_decl_node($1, $2, NULL, NULL, $3); }
+
+var_decl_semi: var_decl ';' {$$ = $1; }
+
+var_decl:
+      ident_list ':' type deprecatd { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, NULL); }
+    | ident_list ':' type EQ const_expr deprecatd { $$ = new var_decl_node(NULL, $1, $2, $3, $4, $5, $6); }
+
+    | attr_decl ident_list ':' type deprecatd { $$ = new var_decl_node($1, $2, $3, $4, NULL, NULL, $5); }
+    | attr_decl ident_list ':' type EQ const_expr deprecatd { $$ = new var_decl_node($1, $2, $3, $4, $5, $6, $7); }
+
    // temporarity commented out since it generates too many bison warnings (ambiguities)
    //  | IDENT ORIGIN const_expr ':' const_simple_type 
    //    { $$ = (var_decl_node*)new var_origin_decl_node($1, $2, $3, $4, $5); }
@@ -1050,7 +1061,7 @@ prop_default_directive:  { $$ = NULL; }
 prop_param_list: prop_param_decl 
     | prop_param_decl ';' prop_param_list { $1->next = $3; $$ = $1; }
 
-prop_param_decl: ident_list ':' param_type { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, NULL, NULL); }
+prop_param_decl: ident_list ':' param_type { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, NULL); }
 
 
 formal_params: { $$ = NULL; } 
@@ -1066,9 +1077,9 @@ formal_param: VAR param_decl { $$ = new var_decl_part_node(NULL, $1, $2); }
     | param_decl { $$ = $1; } 
     //| proc_decl - see comment to proc_decl definition
 
-param_decl: ident_list ':' param_type { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, NULL, NULL); }
-    | ident_list ':' param_type EQ const_expr { $$ = new var_decl_node(NULL, $1, $2, $3, $4, $5, NULL, NULL); }
-    | ident_list { $$ = new var_decl_node(NULL, $1, NULL, NULL, NULL, NULL, NULL, NULL); }
+param_decl: ident_list ':' param_type { $$ = new var_decl_node(NULL, $1, $2, $3, NULL, NULL, NULL); }
+    | ident_list ':' param_type EQ const_expr { $$ = new var_decl_node(NULL, $1, $2, $3, $4, $5, NULL); }
+    | ident_list { $$ = new var_decl_node(NULL, $1, NULL, NULL, NULL, NULL, NULL); }
 
 param_type: simple_type | conformant_array_type //| array_of_const_type
 
@@ -1081,14 +1092,19 @@ type: simple_type | array_type | record_type | class_type | interface_type | set
 
 const_type: simple_type | const_array_type | record_type | const_set_type | string_type | pointer_type
 
-fptr_type: FUNCTION formal_params ':' type
-        { $$ = new fptr_tpd_node($1, $2, $3, $4); }
+fptr_type: 
+      FUNCTION formal_params ':' type
+        { $$ = new fptr_tpd_node($1, $2, $3, $4, NULL, NULL, NULL, NULL); }
+ //   | FUNCTION formal_params ':' type optional_semicolon qualifiers
+ //       { $$ = new fptr_tpd_node($1, $2, $3, $4, $5, $6, NULL, NULL); }
     | FUNCTION formal_params ':' type OF OBJECT
-        { $$ = new fptr_tpd_node($1, $2, $3, $4, $5, $6); }
+        { $$ = new fptr_tpd_node($1, $2, $3, $4, NULL, NULL, $5, $6); }
     | PROCEDURE formal_params 
-        { $$ = new fptr_tpd_node($1, $2); }
+        { $$ = new fptr_tpd_node($1, $2, NULL, NULL, NULL, NULL, NULL, NULL); }
+ //   | PROCEDURE formal_params optional_semicolon qualifiers 
+ //       { $$ = new fptr_tpd_node($1, $2, NULL, NULL, $3, $4, NULL, NULL); }
     | PROCEDURE formal_params OF OBJECT 
-        { $$ = new fptr_tpd_node($1, $2, NULL, NULL, $3, $4); }
+        { $$ = new fptr_tpd_node($1, $2, NULL, NULL, NULL, NULL, $3, $4); }
 
 string_type: STRING '[' const_expr ']' { $$ = new varying_tpd_node($1, $2, $3, $4); }
 
@@ -1145,10 +1161,11 @@ const_set_type: packed SET OF const_type { $$ = new set_tpd_node($1, $2, $3, $4)
 
 packed: { $$ = NULL; } | PACKED 
 
-record_type: packed RECORD record_body END 
-        { $$ = new record_tpd_node($1, $2, $3, $4); }
-    | packed RECORD END 
-        { $$ = new record_tpd_node($1, $2, NULL, $3); }
+record_type: 
+      packed RECORD record_body END deprecatd
+        { $$ = new record_tpd_node($1, $2, $3, $4, $5); }
+    | packed RECORD END deprecatd
+        { $$ = new record_tpd_node($1, $2, NULL, $3, $4); }
 
 record_body: record_field_list record_components 
         { 
@@ -1170,37 +1187,37 @@ record_components: record_component
         }
 
 
+condition_rec_method: 
+      condition_start record_method_decl CELSE record_method_decl CENDIF { $$ = new cond_method_node($1, $2, $3, $4, $5); } 
+    | condition_start record_method_decl CENDIF  { $$ = new cond_method_node($1, $2, NULL, NULL, $3); }
+
 record_component: record_access_spec_decl
     | record_access_spec_decl record_field_list
         { $1->next = $2; $$ = $1; }
     | VAR field_list
         { $$ = new record_field_part_node(NULL, $1, $2); }
     | CLASS VAR field_list
-        { $$ = new record_field_part_node($1, $2, $3); }    
+        { $$ = new record_field_part_node($1, $2, $3); }
     | record_methods
-//    | object_properties
+    | condition_rec_method
     | const_def_part 
     | type_def_part 
 
 record_field_list: field_list
         { $$ = new record_field_part_node(NULL, NULL, $1); }
+   
 
 record_methods: record_method_decl
     | record_method_decl record_methods { $1->next = $2; $$ = $1; }
 
-record_method_decl: 
-      proc_fwd_decl 
-        { $$ = new method_decl_node(NULL, $1); }
-    | proc_spec 
-        { $$ = new method_decl_node(NULL, $1); }
-    | CLASS proc_fwd_decl  
-        { $$ = new method_decl_node($1, $2); }
-    | CLASS proc_spec  
-        { $$ = new method_decl_node($1, $2); }
+record_method_decl: method_decl 
     | CLASS operator_fwd_decl  
-        { $$ = new method_decl_node($1, $2); }
-    | property_decl
-    
+        { $$ = new method_decl_node($1, $2); } 
+      
+
+deprecatd: { $$ = NULL; } 
+    | DEPRECATED { $$ = new two_tokens($1, NULL); }
+    | DEPRECATED SCONST { $$ = new two_tokens($1, $2); }
 
 
 interface_type: 
@@ -1208,38 +1225,32 @@ interface_type:
  //       { $$ = new interface_tpd_node($1, NULL, NULL, NULL, $2, $3, $4); }  
  //   | INTERFACE guid END
  //       { $$ = new interface_tpd_node($1, NULL, NULL, NULL, $2, NULL, $3); }      
-      INTERFACE interface_methods END
-        { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, $2, $3); }
-    | INTERFACE END
-        { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, NULL, $2); }
+      INTERFACE interface_methods END deprecatd
+        { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, $2, $3, $4); }
+    | INTERFACE END //deprecatd
+        { $$ = new interface_tpd_node($1, NULL, NULL, NULL, NULL, NULL, $2, NULL); }
+
  //   | INTERFACE '(' IDENT ')' guid interface_components END
  //       { $$ = new interface_tpd_node($1, $2, $3, $4, $5, $6, $7); }
  //   | INTERFACE '(' IDENT ')' guid END
  //       { $$ = new interface_tpd_node($1, $2, $3, $4, $5, NULL, $6); }
-    | INTERFACE '(' IDENT ')' interface_methods END
-        { $$ = new interface_tpd_node($1, $2, $3, $4, NULL, $5, $6); }
-    | INTERFACE '(' IDENT ')' END
-        { $$ = new interface_tpd_node($1, $2, $3, $4, NULL, NULL, $5); }
+    | INTERFACE '(' IDENT ')' interface_methods END deprecatd
+        { $$ = new interface_tpd_node($1, $2, $3, $4, NULL, $5, $6, $7); }
+    | INTERFACE '(' IDENT ')' END deprecatd
+        { $$ = new interface_tpd_node($1, $2, $3, $4, NULL, NULL, $5, $6); }
 
- /* interface_components: interface_component interface_components
-        { 
-          // special case when two lists under one roof. 
-          // we need to do the following - look for last element in list#1 and connect it with first element of list#2.
-          decl_node** cpp;   
-          for(cpp = &$1->next; *cpp != NULL; cpp = &(*cpp)->next);
-     	  *cpp = $2;
-           $$ = $1; 
-        }
-    | interface_component
-
-interface_component: interface_methods
- //   | object_properties
-  */
 
 //guid: '[' SCONST ']' { $$ = new guid_node($1, $2, $3); }
 
-interface_methods: interface_method_decl
-    | interface_method_decl interface_methods { $1->next = $2; $$ = $1; }
+interface_methods: interface_method_decl_c
+    | interface_method_decl_c interface_methods { $1->next = $2; $$ = $1; }
+
+condition_interface_method: 
+      condition_start interface_method_decl CELSE interface_method_decl CENDIF { $$ = new cond_method_node($1, $2, $3, $4, $5); } 
+    | condition_start interface_method_decl CENDIF  { $$ = new cond_method_node($1, $2, NULL, NULL, $3); }
+
+interface_method_decl_c: interface_method_decl
+    | condition_interface_method 
 
 interface_method_decl: 
       proc_fwd_decl
@@ -1251,16 +1262,16 @@ interface_method_decl:
 class_or_object: OBJECT | CLASS
  
 class_type: 
-      class_or_object object_body END
-        { $$ = new object_tpd_node($1, NULL, NULL, NULL, $2, $3); }  
-    | class_or_object '(' ident_list ')' object_body END
-        { $$ = new object_tpd_node($1, $2, $3, $4, $5, $6); }
-    | class_or_object '(' ident_list ')' END
-        { $$ = new object_tpd_node($1, $2, $3, $4, NULL, $5); }
+      class_or_object object_body END deprecatd
+        { $$ = new object_tpd_node($1, NULL, NULL, NULL, $2, $3, $4); }  
+    | class_or_object '(' ident_list ')' object_body END deprecatd
+        { $$ = new object_tpd_node($1, $2, $3, $4, $5, $6, $7); }
+    | class_or_object '(' ident_list ')' END deprecatd
+        { $$ = new object_tpd_node($1, $2, $3, $4, NULL, $5, $6); }
     | class_or_object '(' ident_list ')'
-        { $$ = new object_tpd_node($1, $2, $3, $4, NULL, NULL); }
-    | class_or_object END
-        { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2); }
+        { $$ = new object_tpd_node($1, $2, $3, $4, NULL, NULL, NULL); }
+    | class_or_object END //deprecatd
+        { $$ = new object_tpd_node($1, NULL, NULL, NULL, NULL, $2, NULL); }
     | CLASS OF IDENT 
         { $$ = new metaclass_tpd_node($1, $2, $3); }
 	
@@ -1300,13 +1311,17 @@ object_components: object_component
 	      *cpp = $2;
            $$ = $1; 
         }
-         
+  
+condition_obj_method: 
+      condition_start method_decl CELSE method_decl CENDIF { $$ = new cond_method_node($1, $2, $3, $4, $5); } 
+    | condition_start method_decl CENDIF  { $$ = new cond_method_node($1, $2, NULL, NULL, $3); }
+       
 object_component: class_access_spec_decl 
     | class_access_spec_decl field_decl_list
         { $1->next = $2; $$ = $1; } 
     | field_decl_part
-//    | object_properties
     | object_methods
+    | condition_obj_method
     | const_def_part 
     | type_def_part 
 
@@ -1325,9 +1340,6 @@ field_decl_part:
 field_decl_list: var_decl_list // { $$ = $1; }
 
 object_methods: method_decl_list
-
-//object_properties: property_decl_list
-//        { $$ = new property_decl_part_node($1); }
 
 method_decl_list: method_decl
     | method_decl method_decl_list { $1->next = $2; $$ = $1; }
