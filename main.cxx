@@ -57,9 +57,12 @@
 * DONE - improved work of $I and $INCLUDE directives
 * DONE - implemented {IFEND}, {$IF ... } and {$ELSEIF ...} directives
 * DONE - added implementation for {$L ...} and {$LINK ... } directives
+* DONE - procedure types can have qualifiers like cdecl and some others
 * 
-* 
-* 
+*
+There are anonymous functions and references to these functions. Need to be implemented.
+* TIntegerFunction = reference to function: Integer;
+  
 * 
 * bug in translating function calls like below (with empty brases)
 * DDelete(); 
