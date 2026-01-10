@@ -56,7 +56,6 @@ class node : public heap_object {
 
 class two_tokens : public token {
 public:
-   // token* t_tok1;
     token* t_tok2;
 
     two_tokens(token* token1, token* token2): token(*token1)
@@ -616,6 +615,22 @@ class expr_node : public node {
 
 //=============================================================================
 
+class cond_expr_node : public expr_node {
+public:
+    token* t_if; // can be $IF $IFDEF $IFNDEF
+    expr_node* if_expr;
+    token* t_else;
+    expr_node* else_expr;
+    token* t_endif; //esither $ENDIF or $IFEND
+
+    cond_expr_node(token* t_if, expr_node* if_expr, token* t_else, expr_node* else_expr, token* t_endif);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+
+
 class atom_expr_node : public expr_node { 
   public: 
     token *  t_tkn;
@@ -967,6 +982,20 @@ class decl_node : public node {
     decl_node() { next = nullptr; attr = 0; }
 };
 
+class cond_method_node : public decl_node {
+public:
+    token* t_if; // can be $IF $IFDEF $IFNDEF
+    decl_node* if_method;
+    token* t_else;
+    decl_node* else_method;
+    token* t_endif; //esither $ENDIF or $IFEND
+
+    cond_method_node(token* t_if, decl_node* if_method, token* t_else, decl_node* else_method, token* t_endif);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
 class attrib_node : public decl_node {
 public:
     token* t_lbr;
@@ -1043,12 +1072,11 @@ class const_def_node : public decl_node {
     token*       t_ident; 
     token*       t_equal;
     expr_node*   constant;
-    token*       t_depr;
-    token*       t_mess;
+    two_tokens*  t_depr;
     symbol*      sym;
     static const_def_node* enumeration;
 
-    const_def_node(token* t_ident, token* t_equal, expr_node* value, token* t_depr, token* t_mess);
+    const_def_node(token* t_ident, token* t_equal, expr_node* value, two_tokens* t_depr);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1061,7 +1089,7 @@ class typed_const_def_node : public const_def_node {
     tpd_node*        tpd; 
   
     typed_const_def_node(token* t_ident, token* t_coln, tpd_node* tpd, token* t_equal, 
-                         expr_node* constant, token* t_depr, token* t_mess);
+                         expr_node* constant, two_tokens* t_depr);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1133,10 +1161,9 @@ class var_decl_node : public decl_node {
     token*        scope;
     token*        t_eq;
     expr_node*    def_value;
-    token*        t_depr;  // deprecated
-    token*        t_mess;  // deprecated message
+    two_tokens*   t_depr;  // deprecated
 
-    var_decl_node(attrib_node* attribute, token_list* vars, token* coln, tpd_node* tpd, token* eq, expr_node* def_value, token* t_depr, token* t_mess);
+    var_decl_node(attrib_node* attribute, token_list* vars, token* coln, tpd_node* tpd, token* eq, expr_node* def_value, two_tokens* t_depr);
 
     virtual void attrib(int ctx);
     virtual void translate(int ctx);
@@ -1154,6 +1181,20 @@ class var_decl_part_node : public decl_node {
     bool             is_const;
 
     var_decl_part_node(token* t_classvar, token* t_var, var_decl_node* vars);
+
+    void attrib(int ctx) override;
+    void translate(int ctx) override;
+};
+
+class cond_var_decl_node : public var_decl_node {
+public:
+    token* t_if; // can be $IF, $IFDEF or $IFNDEF
+    var_decl_node* if_var;
+    token* t_else;
+    var_decl_node* else_var;
+    token* t_endif; //esither $ENDIF or $IFEND
+
+    cond_var_decl_node(token* t_if, var_decl_node* if_var, token* t_else, var_decl_node* else_var, token* t_endif);
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
@@ -1257,8 +1298,7 @@ class proc_decl_node : public decl_node {
 
 class proc_fwd_decl_node : public proc_decl_node {
 protected:
-    token*          t_depr;
-    token*          t_mess;
+    two_tokens*     t_depr;
   public: 
     attrib_node*    attribute;
     token*          t_semi1;
@@ -1422,15 +1462,17 @@ public:
 class fptr_tpd_node : public tpd_node { 
   public: 
     token*           t_proc;    
-    token*           t_coln;  // ':'  
+    token*           t_coln;    // ':'  
     token*           t_params;
     param_list_node* params;
     tpd_node*        ret_type;
+    token*           t_semi1;
+    token_list*      qualifiers;
     token*           t_of;
     token*           t_object;
       
-    fptr_tpd_node(token* t_proc, param_list_node* params, 
-		  token* t_coln = NULL, tpd_node* ret_type = NULL, token* t_of = NULL, token* t_object = NULL);
+    fptr_tpd_node(token* t_proc, param_list_node* params, token* t_coln, tpd_node* ret_type, 
+                   token* t_semi1, token_list* qualifiers, token* t_of, token* t_object);
 
     void attrib(int ctx) override;
     void translate(int ctx) override;
@@ -1638,11 +1680,12 @@ class field_list_node : public decl_node {
 class base_obj_tpd_node : public tpd_node {
 public:
     using ptoken = token*;
-    token*     t_startof; // keyword 'record'
-    token*     t_end;    
-    decl_node* parts;
+    token*      t_startof; // keyword 'record'
+    token*      t_end;    
+    decl_node*  parts;
+    two_tokens* t_depr;
 
-    base_obj_tpd_node(tpd_type tp, token* t_startof, decl_node* parts, token* t_end);
+    base_obj_tpd_node(tpd_type tp, token* t_startof, decl_node* parts, token* t_end, two_tokens* t_depr);
 
     virtual void attrib1(int ctx) = 0;
     virtual void attrib2(int ctx) = 0;
@@ -1653,12 +1696,12 @@ class record_tpd_node : public base_obj_tpd_node {
   public: 
     ptoken&     t_record = t_startof;
     token*      t_packed;
-    //   token*           t_end; 
- //   decl_node*       parts; 
+ //   token*        t_end; 
+ //   decl_node*    parts; 
 
     record_tpd_node* outer;
 
-    record_tpd_node(token* t_packed, token* t_record, decl_node* parts, token* t_end);
+    record_tpd_node(token* t_packed, token* t_record, decl_node* parts, token* t_end, two_tokens* t_depr);
 
     void assign_name();
 
@@ -1679,7 +1722,7 @@ class object_tpd_node : public base_obj_tpd_node {
 
     symbol*      super;
     
-    object_tpd_node(token* t_class, token* t_lbr, token_list* t_ancestorlist, token* t_rbr, decl_node* parts, token* t_end);  
+    object_tpd_node(token* t_class, token* t_lbr, token_list* t_ancestorlist, token* t_rbr, decl_node* parts, token* t_end, two_tokens* t_depr);
 
     void attrib1(int ctx);
     void attrib2(int ctx);
@@ -1700,7 +1743,7 @@ public:
    // symbol* super;
 
     interface_tpd_node(token* t_interface, token* t_lbr, token* t_superinterface, token* t_rbr,
-                       decl_node* guid, decl_node* parts, token* t_end);
+                       decl_node* guid, decl_node* parts, token* t_end, two_tokens* t_depr);
 
     void attrib1(int ctx) override;
     void attrib2(int ctx) override;

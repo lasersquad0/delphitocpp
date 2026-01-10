@@ -14,15 +14,15 @@ static proc_tp* curr_proc = NULL;
 static char*    struct_path = "";
 static token*   global_func_decl_level;
 
-static void insert_depr(token* t_depr, token* t_mess, token* f_tkn)
+static void insert_depr(two_tokens* t_depr, token* f_tkn)
 {
 	assert(f_tkn);
 	if (t_depr)
 	{
-		if (t_mess)
+		if (t_depr->t_tok2)
 		{
-			f_tkn->prepend(dprintf("[[deprecated(\"%s\")]]\n", t_mess->in_text));
-			token::disable(t_depr->prev, t_mess);
+			f_tkn->prepend(dprintf("[[deprecated(\"%s\")]]\n", t_depr->t_tok2->in_text));
+			token::disable(t_depr->prev, t_depr->t_tok2);
 		}
 		else
 		{
@@ -31,6 +31,40 @@ static void insert_depr(token* t_depr, token* t_mess, token* f_tkn)
 		}
 	}
 }
+
+static token* translate_ifdef_directives(token* t_if, token* t_else, token* t_endif)
+{
+	char* trans_if = nullptr;
+	token* first = t_if;
+
+	if (t_if->prev_not_space()->tag != TKN_LN) first = t_if->prepend("\n");
+	if (t_if->next_not_space()->tag != TKN_LN) t_if->append("\n");
+
+	if (t_if->tag == TKN_CIFDEF)
+		t_if->prepend("#ifdef ")->pos = 0;
+	else if (t_if->tag == TKN_CIFNDEF)
+		t_if->prepend("#ifndef ")->pos = 0;
+	else if (t_if->tag == TKN_CIF)
+		t_if->prepend("#if ")->pos = 0;
+	else
+		error(t_if, "Incorrect '$IF' directive.");
+
+	if (t_else)
+	{
+		if (t_else->prev_not_space()->tag != TKN_LN) t_else->prepend("\n");
+		if (t_else->next_not_space()->tag != TKN_LN) t_else->append("\n");
+		t_else->pos = 0;
+		t_else->prepend("#else ");
+	}
+
+	if (t_endif->prev_not_space()->tag != TKN_LN) t_endif->prepend("\n");
+	if (t_endif->next_not_space()->tag != TKN_LN) t_endif->append("\n"); //TODO think how to return two tokens from this function first and last
+	t_endif->pos = 0;
+	t_endif->prepend("#endif ");
+
+	return first;
+}
+
 
 //-----------------------------------------------------------------------------
 
@@ -80,6 +114,28 @@ void node::swallow_semicolon()
 //=============================================================================
 // Statements
 //=============================================================================
+
+cond_method_node::cond_method_node(token* t_if, decl_node* if_method, token* t_else, decl_node* else_method, token* t_endif)
+{
+	CONS5(t_if, if_method, t_else, else_method, t_endif);
+}
+
+void cond_method_node::attrib(int ctx)
+{
+	//TODO add implementation here
+	f_tkn = t_if;
+	l_tkn = t_endif;
+	if_method->attrib(ctx);
+	if(else_method) else_method->attrib(ctx);
+}
+void cond_method_node::translate(int ctx)
+{
+	//TODO add implementation here
+	f_tkn = translate_ifdef_directives(t_if, t_else, t_endif);
+
+	if_method->translate(ctx);
+	if(else_method) else_method->translate(ctx);
+}
 
 attrib_node::attrib_node(token* t_lbr, stmt_node* attr_cont, token* t_rbr)
 {
@@ -1600,6 +1656,33 @@ atom_expr_node::atom_expr_node(token* t_tkn) : expr_node(tn_atom)
 	temp = nullptr;
 	with = nullptr;
 }
+
+// tn_self is just random expr_tag here. may be add special expr_tag for cond_expr?
+cond_expr_node::cond_expr_node(token* t_if, expr_node* if_expr, token* t_else, expr_node* else_expr, token* t_endif) : expr_node(tn_self)
+{
+	CONS5(t_if, if_expr, t_else, else_expr, t_endif);
+}
+
+void cond_expr_node::attrib(int ctx)
+{
+	//TODO add implementation here
+	f_tkn = t_if;
+	l_tkn = t_endif;
+
+	if_expr->attrib(ctx);
+	type = if_expr->type;
+	if (else_expr) else_expr->attrib(ctx);
+}
+
+void cond_expr_node::translate(int ctx)
+{
+	//TODO add implementation here
+	f_tkn = translate_ifdef_directives(t_if, t_else, t_endif);
+
+	if_expr->translate(ctx);
+	if (else_expr) else_expr->translate(ctx);
+}
+
 
 void atom_expr_node::attrib(int ctx)
 {
@@ -4238,10 +4321,10 @@ void label_decl_part_node::translate(int)
 
 const_def_node* const_def_node::enumeration;
 
-const_def_node::const_def_node(token* t_ident, token* t_equal, expr_node* constant, token* t_depr, token* t_mess)
+const_def_node::const_def_node(token* t_ident, token* t_equal, expr_node* constant, two_tokens* t_depr)
 {
-    CONS5(t_ident, t_equal, constant, t_depr, t_mess);
-	sym = NULL;
+    CONS4(t_ident, t_equal, constant, t_depr);
+	sym = nullptr;
 }
 
 void const_def_node::attrib(int)
@@ -4273,7 +4356,7 @@ void const_def_node::translate(int)
     
 	sym->translate(t_ident);
  
-	l_tkn = t_mess ? t_mess : t_depr ? t_depr : constant->l_tkn;
+	l_tkn = t_depr ? t_depr->t_tok2 ? t_depr->t_tok2 : t_depr : constant->l_tkn;
     
 	token::disable(t_ident->next, constant->f_tkn->prev);
 
@@ -4334,7 +4417,7 @@ void const_def_node::translate(int)
 		force_semicolon();
 	}
 
-	insert_depr(t_depr, t_mess, f_tkn);
+	insert_depr(t_depr, f_tkn);
 
 	if (sym->flags & symbol::f_static) {
 		assert(global_func_decl_level != NULL);
@@ -4346,8 +4429,8 @@ void const_def_node::translate(int)
 }
 
 typed_const_def_node::typed_const_def_node(token* t_ident, token* t_coln, tpd_node* tpd, 
-	                    token* t_equal, expr_node* constant, token* t_depr, token* t_mess)
-				: const_def_node(t_ident, t_equal, constant, t_depr, t_mess)
+	                    token* t_equal, expr_node* constant, two_tokens* t_depr)
+				: const_def_node(t_ident, t_equal, constant, t_depr)
 {
     CONS2(t_coln, tpd);
 }
@@ -4382,7 +4465,7 @@ void typed_const_def_node::translate(int)
     t_equal->set_trans(" = ");
     force_semicolon();
 
-	insert_depr(t_depr, t_mess, f_tkn);
+	insert_depr(t_depr, f_tkn);
 
 	if (sym->flags & symbol::f_static) {
 		assert(global_func_decl_level != NULL);
@@ -4698,26 +4781,26 @@ void unit_spec_node::attrib(int ctx)
 void unit_spec_node::translate(int ctx)
 {
     for (decl_node* dcl = decls; dcl != NULL; dcl = dcl->next) {
-	dcl->translate(ctx);
-	l_tkn = dcl->l_tkn;
+		dcl->translate(ctx);
+		l_tkn = dcl->l_tkn;
     }
 }
 
 
-var_decl_node::var_decl_node(attrib_node* attribute, token_list* vars, token* t_coln, tpd_node* tpd, token* t_eq, expr_node* def_value, token* t_depr, token* t_mess)
+var_decl_node::var_decl_node(attrib_node* attribute, token_list* vars, token* t_coln, tpd_node* tpd, token* t_eq, expr_node* def_value, two_tokens* t_depr)
 {
-    CONS8(attribute, vars, t_coln, tpd, t_eq, def_value, t_depr, t_mess);
-    scope = NULL;
+    CONS7(attribute, vars, t_coln, tpd, t_eq, def_value, t_depr);
+    scope = nullptr;
 }
 
 void var_decl_node::attrib(int ctx)
 {
     tpexpr* tp;
-	if (tpd != NULL) 
+	if (tpd != nullptr) 
 	{
 		tpd->attrib(ctx);
 		tp = tpd->type;
-		if (tp == NULL)
+		if (tp == nullptr)
 		{
 			if (/*tpd &&*/ tpd->f_tkn)
 				warning(t_coln, "type is unknown '%s'", tpd->f_tkn->in_text);
@@ -4734,7 +4817,7 @@ void var_decl_node::attrib(int ctx)
 
 	if (def_value) def_value->attrib(ctx);
 
-	for (token_list* tkn = vars; tkn != NULL; tkn = tkn->next) 
+	for (token_list* tkn = vars; tkn != nullptr; tkn = tkn->next) 
 	{
 		int prm_class = symbol::s_var;
 		if (ctx == ctx_constpar)
@@ -4788,14 +4871,15 @@ void var_decl_node::translate(int ctx)
 	if (def_value) def_value->translate(ctx); // need to be here to initialize def_value->l_tkn
 
     f_tkn = vars->ident;
-    l_tkn = t_mess ? t_mess : t_depr ? t_depr: def_value ? def_value->l_tkn: t_coln ? t_coln : f_tkn; //TODO shall we use tpd->l_tkn instead of t_coln here?
+	
+    l_tkn = t_depr? t_depr->t_tok2 ? t_depr->t_tok2 : t_depr : def_value ? def_value->l_tkn: t_coln ? t_coln : f_tkn; //TODO shall we use tpd->l_tkn instead of t_coln here?
 
     if (t_coln) {
 		token::disable(t_coln->prev_relevant()->next, tpd->f_tkn->prev); // disables two tokens: ":" and "PascalType" in variable decl
     }
 
 	if (ctx == ctx_valpar || ctx == ctx_varpar || ctx == ctx_constpar) {  // working with fun/method parameters here
-		assert(!t_depr); assert(!t_mess); //no deprecated in parameters
+		assert(!t_depr); //no deprecated in parameters
 		if (language_c && tp->tag == tp_dynarray) {
 			token* t = vars->ident->prev;
 			((array_tp*)tp->get_typedef())->insert_bound_params(vars->ident);
@@ -4956,7 +5040,7 @@ void var_decl_node::translate(int ctx)
 			(new token((char*)0, TKN_END_SHIFT))->insert_a(l_tkn);
 		}
 
-		insert_depr(t_depr, t_mess, f_tkn);
+		insert_depr(t_depr, f_tkn);
 	}
 }
 
@@ -4992,6 +5076,7 @@ void var_decl_part_node::translate(int ctx)
 		if (t_classvar) var->attr |= decl_flags::is_static; // raise up is_static flag for variable
 		var->translate(ctx == ctx_valpar ? (is_const ? ctx_constpar : (int)ctx_varpar) : ctx);
 		l_tkn = var->l_tkn;
+		assert(l_tkn);
     }
 
 	if (t_classvar) t_classvar->disable();
@@ -5015,6 +5100,31 @@ void var_decl_part_node::translate(int ctx)
 				"#define EXTERN extern\n");
 		}
 	}
+}
+
+cond_var_decl_node::cond_var_decl_node(token* t_if, var_decl_node* if_var, token* t_else, var_decl_node* else_var, token* t_endif)
+	: var_decl_node(*if_var) //TODO check if that is correct such parent constructor call
+{
+	CONS5(t_if, if_var, t_else, else_var, t_endif);
+}
+
+void cond_var_decl_node::attrib(int ctx)
+{
+	//TODO add full implementation here
+	f_tkn = t_if;
+	l_tkn = t_endif;
+
+	if_var->attrib(ctx);
+	if(else_var) else_var->attrib(ctx);
+}
+
+void cond_var_decl_node::translate(int ctx)
+{
+	f_tkn = translate_ifdef_directives(t_if, t_else, t_endif);
+	
+	if_var->translate(ctx);
+	if(else_var) else_var->translate(ctx);
+	
 }
 
 record_field_part_node::record_field_part_node(token* t_classvar, token* t_var, field_list_node* flist)
@@ -5371,7 +5481,7 @@ proc_fwd_decl_node::proc_fwd_decl_node(attrib_node* attribute, token* t_proc, to
 	is_inline = false;
 	is_deprecated = false;
 
-	t_depr = t_mess = nullptr;
+	t_depr = nullptr;
 }
 
 void proc_fwd_decl_node::attrib(int ctx)
@@ -5434,7 +5544,7 @@ void proc_fwd_decl_node::attrib(int ctx)
 		case TKN_FINAL:      is_final    = true; break;
 		case TKN_ABSTRACT:   is_abstract = true; break;
 		case TKN_INLINE:     is_inline   = true; break;
-		case TKN_DEPRECATED: is_deprecated = true; t_depr = t->ident; t_mess = dynamic_cast<two_tokens*>(t->ident)->t_tok2; break;
+		case TKN_DEPRECATED: is_deprecated = true; t_depr = dynamic_cast<two_tokens*>(t->ident); assert(t_depr); break;
 		//case TKN_C: type->is_extern_c  = true; break;
 		}
 
@@ -5579,7 +5689,7 @@ void proc_fwd_decl_node::translate(int)
 		f_tkn = f_tkn->prepend("inline ");
 
 	if (is_deprecated)
-		insert_depr(t_depr, t_mess, f_tkn);
+		insert_depr(t_depr, f_tkn);
 	
 	// explicit and implicit are C++ keywords. they are not translated by regular mechanism (via ptoc.cfg file) because  
 	// they are Delphi tokens defined in token.dpp file. Tokens from token.dpp file are not tranlated using ptoc.cfg file.
@@ -6097,18 +6207,20 @@ void simple_templ_tpd_node::translate(int ctx)
 }
 
 
-fptr_tpd_node::fptr_tpd_node(token* t_proc, param_list_node* params, token* t_coln, 
-	                         tpd_node* ret_type, token* t_of, token* t_object) : tpd_node(tpd_proc)
+fptr_tpd_node::fptr_tpd_node(token* t_proc, param_list_node* params, token* t_coln, tpd_node* ret_type, token* t_semi1,
+	                         token_list* qualifiers, token* t_of, token* t_object) : tpd_node(tpd_proc)
 {
-    CONS6(t_proc, params, t_coln, ret_type, t_of, t_object);
-	t_params = NULL;
+    CONS8(t_proc, params, t_coln, ret_type, t_semi1, qualifiers, t_of, t_object);
+	t_params = nullptr;
 }
 
 void fptr_tpd_node::attrib(int ctx)
 {
     if (ret_type) ret_type->attrib(ctx);
-   
-    type = new proc_tp(ret_type ? ret_type->type : (tpexpr*)NULL);
+
+	//TODO add processing of qualifiers here like it is done in proc_fwd_decl_node
+
+	type = new proc_tp(ret_type ? ret_type->type : nullptr); // (tpexpr*)NULL);
 	if (params) {
 		proc_tp* save_proc = curr_proc;
 		assert(type);
@@ -6123,19 +6235,23 @@ void fptr_tpd_node::attrib(int ctx)
 void fptr_tpd_node::translate(int)
 {
     f_tkn = t_proc;
+	
+	//TODO add processing of qualifiers here like it is done in proc_fwd_decl_node
+
 	if (ret_type) {
 		ret_type->translate(ctx_block);
-		assert(ret_type->type->name != NULL);
+		assert(ret_type->type->name != nullptr);
 		t_proc->set_trans(ret_type->type->name);
 		token::disable(t_coln->prev_relevant()->next, ret_type->l_tkn);
-	}
-	else {
+	} else {
         t_proc->set_trans("void");
     }
+
     if (*pascall) {
 		t_proc->append(pascall);
 		t_proc->append(" ");
     }
+
     if (params) {
         proc_tp* save_proc = curr_proc;
 		assert(type);
@@ -6149,7 +6265,7 @@ void fptr_tpd_node::translate(int)
     }
 
 	if (t_of) {
-		t_of->prepend("//")->prepend(";"); //TODO comment 'of object' stmt to leave hint about function pointer
+		t_of->prepend("//")->prepend(";"); //TODO we are commenting 'of object' stmt to leave hint about function pointer
 		l_tkn = t_object;
 	}
 }
@@ -6824,8 +6940,8 @@ void guid_node::translate(int)
 
 //TODO shall we introduce tpd_interface tag here?
 interface_tpd_node::interface_tpd_node(token* t_interface, token* t_lbr, token* t_superinterface, 
-	                token* t_rbr, decl_node* guid, decl_node* parts, token* t_end) 
-	: object_tpd_node(t_interface, t_lbr, nullptr, t_rbr, parts, t_end)
+	                token* t_rbr, decl_node* guid, decl_node* parts, token* t_end, two_tokens* t_depr)
+	: object_tpd_node(t_interface, t_lbr, nullptr, t_rbr, parts, t_end, t_depr)
 {
 	CONS2(t_superinterface, guid);
 //	super = nullptr;
@@ -6889,7 +7005,8 @@ void interface_tpd_node::translate(int)
 }
 
 object_tpd_node::object_tpd_node(token* t_class, token* t_lbr, token_list* t_ancestorlist, token* t_rbr, 
-	                 decl_node* parts, token* t_end): base_obj_tpd_node(tpd_object, t_class, parts, t_end)
+	                  decl_node* parts, token* t_end, two_tokens* t_depr)
+	           : base_obj_tpd_node(tpd_object, t_class, parts, t_end, t_depr)
 {
     CONS3(t_lbr, t_ancestorlist, t_rbr);
 	super = nullptr;
@@ -6992,7 +7109,7 @@ void object_tpd_node::translate(int)
 }
 
 //TODO shall we have separate tpd_meta tag ?
-metaclass_tpd_node::metaclass_tpd_node(token* t_class, token* t_of, token* t_ident) : base_obj_tpd_node(tpd_metaclass, t_class, nullptr, t_of)
+metaclass_tpd_node::metaclass_tpd_node(token* t_class, token* t_of, token* t_ident) : base_obj_tpd_node(tpd_metaclass, t_class, nullptr, t_of, NULL)
 {
 	CONS1(t_ident);
 }
@@ -7017,13 +7134,13 @@ void metaclass_tpd_node::translate(int)
 }
 
 
-base_obj_tpd_node::base_obj_tpd_node(tpd_type tp, token* t_startof, decl_node* parts, token* t_end): tpd_node(tp)
+base_obj_tpd_node::base_obj_tpd_node(tpd_type tp, token* t_startof, decl_node* parts, token* t_end, two_tokens* t_depr): tpd_node(tp)
 {
-	CONS3(t_startof, parts, t_end);
+	CONS4(t_startof, parts, t_end, t_depr);
 }
 
-record_tpd_node::record_tpd_node(token* t_packed, token* t_record, decl_node* parts, token* t_end)
-           : base_obj_tpd_node(tpd_record, t_record, parts, t_end)
+record_tpd_node::record_tpd_node(token* t_packed, token* t_record, decl_node* parts, token* t_end, two_tokens* t_depr)
+           : base_obj_tpd_node(tpd_record, t_record, parts, t_end, t_depr)
 {
     CONS4(t_packed, t_record, parts, t_end);
 	outer = nullptr;
