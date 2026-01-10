@@ -47,6 +47,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ClassDiagram.cd" />
+    <ClInclude Include="lex.inc">
+      <FileType>Document</FileType>
+    </ClInclude>
     <None Include="lex.l" />
     <None Include="token.dpp" />
   </ItemGroup>
