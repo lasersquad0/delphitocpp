@@ -77,6 +77,20 @@ token* token::prev_relevant() const
     return t;
 }
 
+token* token::prev_not_space() const
+{
+    token* t;
+    for (t = prev; t->tag == TKN_SPACE; t = t->prev);
+    return t;
+}
+
+token* token::next_not_space() const
+{
+    token* t;
+    for (t = next; t->tag == TKN_SPACE; t = t->next);
+    return t;
+}
+
 void token::remove(token* head, token* tail)
 { 
     head->prev->next = tail->next; 

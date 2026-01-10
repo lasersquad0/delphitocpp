@@ -126,6 +126,8 @@ class token : public heap_object {
 
     token* next_relevant() const;
     token* prev_relevant() const;
+    token* prev_not_space() const;
+    token* next_not_space() const;
 
     static token* first_relevant() { return dummy.next_relevant(); }
     static token* last_relevant() { return dummy.prev_relevant(); }
