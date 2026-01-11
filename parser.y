@@ -27,6 +27,10 @@ void zzerror(const char* text)
 %define parse.error verbose               // Enables detailed error messages (required for counterexamples)
 //%define parse.counterexample timeout 15   // Set time limit to 15 seconds
 //%define parse.lr.minimize timeout 30
+%verbose
+%no-lines
+%define parse.trace
+%define api.prefix {zz}
 
 
 %union {
@@ -98,7 +102,7 @@ void zzerror(const char* text)
              FINAL
 	     FINALIZATION
              FINALLY
-             FAR
+      //       FAR
              FOR
              FORWARD
              FUNCTION
@@ -117,9 +121,9 @@ void zzerror(const char* text)
              OBJECT
              OF
              ON
-	     OPERATOR
-             ORIGIN
-             OTHERWISE
+	     OPERATOR	
+   //	          ORIGIN
+  //           OTHERWISE
              OVERLOAD
              OVERRIDE
 	     OUT
@@ -174,7 +178,7 @@ void zzerror(const char* text)
              ']'
              '^'
              '@'
-             SCOPE
+  //           SCOPE
 
 
 %right <tok>    LET LETADD LETSUB LETDIV LETMUL LETAND LETOR LETSHL LETSHR
@@ -197,7 +201,7 @@ void zzerror(const char* text)
                 condition_start
 %type <tok>     packed
 %type <tok>     progend
-%type <tok>     otherwise
+//%type <tok>     otherwise
 %type <tok>     class_or_object
 %type <tok>     class_access_spec_tok
 %type <tok>     record_access_spec_tok
@@ -386,10 +390,6 @@ void zzerror(const char* text)
 
 
 %start translation
-
-%verbose
-%no-lines
-%define parse.trace
 
 %printer { auto obj = dynamic_cast<base_obj_tpd_node*>($$); assert(obj); fprintf(yyo, "%s", obj->t_startof->in_text); } class_type
 %printer { if($$) $$->print_debug(); } <tok> 
@@ -630,7 +630,7 @@ sequence: statement | statement ';' sequence { $1->next = $3; $$ = $1; }
 //    | '(' write_list ')' { $$ = new write_list_node($1, $2, $3); } 
 
 case_list: case_items
-         | case_items otherwise sequence
+         | case_items ELSE sequence
            { 
 	     if ($1 != NULL) { 
 	         case_node** cpp;
@@ -642,7 +642,7 @@ case_list: case_items
              }
 	   }
 
-otherwise: OTHERWISE | ELSE /* Turbo Pascal */
+//otherwise: OTHERWISE | ELSE /* Turbo Pascal */
 
 case_items: { $$ = NULL; } 
     | case_item 
@@ -683,7 +683,7 @@ condition_start: CIFDEF | CIF | CIFNDEF
 condition_const_expr: 
       condition_start const_expr CELSE const_expr CENDIF  { $$ = new cond_expr_node($1, $2, $3, $4, $5); } 
     | condition_start const_expr CENDIF  { $$ = new cond_expr_node($1, $2, NULL, NULL, $3); }
-
+        
 const_expr: const_simple_expr
     | condition_const_expr
     | const_expr PLUS const_expr { $$ = new op_node(tn_add, $1, $2, $3); } 
